@@ -15,19 +15,8 @@ from ..config.cloudinary_config import cloudinary
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-# Create file handler
-log_dir = os.path.join(os.path.expanduser("~"), ".student-portal", "logs")
-os.makedirs(log_dir, exist_ok=True)
-log_path = os.path.join(log_dir, "cloudinary_upload.log")
-fh = logging.FileHandler(log_path)
-fh.setLevel(logging.DEBUG)
-
-# Create formatter and add it to the handlers
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-fh.setFormatter(formatter)
-
-# Add the handlers to the logger
-logger.addHandler(fh)
+# File logging to a specific path is disabled for the serverless environment.
+# The logger will now output to stdout/stderr, which is captured by Vercel.
 
 def upload_file_to_cloudinary(file_obj, public_id: str, folder: Optional[str] = None) -> str:
     """
