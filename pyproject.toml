@@ -1,0 +1,53 @@
+[project]
+name = "app"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Ahsan462aggk",email = "140230982+Ahsan462aggk@users.noreply.github.com"}
+]
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "uvicorn[standard]>=0.27.1,<0.28.0",
+    "sqlmodel>=0.0.14,<0.0.15",
+    "fastapi>=0.115.12,<0.116.0",
+    "python-multipart>=0.0.20,<0.0.21",
+    "python-jose>=3.4.0,<4.0.0",
+    "passlib[bcrypt]>=1.7.4,<2.0.0",
+    "psycopg2>=2.9.10,<3.0.0",
+    "pydantic[email]>=2.11.3,<3.0.0",
+    "python-dateutil>=2.9.0.post0,<3.0.0",
+    "python-dotenv>=1.0.1,<2.0.0",
+    "httpx>=0.26.0,<0.27.0",
+    "psycopg2-binary>=2.9.9,<3.0.0",
+    "authlib (>=1.5.2,<2.0.0)",
+    "reportlab (>=4.4.0,<5.0.0)",
+    "pytz (>=2025.2,<2026.0)",
+    "b2sdk (>=2.8.1,<3.0.0)",
+    "cloudinary (>=1.44.0,<2.0.0)",
+    "alembic (>=1.16.2,<2.0.0)"
+]
+
+[tool.poetry]
+packages = [{include = "app", from = "src"}]
+name = "app"
+version = "0.1.0"
+description = ""
+authors = ["Your Name <your.email@example.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+fastapi = ">=0.115.12,<0.116.0"
+uvicorn = "^0.27.1"
+sqlmodel = "^0.0.14"
+python-dotenv = "^1.0.1"
+python-jose = {extras = ["cryptography"], version = "^3.3.0"}
+passlib = {extras = ["bcrypt"], version = "^1.7.4"}
+httpx = "^0.26.0"
+python-multipart = ">=0.0.20,<0.0.21"
+psycopg2-binary = "^2.9.9"
+reportlab = "^4.1.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
