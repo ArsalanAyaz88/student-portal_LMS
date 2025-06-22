@@ -56,9 +56,9 @@ app = FastAPI(
 )
 
 # Create database tables on startup
-@app.on_event("startup")
-def on_startup():
-    create_db_and_tables()
+# @app.on_event("startup")
+# def on_startup():
+#     create_db_and_tables()
 
 # Log SQLAlchemy mapper relationships for Course and Video on startup
 @app.on_event("startup")
