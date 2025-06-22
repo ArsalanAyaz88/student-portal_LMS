@@ -14,6 +14,7 @@ if not DATABASE_URL:
 engine = create_engine(
     DATABASE_URL,
     pool_pre_ping=True,  # Test connections before they are used from the pool.
+    connect_args={"sslmode": "require"},  # Enforce SSL connection.
     echo=False  # Set to True to log SQL statements for debugging.
 )
 
