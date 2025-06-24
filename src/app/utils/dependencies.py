@@ -44,7 +44,7 @@ async def get_current_admin_user(
             detail="Not authenticated",
         )
     payload = decode_access_token(token)
-    user_id: str = payload.get("sub")
+    user_id: str = payload.get("user_id")
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid token payload")
     user = session.get(User, user_id)

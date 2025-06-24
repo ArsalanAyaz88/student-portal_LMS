@@ -100,14 +100,16 @@ def admin_login(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You are not authorized to access the admin panel."
         )
-    access_token = create_access_token({"sub": str(user.id), "role": user.role})
+    access_token = create_access_token({"user_id": str(user.id), "role": user.role})
     response.set_cookie(
         key="access_token",
         value=access_token,
         httponly=True,
         secure=True,
         samesite="lax",
-        max_age=60 * 60
+        max_age=60 * 60,
+        domain=os.getenv('COOKIE_DOMAIN', None),  # Set this in your .env if needed
+        path="/",
     )
     return {
         "access_token": access_token,
@@ -138,7 +140,9 @@ def login(
         httponly=True,
         secure=True,
         samesite="lax",
-        max_age=60 * 60
+        max_age=60 * 60,
+        domain=os.getenv('COOKIE_DOMAIN', None),  # Set this in your .env if needed
+        path="/",
     )
     return {"message": "Login successful"}
 

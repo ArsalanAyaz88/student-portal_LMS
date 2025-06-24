@@ -57,8 +57,21 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],
-    max_age=3600  # Cache preflight requests for 1 hour
+    max_age=3600,  # Cache preflight requests for 1 hour
 )
+
+# Add middleware to add security headers
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    # Add CORS headers to every response
+    origin = request.headers.get('origin')
+    if origin in cors_origins:
+        response.headers['Access-Control-Allow-Origin'] = origin
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With'
+    return response
 
 # Create database tables on startup
 @app.on_event("startup")
