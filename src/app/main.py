@@ -46,8 +46,13 @@ cors_origins = [origin.strip() for origin in cors_origins_str.split(",")]
 app = FastAPI(
     title="EduTech API",
     description="API for EduTech platform",
-    version="1.0.0",
-    allow_origins=cors_origins,  # Use origins from environment variable
+    version="1.0.0"
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,  # List of allowed origins
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
