@@ -40,7 +40,7 @@ cloudinary.config(
 )
 
 # Read CORS_ORIGINS from environment, default to localhost for development
-cors_origins_str = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:8000")
+cors_origins_str = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:8000,http://localhost:8080")
 cors_origins = [origin.strip() for origin in cors_origins_str.split(",")]
 
 app = FastAPI(
