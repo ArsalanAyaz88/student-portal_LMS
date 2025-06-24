@@ -39,9 +39,11 @@ cloudinary.config(
     secure=True
 )
 
-# Read CORS_ORIGINS from environment, default to localhost for development
-cors_origins_str = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:8000,http://localhost:8080")
-cors_origins = [origin.strip() for origin in cors_origins_str.split(",")]
+# Define allowed CORS origins directly
+cors_origins = [
+    "http://localhost:8080",
+    "http://localhost:3000"
+]
 
 app = FastAPI(
     title="EduTech API",
@@ -57,21 +59,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],
-    max_age=3600,  # Cache preflight requests for 1 hour
+    max_age=3600  # Cache preflight requests for 1 hour
 )
-
-# Add middleware to add security headers
-@app.middleware("http")
-async def add_security_headers(request: Request, call_next):
-    response = await call_next(request)
-    # Add CORS headers to every response
-    origin = request.headers.get('origin')
-    if origin in cors_origins:
-        response.headers['Access-Control-Allow-Origin'] = origin
-        response.headers['Access-Control-Allow-Credentials'] = 'true'
-        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With'
-    return response
 
 # Create database tables on startup
 @app.on_event("startup")
