@@ -2,7 +2,7 @@
 # File location: src/app/main.py
 import os
 import logging
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import inspect
 from src.app.models.course import Course
