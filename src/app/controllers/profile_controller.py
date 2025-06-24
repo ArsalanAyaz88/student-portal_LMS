@@ -14,12 +14,18 @@ router = APIRouter(tags=["Profile"])
 
 @router.get("/profile", response_model=ProfileRead)
 def read_profile(
-    user = Depends(get_current_user),
+    user = Depends(get_current_user),  # This allows both regular users and admins
     session: Session = Depends(get_db)
 ):
+    # For admins, we can add logic here to get a specific user's profile if needed
+    # For now, it returns the profile of the currently authenticated user (admin or regular user)
     profile = session.exec(select(Profile).where(Profile.user_id == user.id)).first()
     if not profile:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Profile not found")
+        # If no profile exists, create one automatically
+        profile = Profile(user_id=user.id)
+        session.add(profile)
+        session.commit()
+        session.refresh(profile)
     return profile
 
 @router.put("/profile", response_model=ProfileRead)
