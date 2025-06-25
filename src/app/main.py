@@ -62,11 +62,10 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Configure CORS middleware with default settings
-# Note: We're using a custom middleware for more control, but keeping this for compatibility
+# Configure CORS middleware with explicit origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_origins if is_production else ["*"],  # Allow all in development
+    allow_origins=cors_origins,  # Use the explicitly defined origins
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -94,9 +93,9 @@ async def cors_and_logging_middleware(request: Request, call_next):
     # Get the origin from the request
     origin = request.headers.get('origin')
     
-    # Only set CORS headers if the origin is in the allowed origins or if we're in development
-    if origin in cors_origins or not is_production:
-        response.headers["Access-Control-Allow-Origin"] = origin if origin in cors_origins else "*"
+    # Only set CORS headers if the origin is in the allowed origins
+    if origin in cors_origins:
+        response.headers["Access-Control-Allow-Origin"] = origin
         response.headers["Access-Control-Allow-Credentials"] = "true"
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
         response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, Access-Control-Allow-Origin, Access-Control-Allow-Credentials"
