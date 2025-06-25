@@ -34,7 +34,6 @@ class QuizBase(BaseModel):
     description: Optional[str]
 
     class Config:
-        orm_mode = True
         from_attributes = True
 
 # ─── Student‐Facing: List vs Detail ────────────────────────────
@@ -48,7 +47,6 @@ class OptionRead(BaseModel):
     text: str
 
     class Config:
-        orm_mode = True
         from_attributes = True
 
 class QuestionRead(BaseModel):
@@ -58,7 +56,6 @@ class QuestionRead(BaseModel):
     options: List[OptionRead]
 
     class Config:
-        orm_mode = True
         from_attributes = True
 
 class QuizDetailRead(QuizBase):
@@ -92,7 +89,6 @@ class QuizSubmissionStatus(BaseModel):
     is_on_time: bool
 
     class Config:
-        orm_mode = True
         from_attributes = True
 
 class QuizResult(BaseModel):
@@ -102,5 +98,4 @@ class QuizResult(BaseModel):
     details: List[QuizResultDetail]
 
     class Config:
-        orm_mode = True
         from_attributes = True

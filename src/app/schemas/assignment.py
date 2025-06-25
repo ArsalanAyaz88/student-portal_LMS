@@ -19,7 +19,6 @@ class AssignmentRead(BaseModel):
     due_date: datetime
 
     class Config:
-        orm_mode = True
         from_attributes = True
 
 class AssignmentList(BaseModel):
@@ -28,7 +27,6 @@ class AssignmentList(BaseModel):
     due_date: datetime
 
     class Config:
-        orm_mode = True
         from_attributes = True
 
 class SubmissionCreate(BaseModel):
@@ -45,7 +43,6 @@ class SubmissionRead(BaseModel):
     feedback: Optional[str]
 
     class Config:
-        orm_mode = True
         from_attributes = True
 
 class SubmissionResponse(BaseModel):
@@ -53,7 +50,6 @@ class SubmissionResponse(BaseModel):
     submission: SubmissionRead
 
     class Config:
-        orm_mode = True
         from_attributes = True
 
 class SubmissionGrade(BaseModel):
@@ -70,7 +66,6 @@ class SubmissionStudent(BaseModel):
     grade: Optional[float]
     feedback: Optional[str]
     class Config:
-        orm_mode = True
         from_attributes = True
 
 class SubmissionStudentsResponse(BaseModel):
@@ -78,5 +73,4 @@ class SubmissionStudentsResponse(BaseModel):
     submissions: List[SubmissionStudent]
 
     class Config:
-        orm_mode = True
         from_attributes = True

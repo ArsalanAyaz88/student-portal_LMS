@@ -23,7 +23,7 @@ class VideoRead(BaseModel):
     description: Optional[str] = Field(None, description="Video description")
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class VideoWithCheckpoint(BaseModel):
     id: str = Field(..., description="Video ID")
@@ -33,7 +33,7 @@ class VideoWithCheckpoint(BaseModel):
     watched: bool = Field(..., description="Whether the video has been watched")
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class CourseBase(BaseModel):
     title: str = Field(..., example="The Complete Web Development Bootcamp")
@@ -56,7 +56,7 @@ class CourseCreateAdmin(CourseBase):
     status: str = "active"
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class CourseUpdate(CourseBase):
     title: Optional[str] = None
@@ -71,7 +71,7 @@ class CourseRead(BaseModel):
     expiration_date: Optional[datetime] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class CourseListRead(CourseRead):
     total_enrollments: int = 0
@@ -99,7 +99,7 @@ class CourseBasicDetail(BaseModel):
     thumbnail_url: Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class DescriptionSchema(BaseModel):
     description: str
@@ -128,7 +128,7 @@ class AdminCourseStats(BaseModel):
     last_updated: datetime = Field(..., description="Last update timestamp")
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class AdminCourseList(BaseModel):
     """Schema for course list in admin panel"""
@@ -143,7 +143,7 @@ class AdminCourseList(BaseModel):
     updated_at: datetime = Field(..., description="Last update date")
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class AdminCourseDetail(BaseModel):
     """Schema for detailed course information in admin panel"""
@@ -161,4 +161,4 @@ class AdminCourseDetail(BaseModel):
     videos: List[VideoRead] = Field(..., description="Course videos")
 
     class Config:
-        orm_mode = True
+        from_attributes = True

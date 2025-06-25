@@ -11,7 +11,7 @@ class ProfileRead(BaseModel):
     bio: Optional[str]
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class ProfileUpdate(BaseModel):
     full_name: Optional[str]
