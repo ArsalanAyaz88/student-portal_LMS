@@ -101,19 +101,24 @@ def admin_login(
             detail="You are not authorized to access the admin panel."
         )
     access_token = create_access_token({"user_id": str(user.id), "role": user.role})
-    # For local development
+    # Determine environment settings
     is_production = os.getenv('ENVIRONMENT') == 'production'
+    is_local = not is_production
+    
+    # Set cookie with appropriate settings
     response.set_cookie(
         key="access_token",
         value=access_token,
         httponly=True,
-        secure=is_production,  # False for localhost, True in production
-        samesite="lax" if not is_production else "none",  # 'lax' for localhost, 'none' for production
+        secure=not is_local,  # False for localhost, True in production
+        samesite="lax" if is_local else "none",  # 'lax' for localhost, 'none' for production
         max_age=60 * 60 * 24,  # 1 day
         path="/",
-        # domain is not needed for localhost, set it in production if needed
         domain=os.getenv('COOKIE_DOMAIN') if is_production else None
     )
+    
+    # Log cookie settings for debugging
+    print(f"Cookie set - secure: {not is_local}, samesite: {'lax' if is_local else 'none'}")
     return {
         "access_token": access_token,
         "token_type": "bearer",
@@ -137,19 +142,24 @@ def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
     token = create_access_token({"user_id": str(user.id), "role": user.role})
-    # For local development
+    # Determine environment settings
     is_production = os.getenv('ENVIRONMENT') == 'production'
+    is_local = not is_production
+    
+    # Set cookie with appropriate settings
     response.set_cookie(
         key="access_token",
         value=token,
         httponly=True,
-        secure=is_production,  # False for localhost, True in production
-        samesite="lax" if not is_production else "none",  # 'lax' for localhost, 'none' for production
+        secure=not is_local,  # False for localhost, True in production
+        samesite="lax" if is_local else "none",  # 'lax' for localhost, 'none' for production
         max_age=60 * 60 * 24,  # 1 day
         path="/",
-        # domain is not needed for localhost, set it in production if needed
         domain=os.getenv('COOKIE_DOMAIN') if is_production else None
     )
+    
+    # Log cookie settings for debugging
+    print(f"Cookie set - secure: {not is_local}, samesite: {'lax' if is_local else 'none'}")
     return {"message": "Login successful"}
 
 @router.post(
