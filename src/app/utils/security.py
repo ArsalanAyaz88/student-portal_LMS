@@ -31,9 +31,6 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 def set_auth_cookie(response: Response, token: str) -> Response:
-    # Add logging for debugging
-    print(f"[COOKIE_DEBUG] IS_PRODUCTION: {IS_PRODUCTION}")
-    print(f"[COOKIE_DEBUG] COOKIE_DOMAIN: {COOKIE_DOMAIN}")
     """
     Set the authentication cookie with secure attributes.
     
@@ -58,7 +55,6 @@ def set_auth_cookie(response: Response, token: str) -> Response:
     if IS_PRODUCTION and COOKIE_DOMAIN:
         cookie_kwargs["domain"] = COOKIE_DOMAIN
     
-    print(f"[COOKIE_DEBUG] Cookie settings: {cookie_kwargs}")
     response.set_cookie(**cookie_kwargs)
     
     # Add CORS headers

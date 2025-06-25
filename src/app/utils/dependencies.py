@@ -36,9 +36,6 @@ async def get_current_admin_user(
     request: Request,
     session: Session = Depends(get_db)
 ) -> User:
-    print(f"[AUTH_DEBUG] Checking auth for: {request.url.path}")
-    print(f"[AUTH_DEBUG] Request Headers: {request.headers}")
-    print(f"[AUTH_DEBUG] Request Cookies: {request.cookies}")
     # 1. Try to get token from Authorization header first
     token = None
     auth_header = request.headers.get("authorization")
