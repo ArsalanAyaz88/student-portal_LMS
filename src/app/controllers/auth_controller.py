@@ -83,84 +83,80 @@ async def admin_login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     session: Session = Depends(get_db)
 ):
-    try:
-        logging.info("Attempting admin login for user: %s", form_data.username)
-        user = session.exec(
-            select(User).where(User.email == form_data.username)
-        ).first()
-        if not user or not verify_password(form_data.password, user.hashed_password):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect email or password"
-            )
-        if not user.is_active:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="User account is not active"
-            )
-        if user.role != "admin":
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You are not authorized to access the admin panel."
-            )
-        
-        # Create access token with user info
-        access_token = create_access_token({
-            "user_id": str(user.id),
-            "role": user.role,
-            "email": user.email
-        })
-        
-        # Log the origin for debugging
-        origin = request.headers.get("origin")
-        print(f"Login request from origin: {origin}")
-        
-        # Create the response content
-        content = {
-            "access_token": access_token,
-            "token_type": "bearer",
-            "role": user.role,
-            "message": "Admin login successful."
-        }
+    print("--- ADMIN LOGIN FUNCTION STARTED ---")
+    logging.info("Attempting admin login for user: %s", form_data.username)
+    user = session.exec(
+        select(User).where(User.email == form_data.username)
+    ).first()
+    if not user or not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password"
+        )
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is not active"
+        )
+    if user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not authorized to access the admin panel."
+        )
+    
+    # Create access token with user info
+    access_token = create_access_token({
+        "user_id": str(user.id),
+        "role": user.role,
+        "email": user.email
+    })
+    
+    # Log the origin for debugging
+    origin = request.headers.get("origin")
+    print(f"Login request from origin: {origin}")
+    
+    # Create the response content
+    content = {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "role": user.role,
+        "message": "Admin login successful."
+    }
 
-        # Create a JSONResponse, set the cookie, and return it
-        response = JSONResponse(content=content)
-        set_auth_cookie(response, access_token)
-        return response
-    finally:
-        print("--- ADMIN LOGIN FUNCTION EXECUTED ---")
+    # Create a JSONResponse, set the cookie, and return it
+    response = JSONResponse(content=content)
+    set_auth_cookie(response, access_token)
+    return response
 
 @router.post("/token")
 def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     session: Session = Depends(get_db)
 ):
-    try:
-        user = session.exec(
-            select(User).where(User.email == form_data.username)
-        ).first()
-        if not user or not verify_password(form_data.password, user.hashed_password):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect email or password",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        token = create_access_token({"user_id": str(user.id), "role": user.role})
+    print("--- STUDENT LOGIN FUNCTION STARTED ---")
+    user = session.exec(
+        select(User).where(User.email == form_data.username)
+    ).first()
+    if not user or not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    token = create_access_token({"user_id": str(user.id), "role": user.role})
 
-        # Create the response content
-        content = {
-            "access_token": token,
-            "token_type": "bearer",
-            "role": user.role,
-            "message": "Login successful."
-        }
+    # Create the response content
+    content = {
+        "access_token": token,
+        "token_type": "bearer",
+        "role": user.role,
+        "message": "Login successful."
+    }
 
-        # Create a JSONResponse, set the cookie, and return it
-        response = JSONResponse(content=content)
-        set_auth_cookie(response, token)
-        return response
-    finally:
-        print("--- STUDENT LOGIN FUNCTION EXECUTED ---")
+    # Create a JSONResponse, set the cookie, and return it
+    response = JSONResponse(content=content)
+    set_auth_cookie(response, token)
+    return response
 
 @router.post(
     "/forgot-password",
