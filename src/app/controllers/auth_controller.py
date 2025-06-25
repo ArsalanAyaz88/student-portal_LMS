@@ -83,6 +83,7 @@ async def admin_login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     session: Session = Depends(get_db)
 ):
+    print("[LOGIN_DEBUG] Admin login endpoint hit.")
     logging.info("Attempting admin login for user: %s", form_data.username)
     user = session.exec(
         select(User).where(User.email == form_data.username)
