@@ -45,3 +45,5 @@ typing-extensions==4.13.2
 typing-inspection==0.4.1
 urllib3==2.4.0
 websockets==15.0.1
+passlib[bcrypt]
+python-jose[cryptography]
