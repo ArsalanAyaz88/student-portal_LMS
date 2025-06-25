@@ -36,27 +36,21 @@ async def get_current_admin_user(
     request: Request,
     session: Session = Depends(get_db)
 ) -> User:
-    # Try to get token from cookie first
-    token = request.cookies.get("access_token")
-    
-    # If not in cookie, check Authorization header
-    if not token and "authorization" in request.headers:
-        auth_header = request.headers["authorization"]
-        if auth_header and auth_header.startswith("Bearer "):
-            token = auth_header.split(" ")[1]
-    
+    # 1. Try to get token from Authorization header first
+    token = None
+    auth_header = request.headers.get("authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ", 1)[1].strip()
+    # 2. If not found, try to get from cookie
+    if not token:
+        token = request.cookies.get("access_token")
     print(f"[LOG] Access token (admin): {token}")
-    
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated - No token provided",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
-    # Remove 'Bearer ' prefix if present (both from cookie and header)
-    token = token.replace("Bearer ", "").strip()
-    
     try:
         payload = decode_access_token(token)
         user_id: str = payload.get("user_id")
@@ -66,7 +60,6 @@ async def get_current_admin_user(
                 detail="Invalid token payload",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-            
         user = session.get(User, user_id)
         if not user:
             raise HTTPException(
@@ -74,7 +67,6 @@ async def get_current_admin_user(
                 detail="User not found",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-            
         # Check if user is an admin
         if user.role != "admin":
             raise HTTPException(
@@ -82,14 +74,10 @@ async def get_current_admin_user(
                 detail="Insufficient permissions",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-            
         return user
-        
     except HTTPException as http_exc:
-        # Re-raise HTTP exceptions with proper headers
         raise http_exc
     except Exception as e:
-        # Handle other exceptions (like JWT decode errors)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
