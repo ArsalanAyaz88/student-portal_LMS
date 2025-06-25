@@ -36,13 +36,13 @@ async def get_current_admin_user(
     request: Request,
     session: Session = Depends(get_db)
 ) -> User:
-    # Try to get token from cookie first, then from Authorization header
+    # Try to get token from cookie first
     token = request.cookies.get("access_token")
     
     # If not in cookie, check Authorization header
     if not token and "authorization" in request.headers:
         auth_header = request.headers["authorization"]
-        if auth_header.startswith("Bearer "):
+        if auth_header and auth_header.startswith("Bearer "):
             token = auth_header.split(" ")[1]
     
     print(f"[LOG] Access token (admin): {token}")
@@ -54,9 +54,8 @@ async def get_current_admin_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # Remove 'Bearer ' prefix if present
-    if token.startswith("Bearer "):
-        token = token[7:]
+    # Remove 'Bearer ' prefix if present (both from cookie and header)
+    token = token.replace("Bearer ", "").strip()
     
     try:
         payload = decode_access_token(token)
