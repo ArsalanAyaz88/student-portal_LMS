@@ -300,8 +300,16 @@ def reset_password(
 def logout(
     response: Response
 ):
-    response.delete_cookie("access_token")
-    return {"message": "Logged out"}
+    is_production = os.getenv('ENVIRONMENT') == 'production'
+    response.delete_cookie(
+        key="access_token",
+        path="/",
+        domain=os.getenv('COOKIE_DOMAIN') if is_production else None,
+        secure=is_production,
+        samesite="lax" if not is_production else "none",
+        httponly=True
+    )
+    return {"message": "Successfully logged out"}
 
 @router.get("/google/login")
 async def google_login():
