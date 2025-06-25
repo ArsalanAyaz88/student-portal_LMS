@@ -82,7 +82,7 @@ async def admin_login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     session: Session = Depends(get_db)
 ):
-    print("[LOGIN_DEBUG] Admin login endpoint hit.")
+    print("--- ADMIN LOGIN FUNCTION STARTED ---")
     logging.info("Attempting admin login for user: %s", form_data.username)
     user = session.exec(
         select(User).where(User.email == form_data.username)
@@ -129,13 +129,14 @@ def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     session: Session = Depends(get_db)
 ):
+    print("--- STUDENT LOGIN FUNCTION STARTED ---")
     user = session.exec(
         select(User).where(User.email == form_data.username)
     ).first()
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
-            status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
     token = create_access_token({"user_id": str(user.id), "role": user.role})

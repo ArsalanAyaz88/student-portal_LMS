@@ -28,7 +28,41 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
+<<<<<<< HEAD
 
+=======
+def set_auth_cookie(response: Response, token: str) -> Response:
+    """
+    Set the authentication cookie with secure attributes.
+    
+    Args:
+        response: FastAPI Response object
+        token: JWT token to be stored in the cookie
+        
+    Returns:
+        Response: The modified response with cookie set
+    """
+    cookie_kwargs = {
+        "key": "access_token",
+        "value": token,
+        "httponly": True,
+        "max_age": 60 * 60 * 24 * 7,  # 7 days
+        "samesite": "none" if IS_PRODUCTION else "lax",
+        "secure": IS_PRODUCTION,  # Only send over HTTPS in production
+        "path": "/",
+    }
+    
+    # Only set domain in production
+    if IS_PRODUCTION and COOKIE_DOMAIN:
+        cookie_kwargs["domain"] = COOKIE_DOMAIN
+    
+    response.set_cookie(**cookie_kwargs)
+    
+    # Add CORS headers
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    
+    return response
+>>>>>>> 792636e845793f4bd04badb5ffd4d1196b8b6b2c
 
 def decode_access_token(token: str) -> dict:
     try:

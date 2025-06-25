@@ -8,14 +8,50 @@ from src.app.db.session import get_db
 from src.app.models.user import User
 from src.app.utils.security import decode_access_token
 
+<<<<<<< HEAD
 # This scheme will handle extracting the token from the Authorization header.
 # The tokenUrl points to the login endpoint, which is essential for OpenAPI docs.
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token")
+=======
+async def get_current_user(
+    request: Request,
+    session: Session = Depends(get_db)
+) -> User:
+    token = None
+    auth_header = request.headers.get("authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ", 1)[1].strip()
+
+    if not token:
+        token = request.cookies.get("access_token")
+        
+    print(f"[LOG] Access token: {token}")
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+        )
+    payload = decode_access_token(token)
+    user_id: str = payload.get("user_id")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials",
+        )
+    user = session.get(User, user_id)
+    if not user or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Inactive or invalid user",
+        )
+    return user
+>>>>>>> 792636e845793f4bd04badb5ffd4d1196b8b6b2c
 
 async def get_current_user(
     token: Annotated[str, Depends(oauth2_scheme)],
     session: Annotated[Session, Depends(get_db)]
 ) -> User:
+<<<<<<< HEAD
     """
     Dependency to get the current user from a JWT token.
     1. Depends on oauth2_scheme to get the token string from the header.
@@ -23,6 +59,23 @@ async def get_current_user(
     3. Retrieves the user from the database.
     4. Raises HTTPException for any errors.
     """
+=======
+    # 1. Try to get token from Authorization header first
+    token = None
+    auth_header = request.headers.get("authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ", 1)[1].strip()
+    # 2. If not found, try to get from cookie
+    if not token:
+        token = request.cookies.get("access_token")
+    print(f"[LOG] Access token (admin): {token}")
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated - No token provided",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+>>>>>>> 792636e845793f4bd04badb5ffd4d1196b8b6b2c
     try:
         payload = decode_access_token(token)
         user_id: str = payload.get("user_id")
