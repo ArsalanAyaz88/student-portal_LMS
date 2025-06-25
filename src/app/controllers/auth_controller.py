@@ -27,6 +27,7 @@ from src.app.utils.security import (
     verify_password,
     create_access_token,
     decode_access_token,
+    set_auth_cookie
 )
 from src.app.utils.email import send_reset_pin_email
 from src.app.utils.oauth import (
@@ -76,7 +77,8 @@ def signup(
     return new_user
 
 @router.post("/admin-login")
-def admin_login(
+async def admin_login(
+    request: Request,
     response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(),
     session: Session = Depends(get_db)
@@ -100,25 +102,21 @@ def admin_login(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You are not authorized to access the admin panel."
         )
-    access_token = create_access_token({"user_id": str(user.id), "role": user.role})
-    # Determine environment settings
-    is_production = os.getenv('ENVIRONMENT') == 'production'
-    is_local = not is_production
     
-    # Set cookie with appropriate settings
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        httponly=True,
-        secure=not is_local,  # False for localhost, True in production
-        samesite="lax" if is_local else "none",  # 'lax' for localhost, 'none' for production
-        max_age=60 * 60 * 24,  # 1 day
-        path="/",
-        domain=os.getenv('COOKIE_DOMAIN') if is_production else None
-    )
+    # Create access token with user info
+    access_token = create_access_token({
+        "user_id": str(user.id),
+        "role": user.role,
+        "email": user.email
+    })
     
-    # Log cookie settings for debugging
-    print(f"Cookie set - secure: {not is_local}, samesite: {'lax' if is_local else 'none'}")
+    # Log the origin for debugging
+    origin = request.headers.get("origin")
+    print(f"Login request from origin: {origin}")
+    
+    # Set the auth cookie
+    response = set_auth_cookie(response, access_token)
+    
     return {
         "access_token": access_token,
         "token_type": "bearer",
