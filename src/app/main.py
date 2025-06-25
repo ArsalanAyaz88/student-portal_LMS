@@ -46,7 +46,9 @@ is_production = os.getenv('ENVIRONMENT') == 'production'
 # In production, only allow specific origins
 if is_production:
     cors_origins = [
-        "https://lmsfrontend-neon.vercel.app",  # Replace with your production frontend URL
+        "https://lmsfrontend-neon.vercel.app",
+        "https://lmsfrontend-git-main-arsalans-projects-4d19f3c6.vercel.app",
+        "https://lmsfrontend-7jpecspdy-arsalans-projects-4d19f3c6.vercel.app"
     ]
 else:
     # Explicitly list allowed origins for development
