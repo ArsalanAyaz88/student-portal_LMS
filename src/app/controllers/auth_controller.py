@@ -27,8 +27,7 @@ from src.app.utils.security import (
     hash_password,
     verify_password,
     create_access_token,
-    decode_access_token,
-    set_auth_cookie
+    decode_access_token
 )
 from src.app.utils.email import send_reset_pin_email
 from src.app.utils.oauth import (
@@ -123,10 +122,7 @@ async def admin_login(
         "message": "Admin login successful."
     }
 
-    # Create a JSONResponse, set the cookie, and return it
-    response = JSONResponse(content=content)
-    set_auth_cookie(response, access_token)
-    return response
+    return JSONResponse(content=content)
 
 @router.post("/token")
 def login(
@@ -152,10 +148,7 @@ def login(
         "message": "Login successful."
     }
 
-    # Create a JSONResponse, set the cookie, and return it
-    response = JSONResponse(content=content)
-    set_auth_cookie(response, token)
-    return response
+    return JSONResponse(content=content)
 
 @router.post(
     "/forgot-password",
@@ -302,18 +295,8 @@ def reset_password(
     }
 
 @router.post("/logout")
-def logout(
-    response: Response
-):
-    is_production = os.getenv('ENVIRONMENT') == 'production'
-    response.delete_cookie(
-        key="access_token",
-        path="/",
-        domain=os.getenv('COOKIE_DOMAIN') if is_production else None,
-        secure=is_production,
-        samesite="lax" if not is_production else "none",
-        httponly=True
-    )
+def logout():
+    # The client is responsible for deleting the token.
     return {"message": "Successfully logged out"}
 
 @router.get("/google/login")
@@ -331,7 +314,7 @@ async def google_login():
         )
 
 @router.get("/google/callback", response_model=OAuthResponse)
-async def google_callback(code: str, response: Response, session: Session = Depends(get_db)):
+async def google_callback(code: str, session: Session = Depends(get_db)):
     """Handle Google OAuth callback."""
     try:
         print(f"Received callback with code: {code}")  # Debug log
@@ -405,16 +388,7 @@ async def google_callback(code: str, response: Response, session: Session = Depe
             "role": user.role
         })
         
-        # Set the access token as a cookie on the response
-        response.set_cookie(
-            key="access_token",
-            value=access_token,
-            httponly=True,
-            secure=True,  # Set to False for localhost if needed
-            samesite="lax",
-            max_age=60 * 60  # 1 hour
-        )
-        print(f"[LOG] Set JWT access_token cookie: {access_token}")
+        # The token is returned in the response body, client should handle it.
 
         # Create and return the OAuth response
         return OAuthResponse(
@@ -432,3 +406,4 @@ async def google_callback(code: str, response: Response, session: Session = Depe
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Google authentication failed: {str(e)}"
         )
+ 
