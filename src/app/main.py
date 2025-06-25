@@ -62,47 +62,58 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Add CORS middleware with more detailed configuration
+# Configure CORS middleware with default settings
+# Note: We're using a custom middleware for more control, but keeping this for compatibility
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_origins,
+    allow_origins=cors_origins if is_production else ["*"],  # Allow all in development
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allow_headers=[
-        "*",
-        "Content-Type",
-        "Authorization",
-        "Access-Control-Allow-Origin",
-        "Access-Control-Allow-Credentials"
-    ],
-    expose_headers=[
-        "Content-Range",
-        "X-Total-Count",
-        "Access-Control-Allow-Origin",
-        "Access-Control-Allow-Credentials"
-    ],
-    max_age=3600,  # Cache preflight requests for 1 hour
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=3600
 )
 
-# Add middleware to log CORS headers for debugging
+# Add middleware to handle CORS and log requests
 @app.middleware("http")
-async def add_cors_headers(request: Request, call_next):
-    response = await call_next(request)
+async def cors_and_logging_middleware(request: Request, call_next):
+    # Handle preflight requests
+    if request.method == "OPTIONS":
+        from fastapi.responses import JSONResponse
+        response = JSONResponse(status_code=200, content={"message": "Preflight request successful"})
+    else:
+        try:
+            response = await call_next(request)
+        except Exception as e:
+            from fastapi.responses import JSONResponse
+            response = JSONResponse(
+                status_code=500,
+                content={"detail": str(e)}
+            )
+    
+    # Get the origin from the request
     origin = request.headers.get('origin')
     
-    # Log CORS-related headers for debugging
-    if origin and origin in cors_origins:
-        response.headers['Access-Control-Allow-Origin'] = origin
-        response.headers['Access-Control-Allow-Credentials'] = 'true'
-        
+    # Only set CORS headers if the origin is in the allowed origins or if we're in development
+    if origin in cors_origins or not is_production:
+        response.headers["Access-Control-Allow-Origin"] = origin if origin in cors_origins else "*"
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, Access-Control-Allow-Origin, Access-Control-Allow-Credentials"
+        response.headers["Access-Control-Expose-Headers"] = "Content-Range, X-Total-Count"
+    
+    # Always allow OPTIONS method for preflight requests
+    if request.method == "OPTIONS":
+        response.headers["Access-Control-Max-Age"] = "3600"
+    
     # Log request details for debugging
     print(f"\n--- Request ---")
     print(f"Method: {request.method}")
     print(f"URL: {request.url}")
     print(f"Origin: {origin}")
-    print(f"Headers: {dict(request.headers)}")
-    print(f"CORS Allowed Origins: {cors_origins}")
+    print(f"CORS Allowed: {origin in cors_origins}")
     print(f"Environment: {'production' if is_production else 'development'}")
+    print(f"Response Status: {response.status_code}")
     print(f"Response Headers: {dict(response.headers)}")
     
     return response
@@ -152,10 +163,17 @@ async def root():
 # Test endpoint for CORS debugging
 @app.get("/test-cors")
 async def test_cors(request: Request):
+    origin = request.headers.get("origin")
     return {
         "message": "CORS test successful",
-        "origin": request.headers.get("origin"),
-        "cors_allowed": request.headers.get("origin") in cors_origins,
+        "origin": origin,
+        "cors_allowed": origin in cors_origins,
         "cors_origins": cors_origins,
-        "environment": "production" if is_production else "development"
-    } 
+        "environment": "production" if is_production else "development",
+        "headers": dict(request.headers)
+    }
+
+# Simple health check endpoint
+@app.get("/health")
+async def health_check():
+    return {"status": "ok", "timestamp": datetime.utcnow().isoformat()} 
