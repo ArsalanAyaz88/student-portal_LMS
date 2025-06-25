@@ -65,60 +65,38 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Configure CORS middleware with explicit origins
+# Configure CORS middleware with explicit origins and proper settings
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,  # Use the explicitly defined origins
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"],
+    expose_headers=["Content-Range", "X-Total-Count"],
     max_age=3600
 )
 
-# Add middleware to handle CORS and log requests
+# Request logging middleware
 @app.middleware("http")
-async def cors_and_logging_middleware(request: Request, call_next):
-    # Handle preflight requests
-    if request.method == "OPTIONS":
-        from fastapi.responses import JSONResponse
-        response = JSONResponse(status_code=200, content={"message": "Preflight request successful"})
-    else:
-        try:
-            response = await call_next(request)
-        except Exception as e:
-            from fastapi.responses import JSONResponse
-            response = JSONResponse(
-                status_code=500,
-                content={"detail": str(e)}
-            )
-    
-    # Get the origin from the request
-    origin = request.headers.get('origin')
-    
-    # Only set CORS headers if the origin is in the allowed origins
-    if origin in cors_origins:
-        response.headers["Access-Control-Allow-Origin"] = origin
-        response.headers["Access-Control-Allow-Credentials"] = "true"
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, Access-Control-Allow-Origin, Access-Control-Allow-Credentials"
-        response.headers["Access-Control-Expose-Headers"] = "Content-Range, X-Total-Count"
-    
-    # Always allow OPTIONS method for preflight requests
-    if request.method == "OPTIONS":
-        response.headers["Access-Control-Max-Age"] = "3600"
-    
-    # Log request details for debugging
+async def log_requests(request: Request, call_next):
+    # Log request details
     print(f"\n--- Request ---")
     print(f"Method: {request.method}")
     print(f"URL: {request.url}")
-    print(f"Origin: {origin}")
-    print(f"CORS Allowed: {origin in cors_origins}")
+    print(f"Origin: {request.headers.get('origin')}")
     print(f"Environment: {'production' if is_production else 'development'}")
-    print(f"Response Status: {response.status_code}")
-    print(f"Response Headers: {dict(response.headers)}")
     
-    return response
+    try:
+        response = await call_next(request)
+        print(f"Response Status: {response.status_code}")
+        return response
+    except Exception as e:
+        from fastapi.responses import JSONResponse
+        print(f"Error: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={"detail": str(e)}
+        )
 
 # Log CORS settings on startup
 print(f"\n--- CORS Configuration ---")
