@@ -42,21 +42,19 @@ cloudinary.config(
 # Define allowed CORS origins based on environment
 is_production = os.getenv('ENVIRONMENT') == 'production'
 
-# In development, allow all origins for easier testing
 # In production, only allow specific origins
 if is_production:
     cors_origins = [
         "https://your-frontend-domain.com",  # Replace with your production frontend URL
     ]
 else:
-    # Allow all origins in development
-    cors_origins = ["*"]
-    # Or be more specific:
-    # cors_origins = [
-    #     "http://localhost:3000",
-    #     "http://localhost:8080",
-    #     "http://127.0.0.1:3000"
-    # ]
+    # Explicitly list allowed origins for development
+    cors_origins = [
+        "http://localhost:3000",
+        "http://localhost:8080",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:8080"
+    ]
 
 app = FastAPI(
     title="EduTech API",
