@@ -142,37 +142,18 @@ def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
     token = create_access_token({"user_id": str(user.id), "role": user.role})
-    # Determine environment settings
-    is_production = os.getenv('ENVIRONMENT') == 'production'
-    is_local = not is_production
-    
-    # Set cookie with appropriate settings
-    response.set_cookie(
-        key="access_token",
-        value=token,
-        httponly=True,
-        secure=not is_local,  # False for localhost, True in production
-        samesite="lax" if is_local else "none",  # 'lax' for localhost, 'none' for production
-        max_age=60 * 60 * 24,  # 1 day
-        path="/",
-        domain=os.getenv('COOKIE_DOMAIN') if is_production else None
-    )
-    
+
     # Create the response content
-    content = {"message": "Login successful"}
+    content = {
+        "access_token": token,
+        "token_type": "bearer",
+        "role": user.role,
+        "message": "Login successful."
+    }
 
     # Create a JSONResponse, set the cookie, and return it
     response = JSONResponse(content=content)
-    response.set_cookie(
-        key="access_token",
-        value=token,
-        httponly=True,
-        secure=not is_local,  # False for localhost, True in production
-        samesite="lax" if is_local else "none",  # 'lax' for localhost, 'none' for production
-        max_age=60 * 60 * 24,  # 1 day
-        path="/",
-        domain=os.getenv('COOKIE_DOMAIN') if is_production else None
-    )
+    set_auth_cookie(response, token)
     return response
 
 @router.post(
