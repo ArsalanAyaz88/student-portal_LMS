@@ -1,5 +1,6 @@
 # File: application/src/app/controllers/auth_controller.py
 from fastapi import APIRouter, Depends, HTTPException, status, Response, BackgroundTasks, Request
+from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session, select
 from datetime import datetime, timedelta
@@ -79,7 +80,6 @@ def signup(
 @router.post("/admin-login")
 async def admin_login(
     request: Request,
-    response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(),
     session: Session = Depends(get_db)
 ):
@@ -114,19 +114,21 @@ async def admin_login(
     origin = request.headers.get("origin")
     print(f"Login request from origin: {origin}")
     
-    # Set the auth cookie
-    response = set_auth_cookie(response, access_token)
-    
-    return {
+    # Create the response content
+    content = {
         "access_token": access_token,
         "token_type": "bearer",
         "role": user.role,
         "message": "Admin login successful."
     }
 
+    # Create a JSONResponse, set the cookie, and return it
+    response = JSONResponse(content=content)
+    set_auth_cookie(response, access_token)
+    return response
+
 @router.post("/token")
 def login(
-    response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(),
     session: Session = Depends(get_db)
 ):
@@ -156,9 +158,22 @@ def login(
         domain=os.getenv('COOKIE_DOMAIN') if is_production else None
     )
     
-    # Log cookie settings for debugging
-    print(f"Cookie set - secure: {not is_local}, samesite: {'lax' if is_local else 'none'}")
-    return {"message": "Login successful"}
+    # Create the response content
+    content = {"message": "Login successful"}
+
+    # Create a JSONResponse, set the cookie, and return it
+    response = JSONResponse(content=content)
+    response.set_cookie(
+        key="access_token",
+        value=token,
+        httponly=True,
+        secure=not is_local,  # False for localhost, True in production
+        samesite="lax" if is_local else "none",  # 'lax' for localhost, 'none' for production
+        max_age=60 * 60 * 24,  # 1 day
+        path="/",
+        domain=os.getenv('COOKIE_DOMAIN') if is_production else None
+    )
+    return response
 
 @router.post(
     "/forgot-password",

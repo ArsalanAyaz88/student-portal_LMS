@@ -43,7 +43,7 @@ def set_auth_cookie(response: Response, token: str) -> Response:
     """
     cookie_kwargs = {
         "key": "access_token",
-        "value": f"Bearer {token}",
+        "value": token,
         "httponly": True,
         "max_age": 60 * 60 * 24 * 7,  # 7 days
         "samesite": "none" if IS_PRODUCTION else "lax",
