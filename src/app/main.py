@@ -62,20 +62,57 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Add CORS middleware
+# Add CORS middleware with more detailed configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["*"],
-    max_age=3600  # Cache preflight requests for 1 hour
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=[
+        "*",
+        "Content-Type",
+        "Authorization",
+        "Access-Control-Allow-Origin",
+        "Access-Control-Allow-Credentials"
+    ],
+    expose_headers=[
+        "Content-Range",
+        "X-Total-Count",
+        "Access-Control-Allow-Origin",
+        "Access-Control-Allow-Credentials"
+    ],
+    max_age=3600,  # Cache preflight requests for 1 hour
 )
 
-# Log CORS settings for debugging
-print(f"CORS Settings - Allowed Origins: {cors_origins}")
+# Add middleware to log CORS headers for debugging
+@app.middleware("http")
+async def add_cors_headers(request: Request, call_next):
+    response = await call_next(request)
+    origin = request.headers.get('origin')
+    
+    # Log CORS-related headers for debugging
+    if origin and origin in cors_origins:
+        response.headers['Access-Control-Allow-Origin'] = origin
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        
+    # Log request details for debugging
+    print(f"\n--- Request ---")
+    print(f"Method: {request.method}")
+    print(f"URL: {request.url}")
+    print(f"Origin: {origin}")
+    print(f"Headers: {dict(request.headers)}")
+    print(f"CORS Allowed Origins: {cors_origins}")
+    print(f"Environment: {'production' if is_production else 'development'}")
+    print(f"Response Headers: {dict(response.headers)}")
+    
+    return response
+
+# Log CORS settings on startup
+print(f"\n--- CORS Configuration ---")
+print(f"Allowed Origins: {cors_origins}")
 print(f"Environment: {'production' if is_production else 'development'}")
+print(f"Allow Credentials: True")
+print("---\n")
 
 # Create database tables on startup
 @app.on_event("startup")
@@ -110,4 +147,15 @@ async def root():
         "message": "Welcome to EduTech API",
         "docs_url": "/docs",
         "redoc_url": "/redoc"
+    }
+
+# Test endpoint for CORS debugging
+@app.get("/test-cors")
+async def test_cors(request: Request):
+    return {
+        "message": "CORS test successful",
+        "origin": request.headers.get("origin"),
+        "cors_allowed": request.headers.get("origin") in cors_origins,
+        "cors_origins": cors_origins,
+        "environment": "production" if is_production else "development"
     } 
