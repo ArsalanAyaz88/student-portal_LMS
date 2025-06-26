@@ -47,11 +47,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:8080",
-        "http://127.0.0.1:8080",
-        "http://192.168.100.132:8080",   # add if you open the site via LAN-IP
-    ],
+    allow_origins=[ "*"],  # Allow all origins for development; restrict in production
     allow_methods=["*"],
     allow_headers=["*"],
     allow_credentials=False,            # keep False (you’re not using cookies)
