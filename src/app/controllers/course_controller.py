@@ -138,22 +138,36 @@ def get_course_videos_with_checkpoint(
         # Convert course_id to UUID
         course_uuid = uuid.UUID(course_id)
         
-        # Check enrollment and expiration
-        current_time = datetime.utcnow()
+        # Fetch the enrollment record
         enrollment = session.exec(
             select(Enrollment).where(
                 Enrollment.user_id == user.id,
                 Enrollment.course_id == course_uuid,
-                Enrollment.status == "approved",
-                Enrollment.is_accessible == True,
-                (Enrollment.expiration_date > current_time) | (Enrollment.expiration_date == None)
+                Enrollment.status == "approved"
             )
         ).first()
-        
+
         if not enrollment:
             raise HTTPException(
-                status_code=403, 
-                detail="You do not have access to this course or your access has expired."
+                status_code=403,
+                detail="You are not enrolled in this course."
+            )
+
+        # Manually check expiration status in memory
+        current_time = get_pakistan_time().replace(tzinfo=None)
+        
+        # An enrollment is not accessible if it has an expiration date that is in the past.
+        if enrollment.expiration_date and enrollment.expiration_date < current_time:
+            raise HTTPException(
+                status_code=403,
+                detail="Your access to this course has expired."
+            )
+        
+        # Also respect the is_accessible flag which might be set to false for other reasons.
+        if not enrollment.is_accessible:
+            raise HTTPException(
+                status_code=403,
+                detail="You do not have access to this course."
             )
 
         # Get course videos
@@ -234,22 +248,36 @@ def mark_video_completed(
                 detail="Video not found"
             )
 
-        # Check enrollment and expiration
-        current_time = datetime.utcnow()
+        # Fetch the enrollment record
         enrollment = session.exec(
             select(Enrollment).where(
                 Enrollment.user_id == user.id,
                 Enrollment.course_id == video.course_id,
-                Enrollment.status == "approved",
-                Enrollment.is_accessible == True,
-                (Enrollment.expiration_date > current_time) | (Enrollment.expiration_date == None)
+                Enrollment.status == "approved"
             )
         ).first()
 
         if not enrollment:
             raise HTTPException(
                 status_code=403,
-                detail="You are not enrolled in this course or your access has expired"
+                detail="You are not enrolled in this course."
+            )
+
+        # Manually check expiration status in memory
+        current_time = get_pakistan_time().replace(tzinfo=None)
+        
+        # An enrollment is not accessible if it has an expiration date that is in the past.
+        if enrollment.expiration_date and enrollment.expiration_date < current_time:
+            raise HTTPException(
+                status_code=403,
+                detail="Your access to this course has expired."
+            )
+        
+        # Also respect the is_accessible flag which might be set to false for other reasons.
+        if not enrollment.is_accessible:
+            raise HTTPException(
+                status_code=403,
+                detail="You do not have access to this course."
             )
         
         # Get video progress
