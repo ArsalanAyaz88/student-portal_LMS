@@ -43,33 +43,18 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# ─── CORS configuration (dev vs. prod) ─────────────────────────
-ENV = os.getenv("ENVIRONMENT", "development").lower()
 
-if ENV == "production":
-    # ✏️  Add every public frontend domain here
-    CORS_ORIGINS = [
-        "https://lmsfrontend-neon.vercel.app",
-        "https://student-portal-lms-seven.vercel.app",
-    ]
-else:
-    # Local development ports
-    CORS_ORIGINS = [
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:8080",
-        "http://127.0.0.1:8080",
-        "http://localhost:80808",      # ← newly added
-        "http://127.0.0.1:80808",
-    ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=CORS_ORIGINS,
+    allow_origins=[
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
+        "http://192.168.100.132:8080",   # add if you open the site via LAN-IP
+    ],
     allow_methods=["*"],
-    allow_headers=["*"],       # includes “Authorization”
-    allow_credentials=False,   # header-token auth → cookies not needed
-    max_age=3600,
+    allow_headers=["*"],
+    allow_credentials=False,            # keep False (you’re not using cookies)
 )
 
 # ─── DB tables on startup ──────────────────────────────────────
