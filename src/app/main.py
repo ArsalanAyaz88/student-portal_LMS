@@ -49,7 +49,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[ "*"],  # Allow all origins for development; restrict in production
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*","Authorization"],
     allow_credentials=False,            # keep False (you’re not using cookies)
 )
 
