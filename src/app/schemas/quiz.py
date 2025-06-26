@@ -19,10 +19,13 @@ class QuestionCreate(BaseModel):
 class QuizUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
+    due_date: Optional[datetime] = None
+    questions: Optional[List[QuestionCreate]] = None
 
 class QuizCreate(BaseModel):
     title: str
     description: Optional[str]
+    due_date: datetime  # Required field
     questions: List[QuestionCreate]
 
 # ─── Shared Base for Reads ──────────────────────────────────────
@@ -99,3 +102,7 @@ class QuizResult(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class QuizGrade(BaseModel):
+    score: float

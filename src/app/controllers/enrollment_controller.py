@@ -68,8 +68,8 @@ def submit_payment_proof(
         user_id=user.id,
         event_type="payment_proof",
         details=(
-            f"Payment proof submitted for course {course.title}.\n"
-            f"User: {user.full_name or user.email} (ID: {user.id})\n"
+            f"Payment proof submitted for course {course.title} (Course ID: {course.id}).\n"
+            f"User: {user.full_name or user.email} (User ID: {user.id})\n"
             f"Email: {user.email}\n"
             f"Proof image: {url}"
         ),

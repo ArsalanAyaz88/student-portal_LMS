@@ -14,6 +14,7 @@ class Quiz(SQLModel, table=True):
     course_id: uuid.UUID = Field(foreign_key="course.id")
     title: str
     description: Optional[str] = None
+    due_date: Optional[datetime] = None
 
     course: "src.app.models.course.Course" = Relationship(back_populates="quizzes")
     questions: List["src.app.models.quiz.Question"] = Relationship(back_populates="quiz", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
@@ -45,6 +46,8 @@ class QuizSubmission(SQLModel, table=True):
     quiz_id: uuid.UUID = Field(foreign_key="quiz.id")
     student_id: uuid.UUID = Field(foreign_key="user.id")
     submitted_at: datetime = Field(default_factory=datetime.utcnow)
+    score: Optional[float] = None
+    is_graded: bool = Field(default=False)
 
     quiz: "src.app.models.quiz.Quiz" = Relationship(back_populates="submissions")
 

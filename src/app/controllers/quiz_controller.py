@@ -146,6 +146,10 @@ def submit_quiz(
             selected_option_id=sel
         ))
 
+    # Update submission with auto-calculated score
+    sub.score = score
+    sub.is_graded = True
+    db.add(sub)
     db.commit()
 
     return QuizResult(
@@ -169,13 +173,15 @@ def get_quiz_result(
     if not sub or sub.quiz_id != quiz_id or sub.student_id != student_id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Submission not found")
 
-    score = 0
+    if sub.score is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Result not available yet.")
+
     details: list[QuizResultDetail] = []
+    total_questions = 0
     for ans in sub.answers:
+        total_questions += 1
         opt = db.get(Option, ans.selected_option_id) if ans.selected_option_id else None
         correct = bool(opt and opt.is_correct)
-        if correct:
-            score += 1
         details.append(QuizResultDetail(
             question_id=ans.question_id,
             correct=correct
@@ -183,8 +189,8 @@ def get_quiz_result(
 
     return QuizResult(
         submission_id=sub.id,
-        score=score,
-        total=len(details),
+        score=sub.score,
+        total=total_questions,
         details=details
     )
 

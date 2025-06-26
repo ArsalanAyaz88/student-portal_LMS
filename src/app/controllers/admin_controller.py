@@ -888,75 +888,103 @@ def admin_update_assignment(
 # 2. Quiz endpoints
 # ──────────────────────────────────────────────────────────────────────────────
 
-@router.post(
-    "/admin/courses/{course_id}/quizzes",
-    response_model=QuizRead,
-    status_code=201
-)
+@router.post("/courses/{course_id}/quizzes", response_model=QuizRead, status_code=status.HTTP_201_CREATED)
 def admin_create_quiz(
     course_id: str,
     payload: QuizCreate,
     db: Session = Depends(get_db),
     admin=Depends(get_current_admin_user),
 ):
-    """Create a quiz along with its questions & options."""
+    """
+    Create a new quiz with its questions and options in a single transaction.
+    """
+    # Validate course_id format
     try:
-        # 1) make the quiz
-        quiz = Quiz(
-            id=uuid.uuid4(),
-            course_id=uuid.UUID(course_id),
-            title=payload.title,
-            description=payload.description,
-            due_date=payload.due_date,
+        course_uuid = uuid.UUID(course_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid course ID format. Please provide a valid UUID."
         )
-        db.add(quiz)
+    
+    # Check if course exists
+    course = db.get(Course, course_uuid)
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Course not found"
+        )
+
+    # Create the quiz object directly from the payload
+    new_quiz = Quiz(
+        course_id=course.id,
+        title=payload.title,
+        description=payload.description,
+        due_date=payload.due_date
+    )
+
+    questions_to_create = []
+    for q_data in payload.questions:
+        new_question = Question(
+            text=q_data.text,
+            is_multiple_choice=q_data.is_multiple_choice
+        )
+        
+        options_to_create = []
+        for o_data in q_data.options:
+            new_option = Option(text=o_data.text, is_correct=o_data.is_correct)
+            options_to_create.append(new_option)
+        
+        new_question.options = options_to_create
+        questions_to_create.append(new_question)
+    
+    new_quiz.questions = questions_to_create
+
+    try:
+        # Add only the parent object to the session.
+        # The relationships with cascade will handle the rest.
+        db.add(new_quiz)
         db.commit()
-        db.refresh(quiz)
-
-        # 2) cascade questions + options
-        for q in payload.questions:
-            question = Question(
-                id=uuid.uuid4(),
-                quiz_id=quiz.id,
-                text=q.text,
-                is_multiple_choice=q.is_multiple_choice
-            )
-            db.add(question)
-            db.commit()
-            db.refresh(question)
-
-            for opt in q.options:
-                option = Option(
-                    id=uuid.uuid4(),
-                    question_id=question.id,
-                    text=opt.text,
-                    is_correct=opt.is_correct
-                )
-                db.add(option)
-            db.commit()
-
-        # 3) reload relationships for response
-        db.refresh(quiz)
-        return quiz
-
+        db.refresh(new_quiz)
+        return new_quiz
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, f"Error creating quiz: {e}")
+        logging.error(f"Error creating quiz: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected error occurred: {e}"
+        )
 
-@router.get(
-    "/admin/courses/{course_id}/quizzes",
-    response_model=List[QuizRead]
-)
+
+@router.get("/courses/{course_id}/quizzes", response_model=List[QuizRead])
 def admin_list_quizzes(
     course_id: str,
     db: Session = Depends(get_db),
     admin=Depends(get_current_admin_user),
 ):
     """List all quizzes for a course."""
-    stmt = select(Quiz).where(Quiz.course_id == uuid.UUID(course_id))
+    # Validate course_id format
+    try:
+        course_uuid = uuid.UUID(course_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid course ID format. Please provide a valid UUID."
+        )
+    
+    # Check if course exists
+    course = db.get(Course, course_uuid)
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Course not found"
+        )
+        
+    stmt = select(Quiz).where(Quiz.course_id == course_uuid)
     return db.exec(stmt).all()
 
-@router.put("/courses/{course_id}/quizzes/{quiz_id}", response_model=QuizRead)
+
+@router.put("/courses/{course_id}/quizzes/{quiz_id}")
 def admin_update_quiz(
     course_id: str,
     quiz_id: str,
@@ -964,19 +992,86 @@ def admin_update_quiz(
     db: Session = Depends(get_db),
     admin=Depends(get_current_admin_user),
 ):
-    """Update a quiz."""
-    quiz = db.get(Quiz, uuid.UUID(quiz_id))
-    if not quiz or str(quiz.course_id) != course_id:
-        raise HTTPException(status_code=404, detail="Quiz not found")
+    """
+    Update a quiz's details, questions, and options.
+    This performs a partial update - only the provided fields will be updated.
+    """
+    # Validate UUID formats
+    try:
+        quiz_uuid = uuid.UUID(quiz_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid quiz ID format: {quiz_id}. Please provide a valid UUID."
+        )
     
+    try:
+        course_uuid = uuid.UUID(course_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid course ID format: {course_id}. Please provide a valid UUID."
+        )
+
+    # Get the quiz with relationships loaded
+    quiz = db.exec(
+        select(Quiz)
+        .where(Quiz.id == quiz_uuid, Quiz.course_id == course_uuid)
+        .options(selectinload(Quiz.questions).selectinload(Question.options))
+    ).first()
+    
+    if not quiz:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Quiz not found in this course"
+        )
+
+    # Update basic fields if provided
     update_data = payload.dict(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(quiz, key, value)
     
-    db.add(quiz)
-    db.commit()
-    db.refresh(quiz)
-    return quiz
+    # Handle basic fields (title, description, due_date)
+    basic_fields = ['title', 'description', 'due_date']
+    for field in basic_fields:
+        if field in update_data:
+            setattr(quiz, field, update_data[field])
+    
+    # Handle questions if provided
+    if 'questions' in update_data and update_data['questions'] is not None:
+        # Clear existing questions (this will cascade to options)
+        for question in quiz.questions:
+            db.delete(question)
+        
+        # Add new questions and options
+        for q_data in payload.questions:
+            new_question = Question(
+                quiz_id=quiz.id,
+                text=q_data.text,
+                is_multiple_choice=q_data.is_multiple_choice
+            )
+            
+            options_to_create = []
+            for o_data in q_data.options:
+                new_option = Option(
+                    text=o_data.text, 
+                    is_correct=o_data.is_correct
+                )
+                options_to_create.append(new_option)
+            
+            new_question.options = options_to_create
+            quiz.questions.append(new_question)
+    
+    try:
+        db.add(quiz)
+        db.commit()
+        return {"message": "Quiz updated successfully"}
+    except Exception as e:
+        db.rollback()
+        logging.error(f"Error updating quiz: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected error occurred during update: {e}"
+        )
+
 
 @router.get("/courses/{course_id}/quizzes/{quiz_id}/submission_status", response_model=List[QuizSubmissionStatus])
 def admin_get_quiz_submission_status(
@@ -1006,6 +1101,7 @@ def admin_get_quiz_submission_status(
         )
     return statuses
 
+
 @router.get("/courses/{course_id}/quizzes/{quiz_id}/submissions", response_model=List[QuizResult])
 def admin_get_quiz_submissions(
     course_id: str,
@@ -1019,54 +1115,56 @@ def admin_get_quiz_submissions(
         raise HTTPException(status_code=404, detail="Quiz not found")
     return quiz.submissions
 
-@router.delete(
-    "/courses/{course_id}/quizzes/{quiz_id}",
-    status_code=204
-)
+
+@router.delete("/courses/{course_id}/quizzes/{quiz_id}", status_code=status.HTTP_200_OK)
 def admin_delete_quiz(
+    course_id: str,
     quiz_id: str,
     db: Session = Depends(get_db),
     admin=Depends(get_current_admin_user),
 ):
     """
-    Remove a quiz (and cascade its questions/options via FK cascade).
-    
-    Returns:
-        dict: A success message if the quiz is deleted successfully
-        
-    Raises:
-        HTTPException: If the quiz is not found
+    Remove a quiz and its related questions and options.
     """
+    # Validate UUID formats
     try:
-        # Try to convert quiz_id to UUID
         quiz_uuid = uuid.UUID(quiz_id)
+        course_uuid = uuid.UUID(course_id)
     except ValueError:
         raise HTTPException(
-            status_code=400,
-            detail="Invalid quiz ID format"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid UUID format for course or quiz ID. Please provide valid UUIDs."
         )
+
+    # Check if course exists
+    course = db.get(Course, course_uuid)
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Course not found"
+        )
+
+    # Get the quiz with relationships loaded
+    quiz = db.exec(
+        select(Quiz)
+        .where(Quiz.id == quiz_uuid, Quiz.course_id == course_uuid)
+        .options(selectinload(Quiz.questions).selectinload(Question.options))
+    ).first()
     
-    # Get the quiz
-    quiz = db.get(Quiz, quiz_uuid)
     if not quiz:
         raise HTTPException(
-            status_code=404,
-            detail="Quiz not found"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Quiz not found in this course"
         )
-    
+
     try:
-        # Delete the quiz (this will cascade to questions and options)
         db.delete(quiz)
         db.commit()
-        
-        # Return success message
-        return {
-            "message": "Quiz deleted successfully"
-        }
-        
+        return {"message": "Quiz deleted successfully"}
     except Exception as e:
         db.rollback()
+        logging.error(f"Error deleting quiz: {e}")
         raise HTTPException(
-            status_code=500,
-            detail=f"Error deleting quiz: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred while deleting the quiz: {str(e)}"
         )
