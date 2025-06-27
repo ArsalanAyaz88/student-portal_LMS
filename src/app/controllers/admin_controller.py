@@ -34,7 +34,9 @@ from src.app.schemas.assignment import AssignmentCreate, AssignmentRead, Assignm
 from src.app.schemas.quiz import QuizCreate, QuizRead, QuizUpdate, QuizResult, QuizSubmissionStatus
 import logging
 
-router = APIRouter(tags=["Admin"])
+router = APIRouter(
+    tags=["Admin"]
+)
 
 # 1. Enrollment Management
 @router.get("/users", response_model=List[UserRead])
@@ -609,9 +611,6 @@ def approve_enrollment_by_user(
     session: Session = Depends(get_db),
     admin=Depends(get_current_admin_user)
 ):
-    # Strip whitespace from IDs to avoid invalid UUID errors
-    user_id = user_id.strip()
-    course_id = course_id.strip()
     enrollment = session.exec(select(Enrollment).where(Enrollment.user_id == user_id, Enrollment.course_id == course_id)).first()
     if not enrollment:
         raise HTTPException(status_code=404, detail="Enrollment not found")

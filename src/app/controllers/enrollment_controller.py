@@ -56,7 +56,7 @@ def submit_payment_proof(
     # Create pending enrollment if not exists
     enrollment = session.exec(select(Enrollment).where(Enrollment.user_id == user.id, Enrollment.course_id == course_id)).first()
     if not enrollment:
-        enrollment = Enrollment(user_id=user.id, course_id=course_id, status="pending", enroll_date=datetime.utcnow(), is_accessible=False, audit_log=[])
+        enrollment = Enrollment(user_id=user.id, course_id=course_id, status="pending", enroll_date=get_pakistan_time(), is_accessible=False, audit_log=[])
         session.add(enrollment)
         session.commit()
         session.refresh(enrollment)
@@ -68,7 +68,7 @@ def submit_payment_proof(
     try:
         notif = Notification(
             user_id=user.id,
-            course_id=uuid.UUID(str(course.id)),  # Ensure course.id is converted to UUID
+            course_id=uuid.UUID(str(course_id)),  # Ensure course.id is converted to UUID
             event_type="payment_proof",
             details=(
                 f"Payment proof submitted for course {course.title} \n"
@@ -87,58 +87,3 @@ def submit_payment_proof(
     session.commit()
     return {"detail": "Payment proof submitted, pending admin approval."}
 
-@router.get("/{course_id}/status", response_model=EnrollmentStatus)
-def check_enrollment_status(course_id: str, user=Depends(get_current_user), session: Session = Depends(get_db)):
-    enrollment = session.exec(select(Enrollment).where(Enrollment.user_id == user.id, Enrollment.course_id == course_id)).first()
-    if not enrollment:
-        return EnrollmentStatus(
-            status="not_enrolled",
-            message="You are not enrolled in this course.",
-            expiration_date=None,
-            days_remaining=None,
-            is_expired=False,
-            is_accessible=False
-        )
-
-    # Update enrollment status using Pakistan time
-    enrollment.update_expiration_status()
-    session.add(enrollment)
-    session.commit()
-
-    if enrollment.status == "pending":
-        return EnrollmentStatus(
-            status="pending",
-            message="Your course enrollment is pending admin approval.",
-            expiration_date=enrollment.expiration_date,
-            days_remaining=enrollment.days_remaining,
-            is_expired=enrollment.is_expired,
-            is_accessible=enrollment.is_accessible
-        )
-    
-    if enrollment.status == "approved":
-        if enrollment.is_expired:
-            return EnrollmentStatus(
-                status="expired",
-                message="Your course access has expired.",
-                expiration_date=enrollment.expiration_date,
-                days_remaining=0,
-                is_expired=True,
-                is_accessible=False
-            )
-        return EnrollmentStatus(
-            status="approved",
-            message=f"Your course enrollment is approved! {enrollment.days_remaining} days remaining.",
-            expiration_date=enrollment.expiration_date,
-            days_remaining=enrollment.days_remaining,
-            is_expired=False,
-            is_accessible=True
-        )
-    
-    return EnrollmentStatus(
-        status=enrollment.status,
-        message=f"Your enrollment status is {enrollment.status}.",
-        expiration_date=enrollment.expiration_date,
-        days_remaining=enrollment.days_remaining,
-        is_expired=enrollment.is_expired,
-        is_accessible=enrollment.is_accessible
-    )
