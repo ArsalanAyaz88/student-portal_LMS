@@ -210,15 +210,8 @@ def get_notifications(session: Session = Depends(get_db), admin=Depends(get_curr
     uuid_regex = re.compile(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', re.I)
 
     for notif in notifications:
-        course_id = None
-        # Search for course ID only in relevant event types
-        if notif.event_type in ["enrollment_request", "enrollment_expired"]:
-            match = uuid_regex.search(notif.details)
-            if match:
-                try:
-                    course_id = uuid.UUID(match.group(1))
-                except ValueError:
-                    course_id = None # Invalid UUID format
+        # Use the course_id directly from the notification record
+        course_id = notif.course_id
 
         response_data.append(
             AdminNotificationRead(

@@ -1,4 +1,5 @@
 # File: application/src/app/controllers/enrollment_controller.py
+import uuid
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlmodel import Session, select
 from ..models.enrollment import Enrollment, get_pakistan_time
@@ -64,16 +65,24 @@ def submit_payment_proof(
     session.add(payment_proof)
     session.commit()
     # Notify admin, include user details and picture URL in details
-    notif = Notification(
-        user_id=user.id,
-        event_type="payment_proof",
-        details=(
-            f"Payment proof submitted for course {course.title} (Course ID: {course.id}).\n"
-            f"User: {user.full_name or user.email} (User ID: {user.id})\n"
-            f"Email: {user.email}\n"
-            f"Proof image: {url}"
-        ),
-    )
+    try:
+        notif = Notification(
+            user_id=user.id,
+            course_id=uuid.UUID(str(course.id)),  # Ensure course.id is converted to UUID
+            event_type="payment_proof",
+            details=(
+                f"Payment proof submitted for course {course.title} \n"
+                f"User: {user.full_name or user.email} (User ID: {user.id})\n"
+                f"Email: {user.email}\n"
+                f"Proof image: {url}"
+            ),
+        )
+        session.add(notif)
+        session.commit()
+    except Exception as e:
+        session.rollback()
+        print(f"Error creating notification: {str(e)}")
+        raise
     session.add(notif)
     session.commit()
     return {"detail": "Payment proof submitted, pending admin approval."}
