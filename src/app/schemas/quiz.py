@@ -1,108 +1,111 @@
-# File: application/src/app/schemas/quiz.py
-
-from pydantic import BaseModel
+# d:\course_lms\student-portal_LMS\src\app\schemas\quiz.py
+from pydantic import BaseModel, Field
+import uuid
 from typing import List, Optional
-from uuid import UUID
 from datetime import datetime
 
-# ─── Admin / Input Schemas ─────────────────────────────────────
+# --- Option Schemas ---
 
-class OptionCreate(BaseModel):
+class OptionBase(BaseModel):
     text: str
     is_correct: bool
 
-class QuestionCreate(BaseModel):
-    text: str
-    is_multiple_choice: bool
-    options: List[OptionCreate]
-
-class QuizUpdate(BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
-    due_date: Optional[datetime] = None
-    questions: Optional[List[QuestionCreate]] = None
-
-class QuizCreate(BaseModel):
-    title: str
-    description: Optional[str]
-    due_date: datetime  # Required field
-    questions: List[QuestionCreate]
-
-# ─── Shared Base for Reads ──────────────────────────────────────
-
-class QuizBase(BaseModel):
-    id: UUID
-    course_id: UUID
-    title: str
-    description: Optional[str]
-
-    class Config:
-        from_attributes = True
-
-# ─── Student‐Facing: List vs Detail ────────────────────────────
-
-class QuizListRead(QuizBase):
-    """Lightweight list view: no questions."""
+class OptionCreate(OptionBase):
     pass
 
-class OptionRead(BaseModel):
-    id: UUID
-    text: str
+class OptionRead(OptionBase):
+    id: uuid.UUID
 
     class Config:
         from_attributes = True
 
-class QuestionRead(BaseModel):
-    id: UUID
+# --- Question Schemas ---
+
+class QuestionBase(BaseModel):
     text: str
-    is_multiple_choice: bool
+    question_type: str = "multiple_choice"
+    points: int = 1
+
+class QuestionCreate(QuestionBase):
+    options: List[OptionCreate]
+
+class QuestionRead(QuestionBase):
+    id: uuid.UUID
     options: List[OptionRead]
 
     class Config:
         from_attributes = True
 
-class QuizDetailRead(QuizBase):
-    """Full detail view: includes questions + options."""
-    questions: List[QuestionRead]
+# --- Quiz Schemas ---
 
-# ─── Admin‐Facing: alias read schema ───────────────────────────
+class QuizBase(BaseModel):
+    title: str
+    description: Optional[str] = None
+    due_date: Optional[datetime] = None
+    published: bool = False
 
-class QuizRead(QuizDetailRead):
-    """Alias for admin controllers that expect `QuizRead`."""
-    pass
+class QuizCreate(QuizBase):
+    pass # No extra fields needed for creation initially
 
-# ─── Submission / Result Schemas ───────────────────────────────
+class QuizUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    due_date: Optional[datetime] = None
+    published: Optional[bool] = None
 
-class AnswerCreate(BaseModel):
-    question_id: UUID
-    selected_option_id: Optional[UUID]
+class QuizRead(QuizBase):
+    id: uuid.UUID
+    course_id: uuid.UUID
 
-class QuizSubmissionCreate(BaseModel):
-    answers: List[AnswerCreate]
+    class Config:
+        from_attributes = True
 
-class QuizResultDetail(BaseModel):
-    question_id: UUID
-    correct: bool
+class QuizReadWithDetails(QuizRead):
+    questions: List[QuestionRead] = []
+
+# --- Submission and Grading Schemas ---
+
+class StudentRead(BaseModel):
+    id: uuid.UUID
+    full_name: str
+    email: str
+
+    class Config:
+        from_attributes = True
 
 
-class QuizSubmissionStatus(BaseModel):
-    submission_id: UUID
-    student_id: UUID
+class AnswerRead(BaseModel):
+    question_id: uuid.UUID
+    selected_option_id: Optional[uuid.UUID] = None
+    text_answer: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+class QuizSubmissionRead(BaseModel):
+    id: uuid.UUID
+    student_id: uuid.UUID
     submitted_at: datetime
-    is_on_time: bool
+    score: Optional[float] = None
+    is_graded: bool
+    feedback: Optional[str] = None
 
     class Config:
         from_attributes = True
 
-class QuizResult(BaseModel):
-    submission_id: UUID
+class QuizSubmissionReadWithStudent(QuizSubmissionRead):
+    student: StudentRead
+
+class QuizSubmissionReadWithDetails(QuizSubmissionReadWithStudent):
+    answers: List[AnswerRead]
+
+
+class GradeSubmissionRequest(BaseModel):
     score: float
-    total: int
-    details: List[QuizResultDetail]
-
-    class Config:
-        from_attributes = True
+    feedback: Optional[str] = None
 
 
-class QuizGrade(BaseModel):
-    score: float
+class GradingViewSchema(BaseModel):
+    submission: QuizSubmissionReadWithDetails
+    quiz: QuizReadWithDetails
+

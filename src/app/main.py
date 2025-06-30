@@ -23,6 +23,7 @@ from src.app.routers import (
     student_assignment_router as sa_router,
     student_quiz_router as sq_router,
     student_dashboard_router,
+    admin_quiz_router,
 )
 from src.app.controllers import enrollment_controller
 
@@ -70,6 +71,11 @@ app.include_router(
     student_dashboard_router.router,
     prefix="/api/student/dashboard",
     tags=["Student Dashboard"],
+)
+app.include_router(
+    admin_quiz_router.router,
+    prefix="/api/admin/quizzes",
+    tags=["Admin Quizzes"],
 )
 
 # ─── Simple endpoints ──────────────────────────────────────────

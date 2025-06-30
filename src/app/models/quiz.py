@@ -16,6 +16,7 @@ class Quiz(SQLModel, table=True):
     title: str
     description: Optional[str] = None
     due_date: Optional[datetime] = None
+    published: bool = Field(default=False) # To control visibility to students
 
     course: "src.app.models.course.Course" = Relationship(back_populates="quizzes")
     questions: List["src.app.models.quiz.Question"] = Relationship(back_populates="quiz", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
@@ -27,7 +28,8 @@ class Question(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     quiz_id: uuid.UUID = Field(foreign_key="quiz.id")
     text: str
-    is_multiple_choice: bool = Field(default=True)
+    question_type: str = Field(default="multiple_choice") # e.g., 'multiple_choice', 'short_answer'
+    points: int = Field(default=1) # Points for a correct answer
 
     quiz: Quiz = Relationship(back_populates="questions")
     options: List["src.app.models.quiz.Option"] = Relationship(back_populates="question", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
@@ -49,6 +51,7 @@ class QuizSubmission(SQLModel, table=True):
     submitted_at: datetime = Field(default_factory=get_pakistan_time)
     score: Optional[float] = None
     is_graded: bool = Field(default=False)
+    feedback: Optional[str] = None # Feedback from the grader
 
     quiz: "src.app.models.quiz.Quiz" = Relationship(back_populates="submissions")
 
