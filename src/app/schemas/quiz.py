@@ -109,3 +109,12 @@ class GradingViewSchema(BaseModel):
     submission: QuizSubmissionReadWithDetails
     quiz: QuizReadWithDetails
 
+# Schemas for legacy admin controller - to be deprecated
+class QuizSubmissionStatus(BaseModel):
+    submission_id: uuid.UUID
+    student_id: uuid.UUID
+    submitted_at: datetime
+    is_on_time: bool
+
+QuizResult = QuizSubmissionRead  # Alias for compatibility
+
