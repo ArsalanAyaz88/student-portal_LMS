@@ -101,107 +101,65 @@ async def create_course(
 
     This endpoint is used by an Admin to create a new course.
     The request should be standard JSON.
-
-    **Example Request Body:**
-    ```json
-    {
-      "title": "The Ultimate Python Course",
-      "description": "A comprehensive course covering all aspects of Python programming.",
-      "price": 99.99,
-      "difficulty_level": "Intermediate",
-      "outcomes": "By the end of this course, you will be able to:\n- Write clean and efficient Python code.\n- Build complex applications.\n- Understand advanced Python concepts.",
-      "prerequisites": "Basic understanding of programming concepts.",
-      "curriculum": "1. Python Basics\n2. Data Structures\n3. Object-Oriented Programming\n4. Web Development with Flask\n5. Data Science with Pandas and NumPy",
-      "status": "active",
-      "preview_video": {
-        "youtube_url": "https://www.youtube.com/watch?v=preview_video_id",
-        "title": "Course Preview",
-        "description": "A short preview of what the course offers."
-      },
-      "videos": [
-        {
-          "youtube_url": "https://www.youtube.com/watch?v=video1_id",
-          "title": "Introduction to Python",
-          "description": "Setting up your Python environment."
-        },
-        {
-          "youtube_url": "https://www.youtube.com/watch?v=video2_id",
-          "title": "Variables and Data Types",
-          "description": "Understanding the basic building blocks of Python."
-        }
-      ]
-    }
-    ```
-
-    **Returns:**
-    - A JSON object with the details of the newly created course, including the preview video and course videos.
-
-    **Raises:**
-    - `HTTPException(400)`: If the request body is invalid.
-    - `HTTPException(500)`: For any other server-side errors.
     """
     session = db
     try:
-        # Start a transaction
-        with session.begin_nested() if session.in_transaction() else session.begin() as transaction:
-            # 1. Create the Course object
-            new_course = Course(
-                title=course_data.title,
-                description=course_data.description,
-                price=course_data.price,
-                difficulty_level=course_data.difficulty_level,
-                outcomes=course_data.outcomes,
-                prerequisites=course_data.prerequisites,
-                curriculum=course_data.curriculum,
-                status=course_data.status,
-                created_by=admin.id,
-                updated_by=admin.id,
+        # 1. Create the Course object without videos first
+        new_course = Course(
+            title=course_data.title,
+            description=course_data.description,
+            price=course_data.price,
+            difficulty_level=course_data.difficulty_level,
+            outcomes=course_data.outcomes,
+            prerequisites=course_data.prerequisites,
+            curriculum=course_data.curriculum,
+            status=course_data.status,
+            created_by=admin.id,
+            updated_by=admin.id,
+        )
+        session.add(new_course)
+        session.flush()  # Flush to generate and retrieve the new_course.id
+
+        # 2. Now create and associate videos with the correct course_id
+        videos_to_add = []
+        preview_video_obj = None
+        if course_data.preview_video:
+            preview_video_data = course_data.preview_video
+            preview_video_obj = Video(
+                youtube_url=str(preview_video_data.youtube_url),
+                title=preview_video_data.title,
+                description=preview_video_data.description,
+                is_preview=True,
+                course_id=new_course.id  # Use the generated course_id
             )
-            session.add(new_course)
+            videos_to_add.append(preview_video_obj)
 
-            # 2. Create and associate videos within the same transaction
-            videos_to_add = []
-            if course_data.preview_video:
-                preview_video_data = course_data.preview_video
-                preview_video = Video(
-                    youtube_url=str(preview_video_data.youtube_url),
-                    title=preview_video_data.title,
-                    description=preview_video_data.description,
-                    is_preview=True,
-                    course_id=new_course.id  # Set course_id directly
+        if course_data.videos:
+            for video_data in course_data.videos:
+                video = Video(
+                    youtube_url=str(video_data.youtube_url),
+                    title=video_data.title,
+                    description=video_data.description,
+                    is_preview=False,
+                    course_id=new_course.id  # Use the generated course_id
                 )
-                videos_to_add.append(preview_video)
-                # We will set the preview_video_id on the course later
+                videos_to_add.append(video)
+        
+        if videos_to_add:
+            session.add_all(videos_to_add)
+            session.flush() # Flush to generate video IDs
 
-            if course_data.videos:
-                for video_data in course_data.videos:
-                    video = Video(
-                        youtube_url=str(video_data.youtube_url),
-                        title=video_data.title,
-                        description=video_data.description,
-                        is_preview=False,
-                        course_id=new_course.id  # Set course_id directly
-                    )
-                    videos_to_add.append(video)
-            
-            if videos_to_add:
-                session.add_all(videos_to_add)
+        # 3. Link the preview video to the course using its ID
+        if preview_video_obj:
+            new_course.preview_video_id = preview_video_obj.id
 
-            # Commit the course and videos to get their IDs
-            session.flush()
-
-            # 3. Now, link the preview video to the course
-            if course_data.preview_video and videos_to_add:
-                # Find the preview video we just created
-                new_course.preview_video_id = videos_to_add[0].id
-
-        # The transaction is committed here if no exceptions were raised
+        session.commit()  # Commit the entire transaction
         session.refresh(new_course)
         return new_course
 
     except Exception as e:
+        session.rollback() # Rollback the transaction on any error
         logging.error(f"Error creating course: {e}")
-        # The transaction is automatically rolled back by the 'with' statement
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An unexpected error occurred on the server: {e}",
