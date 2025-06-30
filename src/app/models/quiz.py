@@ -2,7 +2,7 @@
 from sqlmodel import SQLModel, Field, Relationship
 import uuid
 from typing import List, Optional, TYPE_CHECKING
-from datetime import datetime, timedelta
+from datetime import datetime
 from src.app.utils.time import get_pakistan_time
 
 if TYPE_CHECKING:

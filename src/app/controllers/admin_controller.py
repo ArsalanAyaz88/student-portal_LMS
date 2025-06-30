@@ -297,7 +297,7 @@ async def update_course(
             setattr(course, key, value)
             
         course.updated_by = admin.email
-        course.updated_at = get_pakistan_time()
+        course.updated_at = datetime.utcnow()
         
         try:
             db.add(course)
@@ -390,7 +390,7 @@ async def get_dashboard_stats(
         total_enrollments = db.exec(select(func.count(Enrollment.id))).first()
         
         # Get active enrollments (last 30 days)
-        thirty_days_ago = get_pakistan_time() - timedelta(days=30)
+        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
         active_enrollments = db.exec(
             select(func.count(Enrollment.id))
             .where(
@@ -633,7 +633,6 @@ def approve_enrollment_by_user(
     # Notify student with expiration date
     notif = Notification(
         user_id=enrollment.user_id,
-        course_id=enrollment.course_id,
         event_type="enrollment_approved",
         details=f"Enrollment approved for course ID {enrollment.course_id}. Access granted until {enrollment.expiration_date.strftime('%Y-%m-%d %H:%M:%S %Z')} ({enrollment.days_remaining} days remaining)",
     ) 
@@ -771,7 +770,7 @@ def admin_delete_assignment(
         raise HTTPException(404, "Assignment not found")
     db.delete(assign)
     db.commit()
-    return {"detail": "Assignment deleted successfully"}
+    return
 @router.get(
     "/courses/{course_id}/assignments/{assignment_id}/submissions/students",
     response_model=SubmissionStudentsResponse,
@@ -875,7 +874,7 @@ def admin_update_assignment(
     db.add(assignment)
     db.commit()
     db.refresh(assignment)
-    return {"detail": "Assignment updated successfully"}
+    return assignment
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 2. Quiz endpoints

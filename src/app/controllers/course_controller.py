@@ -19,7 +19,6 @@ from datetime import datetime
 import uuid
 import os
 from ..utils.time import get_pakistan_time
-import pytz
 from fastapi import File
 
 router = APIRouter(tags=["Courses"])
@@ -154,15 +153,21 @@ def get_course_videos_with_checkpoint(
                 detail="You are not enrolled in this course."
             )
 
-        # Manually check expiration status in memory
+        # Get current time in Pakistan timezone
         current_time = get_pakistan_time()
         
-        # An enrollment is not accessible if it has an expiration date that is in the past.
-        if enrollment.expiration_date and pytz.utc.localize(enrollment.expiration_date) < current_time:
-            raise HTTPException(
-                status_code=403,
-                detail="Your access to this course has expired."
-            )
+        # An enrollment is not accessible if it has an expiration date that is in the past
+        if enrollment.expiration_date:
+            # Make both datetimes timezone-naive for comparison
+            expiration_date = enrollment.expiration_date
+            if expiration_date.tzinfo is not None:
+                expiration_date = expiration_date.replace(tzinfo=None)
+            
+            if expiration_date < current_time.replace(tzinfo=None):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Your access to this course has expired."
+                )
         
         # Also respect the is_accessible flag which might be set to false for other reasons.
         if not enrollment.is_accessible:
@@ -264,15 +269,21 @@ def mark_video_completed(
                 detail="You are not enrolled in this course."
             )
 
-        # Manually check expiration status in memory
+        # Get current time in Pakistan timezone
         current_time = get_pakistan_time()
         
-        # An enrollment is not accessible if it has an expiration date that is in the past.
-        if enrollment.expiration_date and pytz.utc.localize(enrollment.expiration_date) < current_time:
-            raise HTTPException(
-                status_code=403,
-                detail="Your access to this course has expired."
-            )
+        # An enrollment is not accessible if it has an expiration date that is in the past
+        if enrollment.expiration_date:
+            # Make both datetimes timezone-naive for comparison
+            expiration_date = enrollment.expiration_date
+            if expiration_date.tzinfo is not None:
+                expiration_date = expiration_date.replace(tzinfo=None)
+            
+            if expiration_date < current_time.replace(tzinfo=None):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Your access to this course has expired."
+                )
         
         # Also respect the is_accessible flag which might be set to false for other reasons.
         if not enrollment.is_accessible:

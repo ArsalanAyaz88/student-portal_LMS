@@ -16,10 +16,10 @@ import uuid
 class Enrollment(SQLModel, table=True):
     __table_args__ = {"extend_existing": True}
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    user_id: uuid.UUID = Field(foreign_key="user.id")
-    course_id: uuid.UUID = Field(foreign_key="course.id")
+    user_id: str = Field(foreign_key="user.id")
+    course_id: str = Field(foreign_key="course.id")
     status: str = Field(default="pending")  # pending, approved, rejected
-    enroll_date: Optional[datetime] = None
+    enroll_date: datetime = Field(default_factory=get_pakistan_time)
     expiration_date: Optional[datetime] = None
     is_accessible: bool = Field(default=False)
     days_remaining: Optional[int] = None
@@ -32,27 +32,19 @@ class Enrollment(SQLModel, table=True):
 
     def update_expiration_status(self):
         """Update the expiration status and days remaining"""
-        current_time = get_pakistan_time()  # This is an aware datetime in Asia/Karachi timezone
-
+        current_time = get_pakistan_time()
+        
         if self.expiration_date:
-            # Assuming self.expiration_date is a naive datetime object stored in UTC.
-            # We need to make it timezone-aware to compare it correctly.
-            expiration_aware = pytz.utc.localize(self.expiration_date)
-
-            # Now we can compare the two aware datetime objects
-            if current_time > expiration_aware:
-                # The course has expired
-                self.is_accessible = False
-            else:
-                # The course is still accessible
-                self.is_accessible = True
-
-            # Calculate the days remaining
-            time_difference = expiration_aware - current_time
-            self.days_remaining = time_difference.days
+            # Convert both dates to UTC for comparison
+            expiration_utc = self.expiration_date.replace(tzinfo=None)
+            current_utc = current_time.replace(tzinfo=None)
+            
+            # Calculate days remaining
+            self.days_remaining = (expiration_utc - current_utc).days
+            
+            # Update is_accessible based on expiration
+            self.is_accessible = self.days_remaining > 0
         else:
-            # If there's no expiration date, the course is always accessible
             self.days_remaining = None
             self.is_accessible = True
-
-        self.last_access_date = current_time 
+        self.last_access_date = current_time

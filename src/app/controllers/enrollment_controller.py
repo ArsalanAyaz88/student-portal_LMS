@@ -10,6 +10,7 @@ from ..utils.dependencies import get_current_user
 from ..models.payment_proof import PaymentProof
 from ..models.notification import Notification
 from datetime import datetime, timedelta
+from ..utils.time import get_pakistan_time
 import os
 from uuid import uuid4
 from ..schemas.enrollment import EnrollmentStatus
@@ -70,6 +71,7 @@ def submit_payment_proof(
             user_id=user.id,
             course_id=uuid.UUID(str(course_id)),  # Ensure course.id is converted to UUID
             event_type="payment_proof",
+            timestamp=get_pakistan_time(),
             details=(
                 f"Payment proof submitted for course {course.title} \n"
                 f"User: {user.full_name or user.email} (User ID: {user.id})\n"

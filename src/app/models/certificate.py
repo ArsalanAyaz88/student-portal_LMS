@@ -10,5 +10,5 @@ class Certificate(SQLModel, table=True):
     user_id: uuid.UUID
     course_id: uuid.UUID
     file_path: str
-    issued_at: str = Field(default_factory=lambda: get_pakistan_time().isoformat())
+    issued_at: datetime = Field(default_factory=get_pakistan_time)
     certificate_number: str  # Unique certificate number for verification 
