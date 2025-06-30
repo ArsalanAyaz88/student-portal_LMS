@@ -38,6 +38,32 @@ router = APIRouter(
     tags=["Admin"]
 )
 
+@router.post("/upload/image", response_model=dict)
+async def upload_image(
+    file: UploadFile = File(...), 
+    admin: User = Depends(get_current_admin_user)
+):
+    """
+    Uploads an image to Cloudinary and returns the URL.
+    This endpoint requires admin authentication.
+    """
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid file type. Only images are allowed."
+        )
+    
+    try:
+        # This utility function handles the upload and returns a public URL.
+        image_url = await save_upload_and_get_url(upload_file=file)
+        return {"url": image_url}
+    except Exception as e:
+        logging.error(f"Error uploading image: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred while uploading the image: {str(e)}"
+        )
+
 # 1. Enrollment Management
 @router.get("/users", response_model=List[UserRead])
 def list_students(session: Session = Depends(get_db), admin=Depends(get_current_admin_user)):
