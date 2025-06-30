@@ -116,7 +116,17 @@ class QuizSubmissionStatus(BaseModel):
     submitted_at: datetime
     is_on_time: bool
 
-QuizResult = QuizSubmissionRead  # Alias for compatibility
+# Schemas for quiz results returned to students
+class QuizResultDetail(BaseModel):
+    question_id: uuid.UUID
+    correct: bool
+
+
+class QuizResult(BaseModel):
+    submission_id: uuid.UUID
+    score: float
+    total: int
+    details: List[QuizResultDetail]
 
 class AnswerCreate(BaseModel):
     question_id: uuid.UUID
