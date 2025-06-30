@@ -94,7 +94,15 @@ def add_question_to_quiz(
     """Add a new question to a specific quiz."""
     if not db.get(Quiz, quiz_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
-    new_question = Question.from_orm(question_data, update={'quiz_id': quiz_id})
+
+    # Create the question instance without the options first
+    new_question = Question(text=question_data.text, quiz_id=quiz_id)
+
+    # Create and add the options manually
+    for option_data in question_data.options:
+        new_option = Option(text=option_data.text, is_correct=option_data.is_correct)
+        new_question.options.append(new_option)
+
     db.add(new_question)
     db.commit()
     db.refresh(new_question)
@@ -114,11 +122,19 @@ def update_question(
     db_question = db.get(Question, question_id)
     if not db_question:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
+
+    # Update the question's text
     db_question.text = question_data.text
+
+    # Clear existing options, leveraging the 'delete-orphan' cascade
     db_question.options.clear()
-    db.flush()
+    db.flush() # Flush to ensure the delete operations are sent to the DB
+
+    # Create and add the new options
     for option_data in question_data.options:
-        db_question.options.append(Option.from_orm(option_data))
+        new_option = Option(text=option_data.text, is_correct=option_data.is_correct)
+        db_question.options.append(new_option)
+
     db.add(db_question)
     db.commit()
     db.refresh(db_question)
