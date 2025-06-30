@@ -104,19 +104,28 @@ async def create_course(
     """
     session = db
     try:
-        # 1. Create the Course object without videos first
-        new_course = Course(
-            title=course_data.title,
-            description=course_data.description,
-            price=course_data.price,
-            difficulty_level=course_data.difficulty_level,
-            outcomes=course_data.outcomes,
-            prerequisites=course_data.prerequisites,
-            curriculum=course_data.curriculum,
-            status=course_data.status,
-            created_by=admin.id,
-            updated_by=admin.id,
-        )
+        # Safely construct the course payload, adding optional fields only if they have a value.
+        course_payload = {
+            "title": course_data.title,
+            "description": course_data.description,
+            "price": course_data.price,
+            "status": course_data.status,
+            "created_by": admin.id,
+            "updated_by": admin.id,
+        }
+
+        if getattr(course_data, 'thumbnail_url', None):
+            course_payload['thumbnail_url'] = course_data.thumbnail_url
+        if getattr(course_data, 'difficulty_level', None):
+            course_payload['difficulty_level'] = course_data.difficulty_level
+        if getattr(course_data, 'outcomes', None):
+            course_payload['outcomes'] = course_data.outcomes
+        if getattr(course_data, 'prerequisites', None):
+            course_payload['prerequisites'] = course_data.prerequisites
+        if getattr(course_data, 'curriculum', None):
+            course_payload['curriculum'] = course_data.curriculum
+
+        new_course = Course(**course_payload)
         session.add(new_course)
         session.flush()  # Flush to generate and retrieve the new_course.id
 
