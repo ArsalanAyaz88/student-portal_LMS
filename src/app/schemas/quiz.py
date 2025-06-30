@@ -27,6 +27,9 @@ class QuestionBase(BaseModel):
 class QuestionCreate(QuestionBase):
     options: List[OptionCreate]
 
+class QuestionUpdate(QuestionCreate):
+    pass
+
 class QuestionRead(QuestionBase):
     id: uuid.UUID
     options: List[OptionRead]

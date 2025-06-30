@@ -11,7 +11,9 @@ from src.app.models.course import Course
 from src.app.models.quiz import Quiz, Question, Option, QuizSubmission, Answer
 from src.app.schemas.quiz import (
     QuizCreate, QuizRead, QuizUpdate,
-    QuestionCreate, QuestionRead,
+    QuestionCreate,
+    QuestionUpdate,
+    QuestionRead,
     QuizReadWithDetails,
     QuizSubmissionRead, QuizSubmissionReadWithStudent, QuizSubmissionReadWithDetails,
     GradingViewSchema
@@ -186,21 +188,19 @@ def update_question(
     if not db_question:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
 
-    # Update the question's text
+    # Update question's text
     db_question.text = question_data.text
 
-    # Clear existing options
-    db_question.options.clear()
-
-    # Add new options
-    for option_data in question_data.options:
-        new_option = Option(text=option_data.text, is_correct=option_data.is_correct)
-        db_question.options.append(new_option)
+    # By assigning a new list to the relationship, SQLAlchemy's 'delete-orphan' 
+    # cascade will automatically delete the old options and add the new ones.
+    db_question.options = [
+        Option(text=opt.text, is_correct=opt.is_correct)
+        for opt in question_data.options
+    ]
 
     db.add(db_question)
     db.commit()
     db.refresh(db_question)
-
     return db_question
 
 @router.delete("/questions/{question_id}", status_code=status.HTTP_204_NO_CONTENT)
