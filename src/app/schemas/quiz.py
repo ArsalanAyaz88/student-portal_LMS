@@ -23,7 +23,6 @@ class OptionRead(OptionBase):
 
 class QuestionBase(BaseModel):
     text: str
-    question_type: str = "multiple_choice"
     points: int = 1
 
 class QuestionCreate(QuestionBase):

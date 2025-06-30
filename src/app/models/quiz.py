@@ -27,7 +27,6 @@ class Question(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     quiz_id: uuid.UUID = Field(foreign_key="quiz.id")
     text: str
-    question_type: str = Field(default="multiple_choice") # e.g., 'multiple_choice', 'short_answer'
     points: int = Field(default=1) # Points for a correct answer
 
     quiz: Quiz = Relationship(back_populates="questions")
