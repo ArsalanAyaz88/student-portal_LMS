@@ -83,9 +83,9 @@ async def create_course(
       "description": "A comprehensive course covering all aspects of Python programming.",
       "price": 99.99,
       "difficulty_level": "Intermediate",
-      "outcomes": "By the end of this course, you will be able to:\\n- Write clean and efficient Python code.\\n- Build complex applications.\\n- Understand advanced Python concepts.",
+      "outcomes": "By the end of this course, you will be able to:\n- Write clean and efficient Python code.\n- Build complex applications.\n- Understand advanced Python concepts.",
       "prerequisites": "Basic understanding of programming concepts.",
-      "curriculum": "1. Python Basics\\n2. Data Structures\\n3. Object-Oriented Programming\\n4. Web Development with Flask\\n5. Data Science with Pandas and NumPy",
+      "curriculum": "1. Python Basics\n2. Data Structures\n3. Object-Oriented Programming\n4. Web Development with Flask\n5. Data Science with Pandas and NumPy",
       "status": "active",
       "preview_video": {
         "youtube_url": "https://www.youtube.com/watch?v=preview_video_id",
@@ -146,10 +146,40 @@ async def create_course(
                 )
                 videos_to_add.append(preview_video)
                 # We will set the preview_video_id on the course later
-    for video in new_course.videos:
-        db.refresh(video)
 
-    return new_course
+            if course_data.videos:
+                for video_data in course_data.videos:
+                    video = Video(
+                        youtube_url=str(video_data.youtube_url),
+                        title=video_data.title,
+                        description=video_data.description,
+                        is_preview=False,
+                        course_id=new_course.id  # Set course_id directly
+                    )
+                    videos_to_add.append(video)
+            
+            if videos_to_add:
+                session.add_all(videos_to_add)
+
+            # Commit the course and videos to get their IDs
+            session.flush()
+
+            # 3. Now, link the preview video to the course
+            if course_data.preview_video and videos_to_add:
+                # Find the preview video we just created
+                new_course.preview_video_id = videos_to_add[0].id
+
+        # The transaction is committed here if no exceptions were raised
+        session.refresh(new_course)
+        return new_course
+
+    except Exception as e:
+        logging.error(f"Error creating course: {e}")
+        # The transaction is automatically rolled back by the 'with' statement
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected error occurred on the server: {e}",
+        )
 
 
 @router.get("/courses/{course_id}", response_model=AdminCourseDetail)
