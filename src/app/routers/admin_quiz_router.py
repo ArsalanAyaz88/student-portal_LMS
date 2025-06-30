@@ -175,34 +175,33 @@ def add_question_to_quiz(
 @router.put("/questions/{question_id}", response_model=QuestionRead)
 def update_question(
     question_id: uuid.UUID,
-    question_data: QuestionCreate, # Reusing create schema for simplicity
+    question_data: QuestionUpdate,
     db: Session = Depends(get_db),
     admin_user=Depends(get_current_admin_user)
 ):
     """
-    Update a question's text, type, points, and options.
+    Update a specific question.
     """
-    question = db.get(Question, question_id)
-    if not question:
+    db_question = db.get(Question, question_id)
+    if not db_question:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
 
-    # Update question fields
-    question.text = question_data.text
-    question.question_type = question_data.question_type
-    question.points = question_data.points
+    # Update the question's text
+    db_question.text = question_data.text
 
-    # Delete old options
-    for option in question.options:
-        db.delete(option)
+    # Clear existing options
+    db_question.options.clear()
 
-    # Create new options
+    # Add new options
     for option_data in question_data.options:
-        new_option = Option(**option_data.dict(), question_id=question.id)
-        db.add(new_option)
+        new_option = Option(text=option_data.text, is_correct=option_data.is_correct)
+        db_question.options.append(new_option)
 
+    db.add(db_question)
     db.commit()
-    db.refresh(question)
-    return question
+    db.refresh(db_question)
+
+    return db_question
 
 @router.delete("/questions/{question_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_question(
