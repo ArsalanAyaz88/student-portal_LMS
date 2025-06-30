@@ -82,7 +82,15 @@ def get_quiz_details(
     """
     Get detailed information about a specific quiz, including its questions and options.
     """
-    quiz = db.get(Quiz, quiz_id)
+    statement = (
+        select(Quiz)
+        .where(Quiz.id == quiz_id)
+        .options(
+            joinedload(Quiz.questions).joinedload(Question.options)
+        )
+    )
+    quiz = db.exec(statement).first()
+
     if not quiz:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
     return quiz
