@@ -47,16 +47,10 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://lmsfrontend-neon.vercel.app",
-        "https://lmsfrontend-git-main-arsalans-projects-4d19f3c6.vercel.app",
-        "https://lmsfrontend-hd2dwsp0m-arsalans-projects-4d19f3c6.vercel.app",
-        "http://localhost:3000",
-        "http://localhost:5173",
-    ],
-    allow_methods=["*"],
-    allow_headers=["*","Authorization"],
-    allow_credentials=False,            # keep False (you’re not using cookies)
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True, # Allows credentials (e.g., Authorization headers)
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
 )
 
 # ─── DB tables on startup ──────────────────────────────────────
