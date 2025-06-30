@@ -3,6 +3,7 @@ from sqlmodel import Session, select
 from sqlalchemy.orm import joinedload
 from typing import List
 import uuid
+import logging
 
 from src.app.db.session import get_db
 from src.app.utils.dependencies import get_current_admin_user
@@ -13,6 +14,10 @@ from src.app.schemas.quiz import (
     QuestionCreate, QuestionUpdate, QuestionRead,
     QuizReadWithDetails, QuizSubmissionReadWithStudent, GradingViewSchema, QuizSubmissionRead
 )
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # --- Router Definitions ---
 # Using distinct routers for each resource type for a clean, RESTful API design.
@@ -91,28 +96,31 @@ def add_question_to_quiz(
     db: Session = Depends(get_db),
     admin_user=Depends(get_current_admin_user)
 ):
-    """Add a new question to a specific quiz."""
+    """Add a new question to a specific quiz with robust logging."""
+    logger.info(f"Attempting to add question to quiz {quiz_id}")
+    logger.info(f"Received question data: {question_data.dict()}")
+    
     if not db.get(Quiz, quiz_id):
+        logger.error(f"Quiz with id {quiz_id} not found.")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
 
-    # Step 1: Create the Question object and flush it to get an ID.
-    new_question = Question(text=question_data.text, quiz_id=quiz_id)
-    db.add(new_question)
-    db.flush()
-
-    # Step 2: Create Option objects with the explicit question_id.
-    for option_data in question_data.options:
-        new_option = Option(
-            text=option_data.text, 
-            is_correct=option_data.is_correct, 
-            question_id=new_question.id
-        )
-        db.add(new_option)
-    
-    # Step 3: Commit the transaction and refresh the question object.
-    db.commit()
-    db.refresh(new_question)
-    return new_question
+    try:
+        new_question = Question(text=question_data.text, quiz_id=quiz_id)
+        new_question.options = [
+            Option(text=opt.text, is_correct=opt.is_correct) 
+            for opt in question_data.options
+        ]
+        
+        logger.info("Adding new question with options to the session.")
+        db.add(new_question)
+        db.commit()
+        db.refresh(new_question)
+        logger.info(f"Successfully created question with id {new_question.id}")
+        return new_question
+    except Exception as e:
+        logger.error(f"Failed to add question to quiz {quiz_id}. Error: {e}", exc_info=True)
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred while saving the question.")
 
 
 # --- Question Management Endpoints ---
@@ -124,32 +132,30 @@ def update_question(
     db: Session = Depends(get_db),
     admin_user=Depends(get_current_admin_user)
 ):
-    """Update a specific question's text and options."""
+    """Update a specific question's text and options with robust logging."""
+    logger.info(f"Attempting to update question {question_id}")
     db_question = db.get(Question, question_id)
     if not db_question:
+        logger.error(f"Question with id {question_id} not found for update.")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
 
-    # Step 1: Update the question's text.
-    db_question.text = question_data.text
+    try:
+        db_question.text = question_data.text
+        db_question.options = [
+            Option(text=opt.text, is_correct=opt.is_correct) 
+            for opt in question_data.options
+        ]
 
-    # Step 2: Manually delete all existing options for this question.
-    for option in db_question.options:
-        db.delete(option)
-    db.flush() # Ensure deletions are processed.
-
-    # Step 3: Create and add new Option objects with the explicit question_id.
-    for option_data in question_data.options:
-        new_option = Option(
-            text=option_data.text, 
-            is_correct=option_data.is_correct, 
-            question_id=db_question.id
-        )
-        db.add(new_option)
-
-    # Step 4: Commit the transaction and refresh the question object.
-    db.commit()
-    db.refresh(db_question)
-    return db_question
+        logger.info(f"Updating question {question_id} with new data.")
+        db.add(db_question)
+        db.commit()
+        db.refresh(db_question)
+        logger.info(f"Successfully updated question {question_id}")
+        return db_question
+    except Exception as e:
+        logger.error(f"Failed to update question {question_id}. Error: {e}", exc_info=True)
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred while updating the question.")
 
 @question_router.delete("/{question_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_question(
