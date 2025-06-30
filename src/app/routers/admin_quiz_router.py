@@ -13,7 +13,7 @@ from src.app.schemas.quiz import (
     QuestionCreate, QuestionRead, QuestionUpdate, 
     QuizSubmissionCreate, QuizSubmissionRead, GradeSubmissionRequest
 )
-from src.app.auth.auth import get_current_admin_user
+from src.app.utils.dependencies import get_current_admin_user
 
 # --- Router Definitions ---
 # Using distinct routers for each resource type for a clean, RESTful API design.
