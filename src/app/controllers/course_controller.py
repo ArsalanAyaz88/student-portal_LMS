@@ -19,7 +19,9 @@ from datetime import datetime
 import uuid
 import os
 from ..utils.time import get_pakistan_time
-from fastapi import File
+from fastapi import File, UploadFile
+import cloudinary
+import cloudinary.uploader
 
 router = APIRouter(tags=["Courses"])
 
@@ -420,4 +422,68 @@ def get_certificate(
         raise HTTPException(
             status_code=500,
             detail=f"Error retrieving certificate: {str(e)}"
+        )
+
+
+@router.put("/courses/{course_id}/thumbnail", response_model=CourseRead)
+def upload_course_thumbnail(
+    course_id: str,
+    file: UploadFile = File(...),
+    session: Session = Depends(get_db),
+    # Assuming you have a dependency to get an admin/instructor user
+    # For now, we'll use get_current_user and you can restrict it later
+    user=Depends(get_current_user)
+):
+    """
+    Uploads a thumbnail for a specific course to Cloudinary and updates the database.
+    This endpoint should be restricted to admins or course instructors.
+    """
+    try:
+        course_uuid = uuid.UUID(course_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid course ID format"
+        )
+
+    course = session.exec(select(Course).where(Course.id == course_uuid)).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    # TODO: Add authorization check to ensure the user is an admin or instructor
+
+    try:
+        # Upload image to Cloudinary
+        upload_result = cloudinary.uploader.upload(
+            file.file,
+            folder="course_thumbnails",
+            public_id=f"{course_id}_thumbnail",
+            overwrite=True,
+            resource_type="image"
+        )
+        secure_url = upload_result.get('secure_url')
+
+        if not secure_url:
+            raise HTTPException(status_code=500, detail="Cloudinary upload failed: No URL returned.")
+
+        # Update course thumbnail_url
+        course.thumbnail_url = secure_url
+        session.add(course)
+        session.commit()
+        session.refresh(course)
+
+        # Return the updated course details
+        return CourseRead(
+            id=course.id,
+            title=course.title,
+            thumbnail_url=course.thumbnail_url,
+            # Expiration date is not relevant here, but the model requires it
+            expiration_date=None 
+        )
+
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"An error occurred during thumbnail upload: {str(e)}"
         )
