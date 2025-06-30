@@ -5,6 +5,7 @@ from reportlab.lib.units import inch
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase import pdfmetrics
 import os
+import io
 import math
 import uuid
 import logging
@@ -20,11 +21,7 @@ logger = logging.getLogger(__name__)
 class CertificateGenerator:
     """PDF certificate with header banner, layered border, watermark,
        arc header, starburst seal, logo, body, and footer."""
-    def __init__(self, output_dir='certificates', logo_path=None, signature_path=None):
-        # Ensure output directory exists
-        self.output_dir = output_dir
-        os.makedirs(self.output_dir, exist_ok=True)  
-
+    def __init__(self, logo_path=None, signature_path=None):
         # Always use the user's provided absolute logo path
         self.logo_path = r"F:\student_project\application\src\app\utils\sabri_logo.png"
         # Signature path (optional)
@@ -59,10 +56,9 @@ class CertificateGenerator:
             if not certificate_number:
                 certificate_number = self._generate_number()
 
-            filename = f"certificate_{certificate_number}.pdf"
-            filepath = os.path.join(self.output_dir, filename)
+            pdf_buffer = io.BytesIO()
             width, height = landscape(A4)
-            c = canvas.Canvas(filepath, pagesize=(width, height))
+            c = canvas.Canvas(pdf_buffer, pagesize=(width, height))
 
             # Define border_margin for downstream code compatibility
             border_margin = 0.32*inch
@@ -193,19 +189,17 @@ class CertificateGenerator:
 
             # Upload to B2 storage
             try:
-                # Create a file-like object from the PDF
-                with open(filepath, 'rb') as file_obj:
-                    # Use save_upload_and_get_url with certificates folder
-                    url = save_upload_and_get_url(
-                        file=UploadFile(
-                            filename=f"certificate_{certificate_number}.pdf",
-                            file=file_obj
-                        ),
-                        folder="certificates"
-                    )
+                # Move buffer's cursor to the beginning
+                pdf_buffer.seek(0)
                 
-                # Clean up local file
-                os.remove(filepath)
+                # Use save_upload_and_get_url with certificates folder
+                url = save_upload_and_get_url(
+                    file=UploadFile(
+                        filename=f"certificate_{certificate_number}.pdf",
+                        file=pdf_buffer
+                    ),
+                    folder="certificates"
+                )
                 
                 return url
             except Exception as e:

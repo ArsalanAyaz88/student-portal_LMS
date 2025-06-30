@@ -4,6 +4,7 @@ from typing import List, Optional, TYPE_CHECKING
 from sqlalchemy import Column, Text, ForeignKey
 import json
 from datetime import datetime
+from src.app.utils.time import get_pakistan_time
 from src.app.models.enrollment import Enrollment
 from src.app.models.course_progress import CourseProgress
 from src.app.models.assignment import Assignment
@@ -45,8 +46,8 @@ class Course(SQLModel, table=True):
     difficulty_level: Optional[str] = None
     created_by: Optional[str] = None
     updated_by: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=get_pakistan_time)
+    updated_at: datetime = Field(default_factory=get_pakistan_time)
     outcomes: str = Field(default="", sa_column=Column(Text))
     prerequisites: str = Field(default="", sa_column=Column(Text))
     curriculum: str = Field(default="", sa_column=Column(Text))

@@ -19,7 +19,7 @@ class Enrollment(SQLModel, table=True):
     user_id: str = Field(foreign_key="user.id")
     course_id: str = Field(foreign_key="course.id")
     status: str = Field(default="pending")  # pending, approved, rejected
-    enroll_date: Optional[datetime] = None
+    enroll_date: datetime = Field(default_factory=get_pakistan_time)
     expiration_date: Optional[datetime] = None
     is_accessible: bool = Field(default=False)
     days_remaining: Optional[int] = None

@@ -4,6 +4,7 @@ from sqlmodel import Session, select
 from uuid import UUID
 from fastapi import HTTPException, status
 from datetime import datetime
+from ..utils.time import get_pakistan_time
 
 from ..models.quiz import Quiz, QuizSubmission, Answer, Option
 from ..models.quiz_audit_log import QuizAuditLog
@@ -90,7 +91,7 @@ def submit_quiz(
     sub = QuizSubmission(
         quiz_id=quiz_id,
         student_id=student_id,
-        submitted_at=datetime.utcnow()
+        submitted_at=get_pakistan_time()
     )
     db.add(sub)
     db.commit()
