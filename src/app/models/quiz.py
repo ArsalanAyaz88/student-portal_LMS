@@ -27,7 +27,6 @@ class Question(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     quiz_id: uuid.UUID = Field(foreign_key="quiz.id")
     text: str
-    points: int = Field(default=1) # Points for a correct answer
 
     quiz: Quiz = Relationship(back_populates="questions")
     options: List["src.app.models.quiz.Option"] = Relationship(back_populates="question", sa_relationship_kwargs={"cascade": "all, delete-orphan"})

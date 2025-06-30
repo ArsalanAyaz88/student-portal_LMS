@@ -23,7 +23,6 @@ class OptionRead(OptionBase):
 
 class QuestionBase(BaseModel):
     text: str
-    points: int = 1
 
 class QuestionCreate(QuestionBase):
     options: List[OptionCreate]
