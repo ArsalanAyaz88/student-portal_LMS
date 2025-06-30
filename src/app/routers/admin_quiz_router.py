@@ -11,7 +11,7 @@ from src.app.models.quiz import Quiz, Question, Option
 from src.app.schemas.quiz import (
     QuizCreate, QuizRead, QuizUpdate, 
     QuestionCreate, QuestionRead, QuestionUpdate, 
-    QuizSubmissionCreate, QuizSubmissionRead, Grade
+    QuizSubmissionCreate, QuizSubmissionRead, GradeSubmissionRequest
 )
 from src.app.auth.auth import get_current_admin_user
 
