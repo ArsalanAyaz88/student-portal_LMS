@@ -43,7 +43,7 @@ def create_quiz_for_course(
     db.refresh(new_quiz)
     return new_quiz
 
-@router.get("/courses/{course_id}/quizzes", response_model=List[QuizRead])
+@router.get("/courses/{course_id}/quizzes")
 def get_quizzes_for_course(
     course_id: uuid.UUID,
     db: Session = Depends(get_db),

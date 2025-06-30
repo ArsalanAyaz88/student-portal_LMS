@@ -42,7 +42,6 @@ class QuizBase(BaseModel):
     title: str
     description: Optional[str] = None
     due_date: Optional[datetime] = None
-    published: bool = False
 
 class QuizCreate(QuizBase):
     pass # No extra fields needed for creation initially
