@@ -55,7 +55,11 @@ def get_quizzes_for_course(
     course = db.get(Course, course_id)
     if not course:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
-    return course.quizzes
+    
+    # Explicitly query for quizzes to avoid potential lazy-loading issues.
+    statement = select(Quiz).where(Quiz.course_id == course_id)
+    quizzes = db.exec(statement).all()
+    return quizzes
 
 @router.get("/quizzes/{quiz_id}", response_model=QuizReadWithDetails)
 def get_quiz_details(
