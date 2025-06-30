@@ -3,6 +3,8 @@ import os
 import uuid
 import logging
 from typing import Optional
+import asyncio
+import functools
 
 from fastapi import UploadFile, HTTPException, status
 import cloudinary.uploader
@@ -18,7 +20,7 @@ logger.setLevel(logging.DEBUG)
 # File logging to a specific path is disabled for the serverless environment.
 # The logger will now output to stdout/stderr, which is captured by Vercel.
 
-def upload_file_to_cloudinary(file_obj, public_id: str, folder: Optional[str] = None) -> str:
+async def upload_file_to_cloudinary(file_obj, public_id: str, folder: Optional[str] = None) -> str:
     """
     Upload file to Cloudinary.
     
@@ -43,8 +45,11 @@ def upload_file_to_cloudinary(file_obj, public_id: str, folder: Optional[str] = 
             upload_options['folder'] = folder.rstrip('/')
         
         # Upload the file
-        result = cloudinary.uploader.upload(file_obj, **upload_options)
-        
+        loop = asyncio.get_event_loop()
+        # Use a lambda to pass keyword arguments to the executor
+        upload_func = functools.partial(cloudinary.uploader.upload, file_obj, **upload_options)
+        result = await loop.run_in_executor(None, upload_func)
+
         # Get the secure URL
         url, options = cloudinary_url(
             result['public_id'],
@@ -62,7 +67,7 @@ def upload_file_to_cloudinary(file_obj, public_id: str, folder: Optional[str] = 
             detail=f"Failed to upload file to Cloudinary: {str(e)}"
         )
 
-def save_upload_and_get_url(file: UploadFile, folder: str = "") -> str:
+async def save_upload_and_get_url(file: UploadFile, folder: str = "") -> str:
     """
     Upload the file to Cloudinary and return the URL.
     
@@ -81,7 +86,7 @@ def save_upload_and_get_url(file: UploadFile, folder: str = "") -> str:
         
         # Upload the file
         file.file.seek(0)
-        return upload_file_to_cloudinary(file.file, public_id, folder)
+        return await upload_file_to_cloudinary(file.file, public_id, folder)
         
     except Exception as e:
         logger.error(f"Error processing file upload: {str(e)}")

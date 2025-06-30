@@ -55,7 +55,7 @@ async def upload_image(
     
     try:
         # This utility function handles the upload and returns a public URL.
-        image_url = await save_upload_and_get_url(upload_file=file)
+        image_url = await save_upload_and_get_url(file=file)
         return {"url": image_url}
     except Exception as e:
         logging.error(f"Error uploading image: {e}")
