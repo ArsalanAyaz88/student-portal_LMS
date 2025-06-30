@@ -154,7 +154,7 @@ def get_course_description(course_id: str, session: Session = Depends(get_db)):
     return DescriptionSchema(description=course.description or "")
 
 
-@router.get("/my-courses/{course_id}/videos", response_model=list[VideoWithCheckpoint])
+@router.get("/my-courses/{course_id}/videos-with-checkpoint", response_model=list[VideoWithCheckpoint])
 def get_course_videos_with_checkpoint(
     course_id: str,
     user=Depends(get_current_user),
