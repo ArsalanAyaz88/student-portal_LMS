@@ -4,6 +4,8 @@ from sqlmodel import Session, select
 from uuid import UUID
 from fastapi import HTTPException, status
 from datetime import datetime
+import pytz
+from ..utils.time import get_pakistan_time
 
 from ..models.assignment import Assignment, AssignmentSubmission
 from ..models.enrollment import Enrollment
@@ -66,8 +68,8 @@ def submit_assignment(
             detail="Assignment not found"
         )
 
-    now_utc = datetime.utcnow()
-    if now_utc > assignment.due_date:
+    now_pakistan_time = get_pakistan_time()
+    if now_pakistan_time > pytz.utc.localize(assignment.due_date):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="⏰ The due date has passed. You can no longer submit this assignment."

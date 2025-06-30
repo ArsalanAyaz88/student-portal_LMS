@@ -19,6 +19,7 @@ from datetime import datetime
 import uuid
 import os
 from ..utils.time import get_pakistan_time
+import pytz
 from fastapi import File
 
 router = APIRouter(tags=["Courses"])
@@ -154,10 +155,10 @@ def get_course_videos_with_checkpoint(
             )
 
         # Manually check expiration status in memory
-        current_time = get_pakistan_time().replace(tzinfo=None)
+        current_time = get_pakistan_time()
         
         # An enrollment is not accessible if it has an expiration date that is in the past.
-        if enrollment.expiration_date and enrollment.expiration_date < current_time:
+        if enrollment.expiration_date and pytz.utc.localize(enrollment.expiration_date) < current_time:
             raise HTTPException(
                 status_code=403,
                 detail="Your access to this course has expired."
@@ -264,10 +265,10 @@ def mark_video_completed(
             )
 
         # Manually check expiration status in memory
-        current_time = get_pakistan_time().replace(tzinfo=None)
+        current_time = get_pakistan_time()
         
         # An enrollment is not accessible if it has an expiration date that is in the past.
-        if enrollment.expiration_date and enrollment.expiration_date < current_time:
+        if enrollment.expiration_date and pytz.utc.localize(enrollment.expiration_date) < current_time:
             raise HTTPException(
                 status_code=403,
                 detail="Your access to this course has expired."

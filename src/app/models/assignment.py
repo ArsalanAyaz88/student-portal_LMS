@@ -1,7 +1,8 @@
 # assignment.py
 from sqlmodel import SQLModel, Field, Relationship
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
+from src.app.utils.time import get_pakistan_time
 from typing import List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -24,7 +25,7 @@ class AssignmentSubmission(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     assignment_id: uuid.UUID = Field(foreign_key="assignment.id")
     student_id: uuid.UUID = Field(foreign_key="user.id")
-    submitted_at: datetime = Field(default_factory=datetime.utcnow)
+    submitted_at: datetime = Field(default_factory=get_pakistan_time)
     content_url: str
 
     # ← New fields:
