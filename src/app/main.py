@@ -15,6 +15,13 @@ import cloudinary
 from src.app.db.session import create_db_and_tables
 from src.app.models.course import Course
 from src.app.models.video import Video
+from src.app.controllers import (
+    auth_controller,
+    student_controller,
+    admin_controller,
+    public_controller,
+    enrollment_controller
+)
 from src.app.routers import (
     auth_router,
     profile_router,
@@ -25,7 +32,6 @@ from src.app.routers import (
     student_dashboard_router,
     admin_quiz_router,
 )
-from src.app.controllers import enrollment_controller
 
 # ─── Env setup ─────────────────────────────────────────────
 load_dotenv()
@@ -62,6 +68,7 @@ async def startup_event() -> None:
 # ─── Routers ───────────────────────────────────────────────────
 app.include_router(auth_router.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(profile_router.router, prefix="/api/profile", tags=["Profile"])
+app.include_router(public_controller.router, prefix="/api/public", tags=["Public"])
 app.include_router(course_router.router, prefix="/api/courses", tags=["Courses"])
 app.include_router(enrollment_controller.router, prefix="/api/enrollments", tags=["Enrollments"])
 app.include_router(admin_router.router, prefix="/api/admin", tags=["Admin"])
@@ -72,11 +79,11 @@ app.include_router(
     prefix="/api/student/dashboard",
     tags=["Student Dashboard"],
 )
-app.include_router(
-    admin_quiz_router.router,
-    prefix="/api/admin/quizzes",
-    tags=["Admin Quizzes"],
-)
+
+# Include the refactored admin quiz routers
+app.include_router(admin_quiz_router.quiz_router, prefix="/api/admin")
+app.include_router(admin_quiz_router.question_router, prefix="/api/admin")
+app.include_router(admin_quiz_router.submission_router, prefix="/api/admin")
 
 # ─── Simple endpoints ──────────────────────────────────────────
 @app.get("/")

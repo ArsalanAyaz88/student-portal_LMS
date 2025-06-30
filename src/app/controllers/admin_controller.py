@@ -26,12 +26,12 @@ import re
 from datetime import datetime, timedelta
 from src.app.utils.time import get_pakistan_time
 from src.app.models.assignment import Assignment, AssignmentSubmission
-from src.app.models.quiz import Quiz, Question, Option
+
 from typing import List
 from fastapi import Form
 from src.app.utils.file import save_upload_and_get_url
 from src.app.schemas.assignment import AssignmentCreate, AssignmentRead, AssignmentList, SubmissionRead, SubmissionGrade, SubmissionStudent, SubmissionStudentsResponse
-from src.app.schemas.quiz import QuizCreate, QuizRead, QuizUpdate, QuizResult, QuizSubmissionStatus
+
 import logging
 
 router = APIRouter(
