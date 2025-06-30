@@ -99,6 +99,30 @@ def explore_course_detail(course_id: str, session: Session = Depends(get_db)):
         prerequisites=course.prerequisites or "",
         curriculum=course.curriculum or ""
     )
+
+# --- Enrollment Status ---
+@router.get("/my-courses/{course_id}/enrollment-status", response_model=dict)
+def get_enrollment_status(course_id: str, user=Depends(get_current_user), session: Session = Depends(get_db)):
+    try:
+        course_uuid = uuid.UUID(course_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid course ID format")
+
+    enrollment = session.exec(
+        select(Enrollment).where(
+            Enrollment.user_id == user.id,
+            Enrollment.course_id == course_uuid,
+            Enrollment.status == "approved"
+        )
+    ).first()
+
+    if enrollment:
+        enrollment.update_expiration_status()
+        if enrollment.is_accessible:
+            return {"is_enrolled": True}
+
+    return {"is_enrolled": False}
+
 # --- Curriculum Text Endpoint ---
 @router.get("/courses/{course_id}/curriculum", response_model=CurriculumSchema)
 def get_course_curriculum(course_id: str, session: Session = Depends(get_db)):
