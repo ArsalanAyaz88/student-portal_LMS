@@ -118,3 +118,10 @@ class QuizSubmissionStatus(BaseModel):
 
 QuizResult = QuizSubmissionRead  # Alias for compatibility
 
+class AnswerCreate(BaseModel):
+    question_id: uuid.UUID
+    selected_option_id: Optional[uuid.UUID] = None
+
+class QuizSubmissionCreate(BaseModel):
+    answers: List[AnswerCreate]
+
