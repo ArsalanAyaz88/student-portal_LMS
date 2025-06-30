@@ -73,7 +73,7 @@ def get_quizzes_for_course(
     ]
     return JSONResponse(content=response_data)
 
-@router.get("/quizzes/{quiz_id}", response_model=QuizReadWithDetails)
+@router.get("/{quiz_id}", response_model=QuizReadWithDetails)
 def get_quiz_details(
     quiz_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -87,7 +87,7 @@ def get_quiz_details(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
     return quiz
 
-@router.put("/quizzes/{quiz_id}", response_model=QuizRead)
+@router.put("/{quiz_id}", response_model=QuizRead)
 def update_quiz(
     quiz_id: uuid.UUID,
     quiz_data: QuizUpdate,
@@ -110,7 +110,7 @@ def update_quiz(
     db.refresh(quiz)
     return quiz
 
-@router.delete("/quizzes/{quiz_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{quiz_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_quiz(
     quiz_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -131,7 +131,7 @@ def delete_quiz(
 # Question Management Endpoints
 #
 
-@router.post("/quizzes/{quiz_id}/questions", response_model=QuestionRead, status_code=status.HTTP_201_CREATED)
+@router.post("/{quiz_id}/questions", response_model=QuestionRead, status_code=status.HTTP_201_CREATED)
 def add_question_to_quiz(
     quiz_id: uuid.UUID,
     question_data: QuestionCreate,
@@ -217,7 +217,7 @@ def delete_question(
 # Submission and Grading Endpoints
 #
 
-@router.get("/quizzes/{quiz_id}/submissions", response_model=List[QuizSubmissionReadWithStudent])
+@router.get("/{quiz_id}/submissions", response_model=List[QuizSubmissionReadWithStudent])
 def get_quiz_submissions(
     quiz_id: uuid.UUID,
     db: Session = Depends(get_db),
