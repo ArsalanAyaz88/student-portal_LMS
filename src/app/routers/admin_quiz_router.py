@@ -160,7 +160,7 @@ def update_question(
     """
     question = db.get(Question, question_id)
     if not question:
-        raise HTTPException(status_code=404_NOT_FOUND, detail="Question not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
 
     # Update question fields
     question.text = question_data.text
@@ -191,7 +191,7 @@ def delete_question(
     """
     question = db.get(Question, question_id)
     if not question:
-        raise HTTPException(status_code=404_NOT_FOUND, detail="Question not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
     
     db.delete(question)
     db.commit()
@@ -270,7 +270,7 @@ def grade_submission(
     """
     submission = db.get(QuizSubmission, submission_id)
     if not submission:
-        raise HTTPException(status_code=404_NOT_FOUND, detail="Submission not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
     
     submission.score = score
     submission.feedback = feedback
