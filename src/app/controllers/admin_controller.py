@@ -90,84 +90,62 @@ async def create_course(
       "preview_video": {
         "youtube_url": "https://www.youtube.com/watch?v=preview_video_id",
         "title": "Course Preview",
-        "description": "A quick look at what this course offers."
+        "description": "A short preview of what the course offers."
       },
       "videos": [
         {
-          "youtube_url": "https://www.youtube.com/watch?v=video_one_id",
-          "title": "Chapter 1: Introduction",
+          "youtube_url": "https://www.youtube.com/watch?v=video1_id",
+          "title": "Introduction to Python",
           "description": "Setting up your Python environment."
         },
         {
-          "youtube_url": "https://www.youtube.com/watch?v=video_two_id",
-          "title": "Chapter 2: Data Types",
-          "description": "An in-depth look at Python's data types."
+          "youtube_url": "https://www.youtube.com/watch?v=video2_id",
+          "title": "Variables and Data Types",
+          "description": "Understanding the basic building blocks of Python."
         }
       ]
     }
     ```
 
     **Returns:**
-    The newly created course object if successful.
+    - A JSON object with the details of the newly created course, including the preview video and course videos.
 
     **Raises:**
-    - `HTTPException(400)`: If a course with the same title already exists.
+    - `HTTPException(400)`: If the request body is invalid.
     - `HTTPException(500)`: For any other server-side errors.
     """
-    # Check for existing course
-    if db.exec(select(Course).where(Course.title == course_data.title)).first():
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Course with this title already exists")
-
-    # 1. Create all objects in memory first
-    new_course = Course(
-        title=course_data.title,
-        description=course_data.description,
-        price=course_data.price,
-        difficulty_level=course_data.difficulty_level,
-        outcomes=course_data.outcomes,
-        prerequisites=course_data.prerequisites,
-        curriculum=course_data.curriculum,
-        status=course_data.status,
-        created_by=str(admin.id),
-        updated_by=str(admin.id),
-        created_at=get_pakistan_time(),
-        updated_at=get_pakistan_time()
-    )
-
-    # 2. Create all video objects first
-    all_video_objects = []
-    preview_video_obj = None
-    if course_data.preview_video:
-        preview_video_obj = Video(**course_data.preview_video.dict())
-        all_video_objects.append(preview_video_obj)
-
-    if course_data.videos:
-        for video_data in course_data.videos:
-            all_video_objects.append(Video(**video_data.dict()))
-
-    # 3. Establish relationships in the correct order
-    # This populates video.course_id via back_populates
-    new_course.videos = all_video_objects
-
-    # This uses the 'post_update' strategy to break the circular dependency
-    if preview_video_obj:
-        new_course.preview_video = preview_video_obj
-
-    # 3. Add only the parent object to the session. Cascade will handle the rest.
-    db.add(new_course)
-
-    # 4. Commit the entire transaction. SQLAlchemy will resolve the insert order.
+    session = db
     try:
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        print(f"Database commit failed: {e}")
-        raise HTTPException(status_code=500, detail="An error occurred while creating the course.")
+        # Start a transaction
+        with session.begin_nested() if session.in_transaction() else session.begin() as transaction:
+            # 1. Create the Course object
+            new_course = Course(
+                title=course_data.title,
+                description=course_data.description,
+                price=course_data.price,
+                difficulty_level=course_data.difficulty_level,
+                outcomes=course_data.outcomes,
+                prerequisites=course_data.prerequisites,
+                curriculum=course_data.curriculum,
+                status=course_data.status,
+                created_by=admin.id,
+                updated_by=admin.id,
+            )
+            session.add(new_course)
 
-    # 5. Refresh the objects to get DB-generated values
-    db.refresh(new_course)
-    if new_course.preview_video:
-        db.refresh(new_course.preview_video)
+            # 2. Create and associate videos within the same transaction
+            videos_to_add = []
+            if course_data.preview_video:
+                preview_video_data = course_data.preview_video
+                preview_video = Video(
+                    youtube_url=str(preview_video_data.youtube_url),
+                    title=preview_video_data.title,
+                    description=preview_video_data.description,
+                    is_preview=True,
+                    course_id=new_course.id  # Set course_id directly
+                )
+                videos_to_add.append(preview_video)
+                # We will set the preview_video_id on the course later
     for video in new_course.videos:
         db.refresh(video)
 
