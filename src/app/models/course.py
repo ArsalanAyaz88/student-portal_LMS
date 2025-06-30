@@ -42,7 +42,7 @@ class Course(SQLModel, table=True):
     enrollments: List["src.app.models.enrollment.Enrollment"] = Relationship(back_populates="course", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
     progress: List["src.app.models.course_progress.CourseProgress"] = Relationship(back_populates="course", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
     assignments: List["src.app.models.assignment.Assignment"] = Relationship(back_populates="course", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
-    quizzes: List["src.app.models.quiz.Quiz"] = Relationship(back_populates="course", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+    quizzes: List["Quiz"] = Relationship(back_populates="course", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
     difficulty_level: Optional[str] = None
     created_by: Optional[str] = None
     updated_by: Optional[str] = None

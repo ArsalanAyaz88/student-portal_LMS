@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import JSONResponse
 from sqlmodel import Session, select
 from sqlalchemy.orm import joinedload
 from typing import List
@@ -43,7 +44,7 @@ def create_quiz_for_course(
     db.refresh(new_quiz)
     return new_quiz
 
-@router.get("/courses/{course_id}/quizzes", response_model=List[QuizRead])
+@router.get("/courses/{course_id}/quizzes")
 def get_quizzes_for_course(
     course_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -55,11 +56,22 @@ def get_quizzes_for_course(
     course = db.get(Course, course_id)
     if not course:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
-    
-    # Explicitly query for quizzes to avoid potential lazy-loading issues.
+
     statement = select(Quiz).where(Quiz.course_id == course_id)
     quizzes = db.exec(statement).all()
-    return quizzes
+
+    # Manually construct the response to bypass serialization issues.
+    response_data = [
+        {
+            "id": str(quiz.id),
+            "course_id": str(quiz.course_id),
+            "title": quiz.title,
+            "description": quiz.description,
+            "due_date": quiz.due_date.isoformat() if quiz.due_date else None
+        }
+        for quiz in quizzes
+    ]
+    return JSONResponse(content=response_data)
 
 @router.get("/quizzes/{quiz_id}", response_model=QuizReadWithDetails)
 def get_quiz_details(

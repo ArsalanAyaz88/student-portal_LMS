@@ -16,12 +16,11 @@ class Quiz(SQLModel, table=True):
     title: str
     description: Optional[str] = None
     due_date: Optional[datetime] = None
-    published: bool = Field(default=False) # To control visibility to students
 
-    course: "src.app.models.course.Course" = Relationship(back_populates="quizzes")
     questions: List["src.app.models.quiz.Question"] = Relationship(back_populates="quiz", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
     submissions: List["src.app.models.quiz.QuizSubmission"] = Relationship(back_populates="quiz", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
     audit_logs: List["src.app.models.quiz_audit_log.QuizAuditLog"] = Relationship(back_populates="quiz", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+    course: "Course" = Relationship(back_populates="quizzes")
 
 class Question(SQLModel, table=True):
     __table_args__ = {"extend_existing": True}
