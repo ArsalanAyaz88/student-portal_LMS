@@ -135,3 +135,8 @@ class AnswerCreate(BaseModel):
 class QuizSubmissionCreate(BaseModel):
     answers: List[AnswerCreate]
 
+
+# --- Aliases for router responses ---
+QuizListRead = QuizRead
+QuizDetailRead = QuizReadWithDetails
+
