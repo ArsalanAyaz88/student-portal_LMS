@@ -95,15 +95,21 @@ def add_question_to_quiz(
     if not db.get(Quiz, quiz_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
 
-    # Create the question instance without the options first
+    # Step 1: Create the Question object and flush it to get an ID.
     new_question = Question(text=question_data.text, quiz_id=quiz_id)
-
-    # Create and add the options manually
-    for option_data in question_data.options:
-        new_option = Option(text=option_data.text, is_correct=option_data.is_correct)
-        new_question.options.append(new_option)
-
     db.add(new_question)
+    db.flush()
+
+    # Step 2: Create Option objects with the explicit question_id.
+    for option_data in question_data.options:
+        new_option = Option(
+            text=option_data.text, 
+            is_correct=option_data.is_correct, 
+            question_id=new_question.id
+        )
+        db.add(new_option)
+    
+    # Step 3: Commit the transaction and refresh the question object.
     db.commit()
     db.refresh(new_question)
     return new_question
@@ -123,19 +129,24 @@ def update_question(
     if not db_question:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
 
-    # Update the question's text
+    # Step 1: Update the question's text.
     db_question.text = question_data.text
 
-    # Clear existing options, leveraging the 'delete-orphan' cascade
-    db_question.options.clear()
-    db.flush() # Flush to ensure the delete operations are sent to the DB
+    # Step 2: Manually delete all existing options for this question.
+    for option in db_question.options:
+        db.delete(option)
+    db.flush() # Ensure deletions are processed.
 
-    # Create and add the new options
+    # Step 3: Create and add new Option objects with the explicit question_id.
     for option_data in question_data.options:
-        new_option = Option(text=option_data.text, is_correct=option_data.is_correct)
-        db_question.options.append(new_option)
+        new_option = Option(
+            text=option_data.text, 
+            is_correct=option_data.is_correct, 
+            question_id=db_question.id
+        )
+        db.add(new_option)
 
-    db.add(db_question)
+    # Step 4: Commit the transaction and refresh the question object.
     db.commit()
     db.refresh(db_question)
     return db_question
