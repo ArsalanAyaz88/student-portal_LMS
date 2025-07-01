@@ -14,7 +14,6 @@ from ..schemas.quiz import (
     QuizSubmissionCreate,
     QuizResult,
     ResultAnswer,
-    QuizListRead,
 )
 
 
@@ -62,17 +61,16 @@ def list_quizzes(db: Session, course_id: UUID, student_id: UUID):
         quizzes_with_status = []
         for quiz in all_quizzes:
             submission = submissions_map.get(quiz.id)
-            quizzes_with_status.append(
-                QuizListRead(
-                    id=quiz.id,
-                    title=quiz.title,
-                    description=quiz.description,
-                    due_date=quiz.due_date,
-                    course_id=quiz.course_id,
-                    is_submitted=submission is not None,
-                    score=submission.score if submission else None,
-                )
-            )
+            quiz_data = {
+                "id": quiz.id,
+                "title": quiz.title,
+                "description": quiz.description,
+                "due_date": quiz.due_date,
+                "course_id": quiz.course_id,
+                "is_submitted": submission is not None,
+                "score": submission.score if submission else None,
+            }
+            quizzes_with_status.append(quiz_data)
 
         logging.info(f"Found {len(all_quizzes)} quizzes for course {course_id}, with submission statuses.")
         return quizzes_with_status
