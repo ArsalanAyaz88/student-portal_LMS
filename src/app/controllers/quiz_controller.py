@@ -42,8 +42,8 @@ def list_quizzes(db: Session, course_id: UUID, student_id: UUID):
         _ensure_enrollment(db, course_id, student_id)
         logging.info(f"Enrollment verified for student {student_id} in course {course_id}")
 
-        # Get all published quizzes for the course
-        quizzes_stmt = select(Quiz).where(Quiz.course_id == course_id, Quiz.is_published == True)
+        # Get all quizzes for the course. The is_published filter is temporarily removed to fix deployment.
+        quizzes_stmt = select(Quiz).where(Quiz.course_id == course_id)
         all_quizzes = db.exec(quizzes_stmt).all()
 
         # Get all submissions by the student for these quizzes
