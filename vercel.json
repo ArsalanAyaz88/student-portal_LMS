@@ -1,18 +1,16 @@
 {
   "version": 2,
+  "buildCommand": "pip install -r requirements.txt && alembic upgrade head",
   "builds": [
     {
-      "src": "api/index.py",
+      "src": "src/app/main.py",
       "use": "@vercel/python"
     }
   ],
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "api/index.py"
+      "dest": "src/app/main.py"
     }
-  ],
-  "env": {
-    "ENVIRONMENT": "production"
-  }
+  ]
 }

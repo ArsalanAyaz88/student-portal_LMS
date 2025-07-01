@@ -67,6 +67,7 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
+    print(f"DEBUG: Alembic is using DATABASE_URL: {os.getenv('DATABASE_URL')}")
     config.set_main_option('sqlalchemy.url', os.getenv('DATABASE_URL'))
     """Run migrations in 'online' mode."""
     configuration = config.get_section(config.config_ini_section)
