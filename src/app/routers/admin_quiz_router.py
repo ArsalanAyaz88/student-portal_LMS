@@ -3,6 +3,7 @@ from sqlmodel import Session, select
 from sqlalchemy.orm import joinedload
 from typing import List
 import uuid
+import logging
 from typing import List
 
 from src.app.db.session import get_db
@@ -117,28 +118,34 @@ def add_question_to_quiz(
     admin_user=Depends(get_current_admin_user)
 ):
     """Add a new question to a specific quiz."""
-    if not db.get(Quiz, quiz_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
+    try:
+        quiz = db.get(Quiz, quiz_id)
+        if not quiz:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
 
-    # Create and save the question first to generate its ID
-    new_question = Question(text=question_data.text, quiz_id=quiz_id)
-    db.add(new_question)
-    db.commit()
-    db.refresh(new_question)
-
-    # Now, create and add options with the generated question_id
-    for opt_data in question_data.options:
-        new_option = Option(
-            text=opt_data.text, 
-            is_correct=opt_data.is_correct, 
-            question_id=new_question.id
+        # Create the question and its options in a single transaction
+        new_question = Question(text=question_data.text, quiz_id=quiz_id)
+        
+        # Prepare options to be added
+        options_to_add = [
+            Option(text=opt.text, is_correct=opt.is_correct, question=new_question)
+            for opt in question_data.options
+        ]
+        
+        db.add(new_question)
+        db.add_all(options_to_add)
+        
+        db.commit()
+        db.refresh(new_question)
+        
+        return new_question
+    except Exception as e:
+        logging.error(f"Error adding question to quiz {quiz_id}: {e}", exc_info=True)
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred while adding the question."
         )
-        db.add(new_option)
-    
-    db.commit()
-    # Refresh the question to load the newly added options
-    db.refresh(new_question)
-    return new_question
 
 
 # --- Question Management Endpoints ---
