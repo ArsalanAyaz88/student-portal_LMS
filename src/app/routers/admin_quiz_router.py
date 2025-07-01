@@ -124,7 +124,11 @@ def add_question_to_quiz(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
 
         # Create the question and its options in a single transaction
-        new_question = Question(text=question_data.text, quiz_id=quiz_id)
+        new_question = Question(
+            text=question_data.text, 
+            quiz_id=quiz_id,
+            is_multiple_choice=True
+        )
         
         # Prepare options to be added
         options_to_add = [
