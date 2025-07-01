@@ -3,10 +3,7 @@
   "builds": [
     {
       "src": "api/index.py",
-      "use": "@vercel/python",
-      "config": {
-        "buildCommand": "alembic upgrade head"
-      }
+      "use": "@vercel/python"
     }
   ],
   "routes": [
