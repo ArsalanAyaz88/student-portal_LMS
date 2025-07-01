@@ -43,13 +43,13 @@ def get_purchase_info(course_id: str, session: Session = Depends(get_db)):
     }
 
 @router.post("/{course_id}/payment-proof")
-def submit_payment_proof(
+async def submit_payment_proof(
     course_id: str,
     file: UploadFile = File(...),
     user=Depends(get_current_user),
     session: Session = Depends(get_db)
 ):
-    url = save_upload_and_get_url(file, folder="payment_proofs")
+    url = await save_upload_and_get_url(file, folder="payment_proofs")
     # Check course
     course = session.exec(select(Course).where(Course.id == course_id)).first()
     if not course:
