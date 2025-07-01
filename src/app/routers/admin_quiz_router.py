@@ -18,24 +18,44 @@ from src.app.utils.dependencies import get_current_admin_user
 
 # --- Router Definitions ---
 # Using distinct routers for each resource type for a clean, RESTful API design.
-quiz_router = APIRouter(prefix="/quizzes", tags=["Admin Quizzes"])
-question_router = APIRouter(prefix="/questions", tags=["Admin Questions"])
-submission_router = APIRouter(prefix="/submissions", tags=["Admin Submissions"])
+quiz_router = APIRouter(tags=["Admin Quizzes"])
+question_router = APIRouter(tags=["Admin Questions"])
+submission_router = APIRouter(tags=["Admin Submissions"])
 
 
 # --- Quiz Management Endpoints ---
 
-@quiz_router.post("/course/{course_id}", response_model=QuizRead, status_code=status.HTTP_201_CREATED)
-def create_quiz_for_course(
+@quiz_router.get("", response_model=List[QuizRead])
+def list_quizzes(
     course_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    admin_user=Depends(get_current_admin_user)
+):
+    """Lists all quizzes for a specific course."""
+    if not db.get(Course, course_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+    
+    statement = select(Quiz).where(Quiz.course_id == course_id)
+    quizzes = db.exec(statement).all()
+    return quizzes
+
+@quiz_router.post("", response_model=QuizRead, status_code=status.HTTP_201_CREATED)
+def create_quiz(
     quiz_data: QuizCreate,
     db: Session = Depends(get_db),
     admin_user=Depends(get_current_admin_user)
 ):
-    """Create a new quiz for a specific course."""
-    if not db.get(Course, course_id):
+    """Creates a new quiz."""
+    if not hasattr(quiz_data, 'course_id') or not quiz_data.course_id:
+         raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Course ID is required to create a quiz."
+        )
+
+    if not db.get(Course, quiz_data.course_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
-    new_quiz = Quiz.from_orm(quiz_data, update={'course_id': course_id})
+
+    new_quiz = Quiz.from_orm(quiz_data)
     db.add(new_quiz)
     db.commit()
     db.refresh(new_quiz)
@@ -47,8 +67,10 @@ def get_quiz_details(
     db: Session = Depends(get_db),
     admin_user=Depends(get_current_admin_user)
 ):
-    """Get detailed information about a specific quiz, including its questions and options."""
-    statement = select(Quiz).where(Quiz.id == quiz_id).options(joinedload(Quiz.questions).joinedload(Question.options))
+    """Gets detailed information about a specific quiz, including its questions and options."""
+    statement = select(Quiz).where(Quiz.id == quiz_id).options(
+        joinedload(Quiz.questions).joinedload(Question.options)
+    )
     quiz = db.exec(statement).first()
     if not quiz:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")

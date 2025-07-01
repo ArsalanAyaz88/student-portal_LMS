@@ -79,9 +79,9 @@ app.include_router(
 )
 
 # Include the refactored admin quiz routers
-app.include_router(admin_quiz_router.quiz_router, prefix="/api/admin")
-app.include_router(admin_quiz_router.question_router, prefix="/api/admin")
-app.include_router(admin_quiz_router.submission_router, prefix="/api/admin")
+app.include_router(admin_quiz_router.quiz_router, prefix="/api/admin/quizzes")
+app.include_router(admin_quiz_router.question_router, prefix="/api/admin/questions")
+app.include_router(admin_quiz_router.submission_router, prefix="/api/admin/submissions")
 
 # ─── Simple endpoints ──────────────────────────────────────────
 @app.get("/")
