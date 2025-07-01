@@ -48,6 +48,18 @@ def get_assignment(db: Session, course_id: UUID, assignment_id: UUID, student_id
         )
     return assignment
 
+def get_submission(db: Session, submission_id: UUID, student_id: UUID):
+    """
+    Get a specific submission by ID, ensuring the requesting student is the owner
+    """
+    submission = db.get(AssignmentSubmission, submission_id)
+    
+    # Check if submission exists and belongs to the student
+    if not submission or submission.student_id != student_id:
+        return None
+        
+    return submission
+
 def submit_assignment(
     db: Session,
     course_id: UUID,
