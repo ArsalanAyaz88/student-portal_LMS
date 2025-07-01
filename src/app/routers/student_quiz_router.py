@@ -13,6 +13,7 @@ from ..schemas.quiz import (
     QuizDetailRead,
     QuizSubmissionCreate,
     QuizResult,
+    QuizSubmissionRead,
 )
 from ..models.user import User
 from ..models.quiz import QuizSubmission
