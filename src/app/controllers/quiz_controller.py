@@ -92,53 +92,76 @@ def submit_quiz(
     student_id: UUID,
     payload: QuizSubmissionCreate
 ) -> QuizSubmission:
-    _ensure_enrollment(db, course_id, student_id)
+    logging.info(f"Attempting quiz submission for quiz_id: {quiz_id}, student_id: {student_id}")
+    logging.info(f"Submission payload: {payload.dict()}")
     
-    existing_submission = db.exec(
-        select(QuizSubmission).where(QuizSubmission.quiz_id == quiz_id, QuizSubmission.student_id == student_id)
-    ).first()
-    if existing_submission:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You have already submitted this quiz.")
-
-    quiz = db.get(Quiz, quiz_id)
-    if not quiz:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found or not available for submission.")
-
-    valid_question_ids = {q.id for q in quiz.questions}
-    if len(payload.answers) != len(valid_question_ids):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="All questions must be answered.")
-
-    score = 0
-    correct_options = {opt.id: opt for q in quiz.questions for opt in q.options if opt.is_correct}
-    
-    new_submission = QuizSubmission(
-        quiz_id=quiz_id,
-        student_id=student_id,
-        submitted_at=get_pakistan_time(),
-        score=0 # Initial score
-    )
-    db.add(new_submission)
-    db.flush() # Flush to get submission ID
-
-    for answer_data in payload.answers:
-        if answer_data.question_id not in valid_question_ids:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid question ID: {answer_data.question_id}")
+    try:
+        _ensure_enrollment(db, course_id, student_id)
+        logging.info("Enrollment verified.")
         
-        # Logic to check if the selected option is correct
-        selected_option = db.get(Option, answer_data.selected_option_id)
-        if selected_option and selected_option.is_correct:
-            score += 1
+        existing_submission = db.exec(
+            select(QuizSubmission).where(QuizSubmission.quiz_id == quiz_id, QuizSubmission.student_id == student_id)
+        ).first()
+        if existing_submission:
+            logging.warning(f"Student {student_id} has already submitted quiz {quiz_id}.")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You have already submitted this quiz.")
+        logging.info("No existing submission found for this student and quiz.")
 
-        db_answer = Answer(**answer_data.dict(), submission_id=new_submission.id)
-        db.add(db_answer)
+        quiz = db.get(Quiz, quiz_id)
+        if not quiz:
+            logging.error(f"Quiz with id {quiz_id} not found.")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found or not available for submission.")
+        logging.info(f"Quiz '{quiz.title}' found.")
 
-    new_submission.score = score
-    new_submission.is_graded = True
-    db.add(new_submission)
-    db.commit()
-    db.refresh(new_submission)
-    
-    return new_submission
+        valid_question_ids = {q.id for q in quiz.questions}
+        logging.info(f"Quiz has {len(valid_question_ids)} questions. Payload has {len(payload.answers)} answers.")
+        if len(payload.answers) != len(valid_question_ids):
+            logging.error("Number of answers in payload does not match number of questions in quiz.")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="All questions must be answered.")
+
+        score = 0
+        
+        new_submission = QuizSubmission(
+            quiz_id=quiz_id,
+            student_id=student_id,
+            submitted_at=get_pakistan_time(),
+            score=0 # Initial score
+        )
+        db.add(new_submission)
+        db.flush() # Flush to get submission ID
+        logging.info(f"Created new submission with id: {new_submission.id}")
+
+        for answer_data in payload.answers:
+            if answer_data.question_id not in valid_question_ids:
+                logging.error(f"Invalid question_id {answer_data.question_id} in payload.")
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid question ID: {answer_data.question_id}")
+            
+            selected_option = db.get(Option, answer_data.selected_option_id)
+            if selected_option and selected_option.is_correct:
+                score += 1
+
+            db_answer = Answer(**answer_data.dict(), submission_id=new_submission.id)
+            db.add(db_answer)
+        
+        logging.info("All answers processed.")
+
+        new_submission.score = score
+        new_submission.is_graded = True
+        db.add(new_submission)
+        db.commit()
+        db.refresh(new_submission)
+        
+        logging.info(f"Quiz submission successful for student {student_id} on quiz {quiz_id}. Final score: {score}")
+        return new_submission
+    except HTTPException as e:
+        logging.error(f"HTTPException during quiz submission: {e.detail}", exc_info=True)
+        raise
+    except Exception as e:
+        logging.critical(f"An unexpected critical error occurred during quiz submission: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred during quiz submission."
+        )
 
 
 def get_quiz_result(db: Session, submission_id: UUID, student_id: UUID) -> QuizResult:
