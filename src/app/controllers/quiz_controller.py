@@ -36,10 +36,26 @@ def _ensure_enrollment(db: Session, course_id: UUID, student_id: UUID):
 
 
 def list_quizzes(db: Session, course_id: UUID, student_id: UUID):
-    _ensure_enrollment(db, course_id, student_id)
-    return db.exec(
-        select(Quiz).where(Quiz.course_id == course_id, Quiz.published == True)
-    ).all()
+    logging.info(f"Listing quizzes for course_id: {course_id}, student_id: {student_id}")
+    try:
+        _ensure_enrollment(db, course_id, student_id)
+        logging.info(f"Enrollment verified for student {student_id} in course {course_id}")
+        
+        quizzes = db.exec(
+            select(Quiz).where(Quiz.course_id == course_id, Quiz.published == True)
+        ).all()
+        
+        logging.info(f"Found {len(quizzes)} quizzes for course {course_id}")
+        return quizzes
+    except HTTPException as e:
+        logging.error(f"HTTPException while listing quizzes for course {course_id}: {e.detail}", exc_info=True)
+        raise
+    except Exception as e:
+        logging.error(f"Unexpected error listing quizzes for course {course_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred while fetching quizzes."
+        )
 
 
 def get_quiz_detail(db: Session, course_id: UUID, quiz_id: UUID, student_id: UUID):
