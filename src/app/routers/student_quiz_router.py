@@ -19,7 +19,7 @@ from ..models.quiz import QuizSubmission
 
 # This router will handle all student-facing quiz interactions
 router = APIRouter(
-    prefix="/student",
+    prefix="/student/quizzes",
     tags=["Student Quizzes"],
 )
 
