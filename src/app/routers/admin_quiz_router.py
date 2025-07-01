@@ -243,7 +243,6 @@ def get_grading_view(
 def grade_submission(
     submission_id: uuid.UUID,
     score: float,
-    feedback: str = None,
     db: Session = Depends(get_db),
     admin_user=Depends(get_current_admin_user)
 ):
@@ -252,7 +251,6 @@ def grade_submission(
     if not submission:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
     submission.score = score
-    submission.feedback = feedback
     submission.is_graded = True
     db.add(submission)
     db.commit()

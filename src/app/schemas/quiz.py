@@ -88,7 +88,6 @@ class QuizSubmissionRead(BaseModel):
     submitted_at: datetime
     score: Optional[float] = None
     is_graded: bool
-    feedback: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -102,7 +101,6 @@ class QuizSubmissionReadWithDetails(QuizSubmissionReadWithStudent):
 
 class GradeSubmissionRequest(BaseModel):
     score: float
-    feedback: Optional[str] = None
 
 
 class GradingViewSchema(BaseModel):

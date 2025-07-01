@@ -50,7 +50,6 @@ class QuizSubmission(SQLModel, table=True):
     submitted_at: datetime = Field(default_factory=get_pakistan_time)
     score: Optional[float] = None
     is_graded: bool = Field(default=False)
-    feedback: Optional[str] = None # Feedback from the grader
 
     quiz: "src.app.models.quiz.Quiz" = Relationship(back_populates="submissions")
     student: "User" = Relationship(back_populates="quiz_submissions")
