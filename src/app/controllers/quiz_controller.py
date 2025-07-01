@@ -42,7 +42,7 @@ def list_quizzes(db: Session, course_id: UUID, student_id: UUID):
         logging.info(f"Enrollment verified for student {student_id} in course {course_id}")
         
         quizzes = db.exec(
-            select(Quiz).where(Quiz.course_id == course_id, Quiz.published.is_(True))
+            select(Quiz).where(Quiz.course_id == course_id)
         ).all()
         
         logging.info(f"Found {len(quizzes)} quizzes for course {course_id}")
@@ -66,7 +66,7 @@ def get_quiz_detail(db: Session, course_id: UUID, quiz_id: UUID, student_id: UUI
 
         statement = (
             select(Quiz)
-            .where(Quiz.id == quiz_id, Quiz.course_id == course_id, Quiz.published == True)
+            .where(Quiz.id == quiz_id, Quiz.course_id == course_id)
             .options(joinedload(Quiz.questions).joinedload(Question.options))
         )
         quiz = db.exec(statement).first()
@@ -101,7 +101,7 @@ def submit_quiz(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You have already submitted this quiz.")
 
     quiz = db.get(Quiz, quiz_id)
-    if not quiz or not quiz.published:
+    if not quiz:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found or not available for submission.")
 
     valid_question_ids = {q.id for q in quiz.questions}
