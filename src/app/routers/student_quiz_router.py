@@ -17,7 +17,6 @@ from ..schemas.quiz import (
 )
 from ..models.user import User
 from ..models.quiz import QuizSubmission
-from ..schemas.quiz import QuizSubmissionRead
 
 # This router will handle all student-facing quiz interactions
 router = APIRouter(

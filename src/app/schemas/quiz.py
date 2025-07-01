@@ -142,9 +142,17 @@ class QuizSubmissionCreate(BaseModel):
     answers: List[AnswerCreate]
 
 
-class QuizListRead(QuizRead):
+class QuizListRead(BaseModel):
+    id: uuid.UUID
+    course_id: uuid.UUID
+    title: str
+    description: Optional[str] = None
+    due_date: Optional[datetime] = None
     is_submitted: bool = False
     score: Optional[float] = None
+
+    class Config:
+        from_attributes = True
 
 
 # --- Aliases for router responses ---
