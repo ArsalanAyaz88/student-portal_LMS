@@ -6,7 +6,7 @@ from uuid import UUID
 from typing import List
 
 from ..db.session import get_db
-from ..utils.dependencies import get_current_active_user
+from ..utils.dependencies import get_current_user
 from ..controllers import quiz_controller
 from ..schemas.quiz import (
     QuizListRead,
@@ -31,7 +31,7 @@ router = APIRouter(
 def student_list_quizzes(
     course_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
 ):
     if current_user.role != "student":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
@@ -47,7 +47,7 @@ def student_get_quiz(
     course_id: UUID,
     quiz_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
 ):
     if current_user.role != "student":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
@@ -65,7 +65,7 @@ def student_submit_quiz(
     quiz_id: UUID,
     payload: QuizSubmissionCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
 ):
     if current_user.role != "student":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
@@ -81,7 +81,7 @@ def student_submit_quiz(
 def get_quiz_result_route(
     submission_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
     # These are in the path but not used by the controller
     course_id: UUID = None,
     quiz_id: UUID = None,
