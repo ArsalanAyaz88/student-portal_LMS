@@ -23,7 +23,6 @@ class OptionRead(OptionBase):
 
 class QuestionBase(BaseModel):
     text: str
-    is_multiple_choice: bool = False
 
 class QuestionCreate(QuestionBase):
     options: List[OptionCreate]

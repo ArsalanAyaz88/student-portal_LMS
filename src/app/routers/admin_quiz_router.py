@@ -123,14 +123,10 @@ def add_question_to_quiz(
         if not quiz:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
 
-        # Determine if the question is multiple choice based on the number of correct options
-        is_multiple_choice = sum(1 for opt in question_data.options if opt.is_correct) > 1
-
         # Create the question and its options in a single transaction
         new_question = Question(
             text=question_data.text, 
-            quiz_id=quiz_id,
-            is_multiple_choice=is_multiple_choice
+            quiz_id=quiz_id
         )
         
         # Prepare options to be added
