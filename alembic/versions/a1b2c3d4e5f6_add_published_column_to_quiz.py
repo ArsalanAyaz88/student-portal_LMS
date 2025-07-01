@@ -20,8 +20,8 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column('quiz', sa.Column('published', sa.Boolean(), nullable=False, server_default=sa.text('false')))
+    op.add_column('quiz', sa.Column('is_published', sa.Boolean(), nullable=False, server_default=sa.text('false'))) 
 
 
 def downgrade() -> None:
-    op.drop_column('quiz', 'published')
+    op.drop_column('quiz', 'is_published')
