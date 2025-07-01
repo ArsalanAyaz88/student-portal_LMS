@@ -42,7 +42,7 @@ def list_quizzes(db: Session, course_id: UUID, student_id: UUID):
         logging.info(f"Enrollment verified for student {student_id} in course {course_id}")
         
         quizzes = db.exec(
-            select(Quiz).where(Quiz.course_id == course_id, Quiz.published == True)
+            select(Quiz).where(Quiz.course_id == course_id, Quiz.published.is_(True))
         ).all()
         
         logging.info(f"Found {len(quizzes)} quizzes for course {course_id}")
