@@ -78,6 +78,28 @@ def get_quiz_details(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
     return quiz
 
+@quiz_router.get("/{quiz_id}/submissions", response_model=List[QuizSubmissionReadWithStudent])
+def get_quiz_submissions(
+    quiz_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    admin_user=Depends(get_current_admin_user)
+):
+    """Get all submissions for a specific quiz."""
+    logging.info(f"Fetching submissions for quiz ID: {quiz_id}")
+    quiz = db.get(Quiz, quiz_id)
+    if not quiz:
+        logging.warning(f"Quiz not found for ID: {quiz_id}")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
+
+    try:
+        statement = select(QuizSubmission).where(QuizSubmission.quiz_id == quiz_id).options(joinedload(QuizSubmission.student)).order_by(QuizSubmission.submitted_at.desc())
+        submissions = db.exec(statement).all()
+        logging.info(f"Found {len(submissions)} submissions for quiz ID: {quiz_id}")
+        return submissions
+    except Exception as e:
+        logging.error(f"An error occurred fetching submissions for quiz ID {quiz_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to fetch submissions")
+
 @quiz_router.put("/{quiz_id}", response_model=QuizRead)
 def update_quiz(
     quiz_id: uuid.UUID,
@@ -200,15 +222,7 @@ def delete_question(
 
 # --- Submission and Grading Endpoints ---
 
-@submission_router.get("/quiz/{quiz_id}", response_model=List[QuizSubmissionReadWithStudent])
-def get_quiz_submissions(
-    quiz_id: uuid.UUID,
-    db: Session = Depends(get_db),
-    admin_user=Depends(get_current_admin_user)
-):
-    """Get all submissions for a specific quiz."""
-    statement = select(QuizSubmission).where(QuizSubmission.quiz_id == quiz_id).options(joinedload(QuizSubmission.student)).order_by(QuizSubmission.submitted_at.desc())
-    return db.exec(statement).all()
+
 
 @submission_router.get("/{submission_id}/grading-view", response_model=GradingViewSchema)
 def get_grading_view(
