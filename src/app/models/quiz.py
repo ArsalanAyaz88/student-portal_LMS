@@ -8,6 +8,7 @@ from src.app.utils.time import get_pakistan_time
 if TYPE_CHECKING:
     from src.app.models.course import Course
     from src.app.models.quiz_audit_log import QuizAuditLog
+    from src.app.models.user import User
 
 class Quiz(SQLModel, table=True):
     __table_args__ = {"extend_existing": True}
@@ -52,7 +53,7 @@ class QuizSubmission(SQLModel, table=True):
     feedback: Optional[str] = None # Feedback from the grader
 
     quiz: "src.app.models.quiz.Quiz" = Relationship(back_populates="submissions")
-
+    student: "User" = Relationship(back_populates="quiz_submissions")
     answers: List["src.app.models.quiz.Answer"] = Relationship(back_populates="submission", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
 
 class Answer(SQLModel, table=True):

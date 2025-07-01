@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from src.app.models.oauth import OAuthAccount
     from src.app.models.profile import Profile
     from src.app.models.video_progress import VideoProgress
+    from src.app.models.quiz import QuizSubmission
 
 class User(SQLModel, table=True):
     __table_args__ = {"extend_existing": True}
@@ -29,4 +30,5 @@ class User(SQLModel, table=True):
     oauth_accounts: List["src.app.models.oauth.OAuthAccount"] = Relationship(back_populates="user")
     assignment_submissions: List["src.app.models.assignment.AssignmentSubmission"] = Relationship(back_populates="student")
     video_progress: List["src.app.models.video_progress.VideoProgress"] = Relationship(back_populates="user")
+    quiz_submissions: List["QuizSubmission"] = Relationship(back_populates="student")
 
