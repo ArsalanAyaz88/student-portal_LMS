@@ -60,7 +60,8 @@ class Answer(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     submission_id: uuid.UUID = Field(foreign_key="quizsubmission.id")
     question_id: uuid.UUID = Field(foreign_key="question.id")
-    selected_option_id: Optional[uuid.UUID] = None
+    selected_option_id: Optional[uuid.UUID] = Field(default=None, foreign_key="option.id")
     text_answer: Optional[str] = None
 
     submission: QuizSubmission = Relationship(back_populates="answers")
+    selected_option: Optional["Option"] = Relationship()

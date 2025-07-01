@@ -9,14 +9,11 @@ from datetime import datetime
 from ..utils.time import get_pakistan_time
 
 from ..models.quiz import Quiz, Question, QuizSubmission, Answer, Option
-from ..models.quiz_audit_log import QuizAuditLog
 from ..models.enrollment import Enrollment
 from ..schemas.quiz import (
-    QuizCreate,
-    QuizUpdate,
     QuizSubmissionCreate,
     QuizResult,
-    QuizResultDetail,
+    ResultAnswer,
 )
 
 
@@ -41,7 +38,7 @@ def _ensure_enrollment(db: Session, course_id: UUID, student_id: UUID):
 def list_quizzes(db: Session, course_id: UUID, student_id: UUID):
     _ensure_enrollment(db, course_id, student_id)
     return db.exec(
-        select(Quiz).where(Quiz.course_id == course_id)
+        select(Quiz).where(Quiz.course_id == course_id, Quiz.published == True)
     ).all()
 
 
@@ -53,14 +50,14 @@ def get_quiz_detail(db: Session, course_id: UUID, quiz_id: UUID, student_id: UUI
 
         statement = (
             select(Quiz)
-            .where(Quiz.id == quiz_id, Quiz.course_id == course_id)
+            .where(Quiz.id == quiz_id, Quiz.course_id == course_id, Quiz.published == True)
             .options(joinedload(Quiz.questions).joinedload(Question.options))
         )
         quiz = db.exec(statement).first()
 
         if not quiz:
-            logging.warning(f"Quiz not found for quiz_id: {quiz_id}")
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
+            logging.warning(f"Quiz not found or not published for quiz_id: {quiz_id}")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found or is not available.")
 
         logging.info(f"Successfully fetched quiz: {quiz.title}")
         return quiz
@@ -69,7 +66,7 @@ def get_quiz_detail(db: Session, course_id: UUID, quiz_id: UUID, student_id: UUI
         raise
     except Exception as e:
         logging.error(f"Unexpected error in get_quiz_detail for quiz_id {quiz_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred.")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred while fetching the quiz.")
 
 
 def submit_quiz(
@@ -78,178 +75,109 @@ def submit_quiz(
     quiz_id: UUID,
     student_id: UUID,
     payload: QuizSubmissionCreate
-) -> QuizResult:
-    # --- Only allow one submission per student per quiz ---
+) -> QuizSubmission:
+    _ensure_enrollment(db, course_id, student_id)
+    
     existing_submission = db.exec(
-        select(QuizSubmission)
-        .where(
-            QuizSubmission.quiz_id == quiz_id,
-            QuizSubmission.student_id == student_id
-        )
+        select(QuizSubmission).where(QuizSubmission.quiz_id == quiz_id, QuizSubmission.student_id == student_id)
     ).first()
     if existing_submission:
-        raise HTTPException(
-            status_code=403,
-            detail="You have already submitted this quiz. Only one attempt is allowed."
-        )
-    # 1️⃣ verify enrollment + quiz exists
-    quiz = get_quiz_detail(db, course_id, quiz_id, student_id)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You have already submitted this quiz.")
 
-    # 2️⃣ prepare validation maps
-    valid_qids = {q.id for q in quiz.questions}
-    valid_opts = {q.id: {opt.id for opt in q.options} for q in quiz.questions}
+    quiz = db.get(Quiz, quiz_id)
+    if not quiz or not quiz.published:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found or not available for submission.")
 
-    # 3️⃣ record new submission
-    sub = QuizSubmission(
-        quiz_id=quiz_id,
-        student_id=student_id,
-        submitted_at=get_pakistan_time()
-    )
-    db.add(sub)
-    db.commit()
-    db.refresh(sub)
-    # --- Audit log ---
-    audit = QuizAuditLog(
-        student_id=student_id,
-        quiz_id=quiz_id,
-        action="submit",
-        details=f"Submission ID: {sub.id}"
-    )
-    db.add(audit)
-    db.commit()
-
-
-    # 4️⃣ map correct answers
-    correct_map = {
-        opt.question_id: opt.id
-        for q in quiz.questions
-        for opt in q.options
-        if opt.is_correct
-    }
+    valid_question_ids = {q.id for q in quiz.questions}
+    if len(payload.answers) != len(valid_question_ids):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="All questions must be answered.")
 
     score = 0
-    details: list[QuizResultDetail] = []
+    correct_options = {opt.id: opt for q in quiz.questions for opt in q.options if opt.is_correct}
+    
+    new_submission = QuizSubmission(
+        quiz_id=quiz_id,
+        student_id=student_id,
+        submitted_at=get_pakistan_time(),
+        score=0 # Initial score
+    )
+    db.add(new_submission)
+    db.flush() # Flush to get submission ID
 
-    # 5️⃣ validate & save each answer
-    for ans in payload.answers:
-        # question must belong to quiz
-        if ans.question_id not in valid_qids:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST,
-                                f"Invalid question_id: {ans.question_id}")
-        # if provided, option must belong to that question
-        sel = ans.selected_option_id
-        if sel is not None and sel not in valid_opts[ans.question_id]:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST,
-                                f"Option {sel} is not valid for question {ans.question_id}")
-
-        # compute correctness
-        is_corr = (sel == correct_map.get(ans.question_id))
-        if is_corr:
+    for answer_data in payload.answers:
+        if answer_data.question_id not in valid_question_ids:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid question ID: {answer_data.question_id}")
+        
+        # Logic to check if the selected option is correct
+        selected_option = db.get(Option, answer_data.selected_option_id)
+        if selected_option and selected_option.is_correct:
             score += 1
 
-        details.append(QuizResultDetail(
-            question_id=ans.question_id,
-            correct=is_corr
-        ))
+        db_answer = Answer(**answer_data.dict(), submission_id=new_submission.id)
+        db.add(db_answer)
 
-        # persist answer
-        db.add(Answer(
-            submission_id=sub.id,
-            question_id=ans.question_id,
-            selected_option_id=sel
-        ))
-
-    # Update submission with auto-calculated score
-    sub.score = score
-    sub.is_graded = True
-    db.add(sub)
+    new_submission.score = score
+    new_submission.is_graded = True
+    db.add(new_submission)
     db.commit()
-
-    return QuizResult(
-        submission_id=sub.id,
-        score=score,
-        total=len(payload.answers),
-        details=details
-    )
-
-
-def get_quiz_result(
-    db: Session,
-    course_id: UUID,
-    quiz_id: UUID,
-    submission_id: UUID,
-    student_id: UUID
-) -> QuizResult:
-    _ensure_enrollment(db, course_id, student_id)
-
-    sub = db.get(QuizSubmission, submission_id)
-    if not sub or sub.quiz_id != quiz_id or sub.student_id != student_id:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Submission not found")
-
-    if sub.score is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Result not available yet.")
-
-    details: list[QuizResultDetail] = []
-    total_questions = 0
-    for ans in sub.answers:
-        total_questions += 1
-        opt = db.get(Option, ans.selected_option_id) if ans.selected_option_id else None
-        correct = bool(opt and opt.is_correct)
-        details.append(QuizResultDetail(
-            question_id=ans.question_id,
-            correct=correct
-        ))
-
-    return QuizResult(
-        submission_id=sub.id,
-        score=sub.score,
-        total=total_questions,
-        details=details
-    )
-
-
-def create_quiz(db: Session, course_id: UUID, quiz_data: QuizCreate) -> Quiz:
-    new_quiz = Quiz(course_id=course_id, title=quiz_data.title, description=quiz_data.description)
-    db.add(new_quiz)
-    db.commit()
-    db.refresh(new_quiz)
-
-    for q_data in quiz_data.questions:
-        new_question = Question(quiz_id=new_quiz.id, text=q_data.text, is_multiple_choice=q_data.is_multiple_choice)
-        db.add(new_question)
-        db.commit()
-        db.refresh(new_question)
-
-        for o_data in q_data.options:
-            new_option = Option(question_id=new_question.id, text=o_data.text, is_correct=o_data.is_correct)
-            db.add(new_option)
+    db.refresh(new_submission)
     
-    db.commit()
-    db.refresh(new_quiz)
-    return new_quiz
+    return new_submission
 
-def update_quiz(db: Session, quiz_id: UUID, quiz_data: QuizUpdate) -> Quiz:
-    quiz = db.get(Quiz, quiz_id)
-    if not quiz:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
 
-    update_data = quiz_data.dict(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(quiz, key, value)
+def get_quiz_result(db: Session, submission_id: UUID, student_id: UUID) -> QuizResult:
+    logging.info(f"Fetching quiz results for submission_id: {submission_id}")
+    try:
+        submission = db.exec(
+            select(QuizSubmission)
+            .where(QuizSubmission.id == submission_id, QuizSubmission.student_id == student_id)
+            .options(
+                joinedload(QuizSubmission.quiz).joinedload(Quiz.questions).joinedload(Question.options),
+                joinedload(QuizSubmission.answers).joinedload(Answer.selected_option)
+            )
+        ).first()
 
-    db.add(quiz)
-    db.commit()
-    db.refresh(quiz)
-    return quiz
+        if not submission:
+            logging.warning(f"Submission not found for submission_id: {submission_id}")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
 
-def delete_quiz(db: Session, quiz_id: UUID):
-    quiz = db.get(Quiz, quiz_id)
-    if not quiz:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
-    
-    db.delete(quiz)
-    db.commit()
-    return {"message": "Quiz deleted successfully"}
+        quiz = submission.quiz
+        answers_map = {ans.question_id: ans for ans in submission.answers}
+        result_answers = []
 
-def get_quiz_submissions(db: Session, quiz_id: UUID):
-    return db.exec(select(QuizSubmission).where(QuizSubmission.quiz_id == quiz_id)).all()
+        for question in quiz.questions:
+            student_answer = answers_map.get(question.id)
+            correct_option = next((opt for opt in question.options if opt.is_correct), None)
+
+            if not student_answer or not correct_option or not student_answer.selected_option:
+                logging.warning(f"Skipping question {question.id} due to missing data.")
+                continue
+
+            selected_option = student_answer.selected_option
+            is_correct = selected_option.id == correct_option.id
+
+            result_answers.append(
+                ResultAnswer(
+                    question_id=question.id,
+                    question_text=question.text,
+                    selected_option_id=selected_option.id,
+                    selected_option_text=selected_option.text,
+                    correct_option_id=correct_option.id,
+                    correct_option_text=correct_option.text,
+                    is_correct=is_correct,
+                )
+            )
+
+        quiz_result = QuizResult(
+            submission_id=submission.id,
+            quiz_title=quiz.title,
+            score=submission.score,
+            total_questions=len(quiz.questions),
+            answers=result_answers,
+        )
+        logging.info(f"Successfully prepared results for submission_id: {submission_id}")
+        return quiz_result
+
+    except Exception as e:
+        logging.error(f"Error fetching results for submission {submission_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to retrieve quiz results.")

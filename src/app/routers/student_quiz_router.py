@@ -1,74 +1,96 @@
 # File: application/src/app/routers/student_quiz_router.py
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session
 from uuid import UUID
 from typing import List
 
 from ..db.session import get_db
-from ..utils.dependencies import get_current_user
-from ..controllers.quiz_controller import (
-    list_quizzes,
-    get_quiz_detail,
-    submit_quiz,
-    get_quiz_result,
-)
+from ..utils.dependencies import get_current_active_user
+from ..controllers import quiz_controller
 from ..schemas.quiz import (
     QuizListRead,
     QuizDetailRead,
     QuizSubmissionCreate,
     QuizResult,
 )
+from ..models.user import User
+from ..models.quiz import QuizSubmission
 
+# This router will handle all student-facing quiz interactions
 router = APIRouter(
-    prefix="/courses/{course_id}/quizzes",
-    tags=["student_quizzes"],
+    prefix="/student",
+    tags=["Student Quizzes"],
 )
 
-
-@router.get("", response_model=List[QuizListRead])
+@router.get(
+    "/courses/{course_id}/quizzes",
+    response_model=List[QuizListRead],
+    summary="List Quizzes for a Student in a Course",
+)
 def student_list_quizzes(
     course_id: UUID,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
 ):
-    return list_quizzes(db, course_id, user.id)
+    if current_user.role != "student":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+    return quiz_controller.list_quizzes(db, course_id, current_user.id)
 
 
-@router.get("/{quiz_id}", response_model=QuizDetailRead)
+@router.get(
+    "/courses/{course_id}/quizzes/{quiz_id}",
+    response_model=QuizDetailRead,
+    summary="Get a Single Quiz for a Student",
+)
 def student_get_quiz(
     course_id: UUID,
     quiz_id: UUID,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
 ):
-    return get_quiz_detail(db, course_id, quiz_id, user.id)
+    if current_user.role != "student":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+    return quiz_controller.get_quiz_detail(db, course_id, quiz_id, current_user.id)
 
 
 @router.post(
-    "/{quiz_id}/submissions",
-    response_model=QuizResult,
-    status_code=status.HTTP_201_CREATED
+    "/courses/{course_id}/quizzes/{quiz_id}/submissions",
+    response_model=QuizSubmission,
+    status_code=status.HTTP_201_CREATED,
+    summary="Submit a Quiz",
 )
 def student_submit_quiz(
     course_id: UUID,
     quiz_id: UUID,
     payload: QuizSubmissionCreate,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
 ):
-    return submit_quiz(db, course_id, quiz_id, user.id, payload)
+    if current_user.role != "student":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+    submission = quiz_controller.submit_quiz(db, course_id, quiz_id, current_user.id, payload)
+    return submission
 
 
 @router.get(
-    "/{quiz_id}/results/{submission_id}",
-    response_model=QuizResult
+    "/courses/{course_id}/quizzes/{quiz_id}/results/{submission_id}",
+    response_model=QuizResult,
+    summary="Get Quiz Result for a Student",
 )
-def student_get_quiz_result(
-    course_id: UUID,
-    quiz_id: UUID,
+def get_quiz_result_route(
     submission_id: UUID,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
+    # These are in the path but not used by the controller
+    course_id: UUID = None,
+    quiz_id: UUID = None,
 ):
-    return get_quiz_result(db, course_id, quiz_id, submission_id, user.id)
+    if current_user.role != "student":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+    
+    return quiz_controller.get_quiz_result(
+        db=db,
+        submission_id=submission_id,
+        student_id=current_user.id
+    )

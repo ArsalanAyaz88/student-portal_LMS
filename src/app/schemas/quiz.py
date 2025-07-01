@@ -103,6 +103,24 @@ class GradeSubmissionRequest(BaseModel):
     score: float
 
 
+class ResultAnswer(SQLModel):
+    question_id: uuid.UUID
+    question_text: str
+    selected_option_id: uuid.UUID
+    selected_option_text: str
+    correct_option_id: uuid.UUID
+    correct_option_text: str
+    is_correct: bool
+
+
+class QuizResult(SQLModel):
+    submission_id: uuid.UUID
+    quiz_title: str
+    score: float
+    total_questions: int
+    answers: List[ResultAnswer]
+
+
 class GradingViewSchema(BaseModel):
     submission: QuizSubmissionReadWithDetails
     quiz: QuizReadWithDetails
@@ -115,16 +133,21 @@ class QuizSubmissionStatus(BaseModel):
     is_on_time: bool
 
 # Schemas for quiz results returned to students
-class QuizResultDetail(BaseModel):
+class ResultAnswer(BaseModel):
     question_id: uuid.UUID
-    correct: bool
-
+    question_text: str
+    selected_option_id: uuid.UUID
+    selected_option_text: str
+    correct_option_id: uuid.UUID
+    correct_option_text: str
+    is_correct: bool
 
 class QuizResult(BaseModel):
     submission_id: uuid.UUID
+    quiz_title: str
     score: float
-    total: int
-    details: List[QuizResultDetail]
+    total_questions: int
+    answers: List[ResultAnswer]
 
 class AnswerCreate(BaseModel):
     question_id: uuid.UUID
