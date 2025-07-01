@@ -22,10 +22,26 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Import all models here
+from sqlmodel import SQLModel
 from src.app.models import (
-    user, course, video, quiz, assignment, enrollment, video_progress, 
-    course_progress, quiz_audit_log, oauth, profile, certificate, 
-    course_feedback, payment_proof
+    assignment,
+    bank_account,
+    certificate,
+    course,
+    course_feedback,
+    course_progress,
+    enrollment,
+    notification,
+    oauth,
+    password_reset,
+    payment,
+    payment_proof,
+    profile,
+    quiz,
+    quiz_audit_log,
+    user,
+    video,
+    video_progress,
 )
 
 # Set the metadata for autogenerate support
