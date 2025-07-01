@@ -56,7 +56,7 @@ def student_get_quiz(
 
 @router.post(
     "/quizzes/courses/{course_id}/quizzes/{quiz_id}/submissions",
-    response_model=QuizSubmission,
+    response_model=QuizSubmissionRead,
     status_code=status.HTTP_201_CREATED,
     summary="Submit a Quiz",
 )
