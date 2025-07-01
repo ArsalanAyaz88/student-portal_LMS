@@ -36,12 +36,13 @@ load_dotenv()
 
 # ─── FastAPI app ───────────────────────────────────────────────
 app = FastAPI(
-    title="EduTech API",
+    title="Student Portal LMS",
     description="API for EduTech platform",
     version="1.0.0",
 )
 
-
+# Harmless print statement to trigger a new deployment
+print("FastAPI application starting up...")
 
 app.add_middleware(
     CORSMiddleware,
