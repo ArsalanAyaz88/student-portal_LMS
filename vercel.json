@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "pip install -r requirements.txt && alembic upgrade head",
+  "buildCommand": "pip install -r requirements.txt",
   "builds": [
     {
       "src": "src/app/main.py",
