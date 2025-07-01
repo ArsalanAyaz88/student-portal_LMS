@@ -58,14 +58,14 @@ def update_profile(
     return profile
 
 @router.post("/profile/avatar")
-def upload_avatar(
+async def upload_avatar(
     file: UploadFile = File(...),
     user = Depends(get_current_user),
     session: Session = Depends(get_db)
 ):
     try:
         # Upload file to B2
-        url = save_upload_and_get_url(file, folder="avatars")
+        url = await save_upload_and_get_url(file, folder="avatars")
         
         # Update profile with new avatar URL
         profile = session.exec(select(Profile).where(Profile.user_id == user.id)).first()
