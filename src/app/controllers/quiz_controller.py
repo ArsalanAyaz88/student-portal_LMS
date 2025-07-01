@@ -2,7 +2,7 @@
 
 import logging
 from sqlmodel import Session, select
-from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy.orm import joinedload
 from uuid import UUID
 from fastapi import HTTPException, status
 from datetime import datetime
@@ -47,7 +47,7 @@ def list_quizzes(db: Session, course_id: UUID, student_id: UUID):
         quizzes_stmt = select(Quiz).where(
             Quiz.course_id == course_id,
             Quiz.due_date != None
-        ).options(selectinload(Quiz.questions))
+        ).options(joinedload(Quiz.questions))
         all_quizzes = db.exec(quizzes_stmt).all()
 
         # Get all submissions by the student for these quizzes
