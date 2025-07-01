@@ -7,7 +7,8 @@ from typing import List
 
 from src.app.db.session import get_db
 from src.app.models.user import User
-from src.app.models.quiz import Quiz, Question, Option
+from src.app.models.quiz import Quiz, Question, Option, QuizSubmission
+from src.app.models.course import Course
 from src.app.schemas.quiz import (
     QuizCreate, QuizRead, QuizUpdate, 
     QuestionCreate, QuestionRead, QuestionUpdate, 
