@@ -2,8 +2,8 @@
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session
-from uuid import UUID
 from typing import List
+from uuid import UUID
 
 from ..db.session import get_db
 from ..utils.dependencies import get_current_user
