@@ -14,6 +14,7 @@ from ..schemas.quiz import (
     QuizSubmissionCreate,
     QuizResult,
     ResultAnswer,
+    QuizRead,
 )
 
 
@@ -61,15 +62,11 @@ def list_quizzes(db: Session, course_id: UUID, student_id: UUID):
         quizzes_with_status = []
         for quiz in all_quizzes:
             submission = submissions_map.get(quiz.id)
-            quiz_data = {
-                "id": quiz.id,
-                "title": quiz.title,
-                "description": quiz.description,
-                "due_date": quiz.due_date,
-                "course_id": quiz.course_id,
-                "is_submitted": submission is not None,
-                "score": submission.score if submission else None,
-            }
+            # Convert ORM model to Pydantic model, then to dict
+            quiz_data = QuizRead.model_validate(quiz).model_dump()
+            # Add submission-specific data
+            quiz_data['is_submitted'] = submission is not None
+            quiz_data['score'] = submission.score if submission else None
             quizzes_with_status.append(quiz_data)
 
         logging.info(f"Found {len(all_quizzes)} quizzes for course {course_id}, with submission statuses.")
