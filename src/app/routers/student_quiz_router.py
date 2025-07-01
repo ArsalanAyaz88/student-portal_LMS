@@ -74,7 +74,7 @@ def student_submit_quiz(
 
 
 @router.get(
-    "/quizzes/courses/{course_id}/quizzes/{quiz_id}/results/{submission_id}",
+    "/courses/{course_id}/quizzes/{quiz_id}/results/{submission_id}",
     response_model=QuizResult,
     summary="Get Quiz Result for a Student",
 )
