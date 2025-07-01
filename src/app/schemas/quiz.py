@@ -103,22 +103,7 @@ class GradeSubmissionRequest(BaseModel):
     score: float
 
 
-class ResultAnswer(SQLModel):
-    question_id: uuid.UUID
-    question_text: str
-    selected_option_id: uuid.UUID
-    selected_option_text: str
-    correct_option_id: uuid.UUID
-    correct_option_text: str
-    is_correct: bool
 
-
-class QuizResult(SQLModel):
-    submission_id: uuid.UUID
-    quiz_title: str
-    score: float
-    total_questions: int
-    answers: List[ResultAnswer]
 
 
 class GradingViewSchema(BaseModel):
