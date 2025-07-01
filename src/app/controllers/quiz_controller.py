@@ -36,16 +36,34 @@ def _ensure_enrollment(db: Session, course_id: UUID, student_id: UUID):
 
 
 def list_quizzes(db: Session, course_id: UUID, student_id: UUID):
-    logging.info(f"Listing quizzes for course_id: {course_id}, student_id: {student_id}")
+    logging.info(f"Listing available (un-attempted) quizzes for course_id: {course_id}, student_id: {student_id}")
     try:
         _ensure_enrollment(db, course_id, student_id)
         logging.info(f"Enrollment verified for student {student_id} in course {course_id}")
         
-        quizzes = db.exec(
-            select(Quiz).where(Quiz.course_id == course_id)
-        ).all()
+        # Get IDs of quizzes the student has already submitted for this course
+        submitted_quiz_ids_stmt = (
+            select(QuizSubmission.quiz_id)
+            .join(Quiz)
+            .where(
+                QuizSubmission.student_id == student_id,
+                Quiz.course_id == course_id
+            )
+        )
+        submitted_quiz_ids = db.exec(submitted_quiz_ids_stmt).all()
+        logging.info(f"Student has submitted quizzes with IDs: {submitted_quiz_ids}")
+
+        # Fetch quizzes for the course that have NOT been submitted by the student
+        quizzes_stmt = (
+            select(Quiz)
+            .where(
+                Quiz.course_id == course_id,
+                Quiz.id.notin_(submitted_quiz_ids)
+            )
+        )
+        quizzes = db.exec(quizzes_stmt).all()
         
-        logging.info(f"Found {len(quizzes)} quizzes for course {course_id}")
+        logging.info(f"Found {len(quizzes)} un-attempted quizzes for course {course_id}")
         return quizzes
     except HTTPException as e:
         logging.error(f"HTTPException while listing quizzes for course {course_id}: {e.detail}", exc_info=True)
@@ -163,6 +181,27 @@ def submit_quiz(
             detail="An unexpected error occurred during quiz submission."
         )
 
+
+def list_submissions_for_student(db: Session, course_id: UUID, student_id: UUID):
+    logging.info(f"Listing submissions for student {student_id} in course {course_id}")
+    try:
+        _ensure_enrollment(db, course_id, student_id)
+        
+        submissions = db.exec(
+            select(QuizSubmission)
+            .join(Quiz)
+            .where(
+                QuizSubmission.student_id == student_id,
+                Quiz.course_id == course_id
+            )
+            .options(joinedload(QuizSubmission.quiz))
+        ).all()
+        
+        logging.info(f"Found {len(submissions)} submissions for student {student_id} in course {course_id}")
+        return submissions
+    except Exception as e:
+        logging.error(f"Error listing submissions for student {student_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to retrieve quiz submissions.")
 
 def get_quiz_result(db: Session, submission_id: UUID, student_id: UUID) -> QuizResult:
     logging.info(f"Fetching quiz results for submission_id: {submission_id}")

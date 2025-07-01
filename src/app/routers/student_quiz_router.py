@@ -16,6 +16,7 @@ from ..schemas.quiz import (
 )
 from ..models.user import User
 from ..models.quiz import QuizSubmission
+from ..schemas.quiz import QuizSubmissionRead
 
 # This router will handle all student-facing quiz interactions
 router = APIRouter(
@@ -94,3 +95,18 @@ def get_quiz_result_route(
         submission_id=submission_id,
         student_id=current_user.id
     )
+
+
+@router.get(
+    "/courses/{course_id}/submissions",
+    response_model=List[QuizSubmissionRead],
+    summary="List All Quiz Submissions for a Student in a Course",
+)
+def list_student_submissions(
+    course_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "student":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+    return quiz_controller.list_submissions_for_student(db, course_id, current_user.id)
