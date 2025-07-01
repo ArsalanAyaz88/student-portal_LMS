@@ -40,7 +40,7 @@ def student_list_quizzes(
 
 
 @router.get(
-    "/courses/{course_id}/quizzes/{quiz_id}",
+    "/{course_id}/quizzes/{quiz_id}",
     response_model=QuizDetailRead,
     summary="Get a Single Quiz for a Student",
 )
@@ -56,7 +56,7 @@ def student_get_quiz(
 
 
 @router.post(
-    "/courses/{course_id}/quizzes/{quiz_id}/submissions",
+    "/{course_id}/quizzes/{quiz_id}/submissions",
     response_model=QuizSubmission,
     status_code=status.HTTP_201_CREATED,
     summary="Submit a Quiz",
@@ -75,7 +75,7 @@ def student_submit_quiz(
 
 
 @router.get(
-    "/courses/{course_id}/quizzes/{quiz_id}/results/{submission_id}",
+    "/{course_id}/quizzes/{quiz_id}/results/{submission_id}",
     response_model=QuizResult,
     summary="Get Quiz Result for a Student",
 )
@@ -98,7 +98,7 @@ def get_quiz_result_route(
 
 
 @router.get(
-    "/courses/{course_id}/submissions",
+    "/{course_id}/submissions",
     response_model=List[QuizSubmissionRead],
     summary="List All Quiz Submissions for a Student in a Course",
 )
