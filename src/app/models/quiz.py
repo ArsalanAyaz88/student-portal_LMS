@@ -18,8 +18,8 @@ class Quiz(SQLModel, table=True):
     description: Optional[str] = None
     due_date: Optional[datetime] = None
 
-    questions: List["src.app.models.quiz.Question"] = Relationship(back_populates="quiz", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
-    submissions: List["src.app.models.quiz.QuizSubmission"] = Relationship(back_populates="quiz", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+    questions: List["Question"] = Relationship(back_populates="quiz", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+    submissions: List["QuizSubmission"] = Relationship(back_populates="quiz", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
     audit_logs: List["src.app.models.quiz_audit_log.QuizAuditLog"] = Relationship(back_populates="quiz", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
     course: "Course" = Relationship(back_populates="quizzes")
 
@@ -31,7 +31,7 @@ class Question(SQLModel, table=True):
     is_multiple_choice: bool = Field(default=False)
 
     quiz: Quiz = Relationship(back_populates="questions")
-    options: List["src.app.models.quiz.Option"] = Relationship(back_populates="question", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+    options: List["Option"] = Relationship(back_populates="question", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
 
 class Option(SQLModel, table=True):
     __table_args__ = {"extend_existing": True}
@@ -51,9 +51,9 @@ class QuizSubmission(SQLModel, table=True):
     score: Optional[float] = None
     is_graded: bool = Field(default=False)
 
-    quiz: "src.app.models.quiz.Quiz" = Relationship(back_populates="submissions")
+    quiz: "Quiz" = Relationship(back_populates="submissions")
     student: "User" = Relationship(back_populates="quiz_submissions")
-    answers: List["src.app.models.quiz.Answer"] = Relationship(back_populates="submission", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+    answers: List["Answer"] = Relationship(back_populates="submission", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
 
 class Answer(SQLModel, table=True):
     __table_args__ = {"extend_existing": True}

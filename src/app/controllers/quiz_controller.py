@@ -2,7 +2,7 @@
 
 import logging
 from sqlmodel import Session, select
-from sqlalchemy.orm import joinedload
+from sqlalchemy import func
 from uuid import UUID
 from fastapi import HTTPException, status
 from datetime import datetime
@@ -43,26 +43,34 @@ def list_quizzes(db: Session, course_id: UUID, student_id: UUID):
         logging.info(f"Enrollment verified for student {student_id} in course {course_id}")
 
         # A quiz is considered published if its due_date is not NULL.
-        # This avoids a failing migration for an is_published column.
         quizzes_stmt = select(Quiz).where(
             Quiz.course_id == course_id,
             Quiz.due_date != None
-        ).options(joinedload(Quiz.questions))
+        )
         all_quizzes = db.exec(quizzes_stmt).all()
 
-        # Get all submissions by the student for these quizzes
+        if not all_quizzes:
+            return []
+
         quiz_ids = [quiz.id for quiz in all_quizzes]
-        submissions_stmt = (
-            select(QuizSubmission)
-            .where(
-                QuizSubmission.student_id == student_id,
-                QuizSubmission.quiz_id.in_(quiz_ids)
-            )
+
+        # Get all submissions by the student for these quizzes
+        submissions_stmt = select(QuizSubmission).where(
+            QuizSubmission.student_id == student_id,
+            QuizSubmission.quiz_id.in_(quiz_ids)
         )
         submissions = db.exec(submissions_stmt).all()
         submissions_map = {sub.quiz_id: sub for sub in submissions}
 
-        # Explicitly create a list of QuizListRead objects to ensure correct response model.
+        # Get question counts for all quizzes
+        question_count_stmt = (
+            select(Question.quiz_id, func.count(Question.id).label("question_count"))
+            .where(Question.quiz_id.in_(quiz_ids))
+            .group_by(Question.quiz_id)
+        )
+        question_counts_result = db.exec(question_count_stmt).all()
+        question_counts_map = {quiz_id: count for quiz_id, count in question_counts_result}
+
         quizzes_with_status = []
         for quiz in all_quizzes:
             submission = submissions_map.get(quiz.id)
@@ -76,7 +84,7 @@ def list_quizzes(db: Session, course_id: UUID, student_id: UUID):
                     is_submitted=submission is not None,
                     score=submission.score if submission else None,
                     submission_id=submission.id if submission else None,
-                    total_questions=len(quiz.questions),
+                    total_questions=question_counts_map.get(quiz.id, 0),
                 )
             )
 
