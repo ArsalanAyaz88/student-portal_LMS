@@ -8,7 +8,7 @@ from fastapi import HTTPException, status
 from datetime import datetime
 from ..utils.time import get_pakistan_time
 
-from ..models.quiz import Quiz, QuizSubmission, Answer, Option
+from ..models.quiz import Quiz, Question, QuizSubmission, Answer, Option
 from ..models.quiz_audit_log import QuizAuditLog
 from ..models.enrollment import Enrollment
 from ..schemas.quiz import (
