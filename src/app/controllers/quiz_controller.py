@@ -1,6 +1,7 @@
 # File: application/src/app/controllers/quiz_controller.py
 
 from sqlmodel import Session, select
+from sqlalchemy.orm import joinedload
 from uuid import UUID
 from fastapi import HTTPException, status
 from datetime import datetime
@@ -46,16 +47,15 @@ def list_quizzes(db: Session, course_id: UUID, student_id: UUID):
 def get_quiz_detail(db: Session, course_id: UUID, quiz_id: UUID, student_id: UUID):
     _ensure_enrollment(db, course_id, student_id)
 
-    quiz = db.exec(
+    statement = (
         select(Quiz)
         .where(Quiz.id == quiz_id, Quiz.course_id == course_id)
-    ).first()
+        .options(joinedload(Quiz.questions).joinedload(Question.options))
+    )
+    quiz = db.exec(statement).first()
+
     if not quiz:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
-
-    # eager-load options
-    for q in quiz.questions:
-        _ = q.options
 
     return quiz
 
