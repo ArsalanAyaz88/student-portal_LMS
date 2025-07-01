@@ -142,7 +142,11 @@ class QuizSubmissionCreate(BaseModel):
     answers: List[AnswerCreate]
 
 
+class QuizListRead(QuizRead):
+    is_submitted: bool = False
+    score: Optional[float] = None
+
+
 # --- Aliases for router responses ---
-QuizListRead = QuizRead
 QuizDetailRead = QuizReadWithDetails
 

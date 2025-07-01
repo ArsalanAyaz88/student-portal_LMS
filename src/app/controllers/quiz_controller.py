@@ -36,40 +36,43 @@ def _ensure_enrollment(db: Session, course_id: UUID, student_id: UUID):
 
 
 def list_quizzes(db: Session, course_id: UUID, student_id: UUID):
-    logging.info(f"Listing available (un-attempted) quizzes for course_id: {course_id}, student_id: {student_id}")
+    logging.info(f"Listing all quizzes for course_id: {course_id}, student_id: {student_id}")
     try:
         _ensure_enrollment(db, course_id, student_id)
         logging.info(f"Enrollment verified for student {student_id} in course {course_id}")
-        
-        # Get IDs of quizzes the student has already submitted for this course
-        submitted_quiz_ids_stmt = (
-            select(QuizSubmission.quiz_id)
-            .join(Quiz)
+
+        # Get all published quizzes for the course
+        quizzes_stmt = select(Quiz).where(Quiz.course_id == course_id, Quiz.is_published == True)
+        all_quizzes = db.exec(quizzes_stmt).all()
+
+        # Get all submissions by the student for these quizzes
+        quiz_ids = [quiz.id for quiz in all_quizzes]
+        submissions_stmt = (
+            select(QuizSubmission)
             .where(
                 QuizSubmission.student_id == student_id,
-                Quiz.course_id == course_id
+                QuizSubmission.quiz_id.in_(quiz_ids)
             )
         )
-        submitted_quiz_ids = db.exec(submitted_quiz_ids_stmt).all()
-        logging.info(f"Student has submitted quizzes with IDs: {submitted_quiz_ids}")
+        submissions = db.exec(submissions_stmt).all()
+        submissions_map = {sub.quiz_id: sub for sub in submissions}
 
-        # Fetch quizzes for the course that have NOT been submitted by the student
-        quizzes_stmt = (
-            select(Quiz)
-            .where(
-                Quiz.course_id == course_id,
-                Quiz.id.notin_(submitted_quiz_ids)
-            )
-        )
-        quizzes = db.exec(quizzes_stmt).all()
-        
-        logging.info(f"Found {len(quizzes)} un-attempted quizzes for course {course_id}")
-        return quizzes
+        # Combine quiz info with submission status and score
+        quizzes_with_status = []
+        for quiz in all_quizzes:
+            submission = submissions_map.get(quiz.id)
+            quiz_data = quiz.dict()
+            quiz_data['is_submitted'] = submission is not None
+            quiz_data['score'] = submission.score if submission else None
+            quizzes_with_status.append(quiz_data)
+
+        logging.info(f"Found {len(all_quizzes)} quizzes for course {course_id}, with submission statuses.")
+        return quizzes_with_status
     except HTTPException as e:
-        logging.error(f"HTTPException while listing quizzes for course {course_id}: {e.detail}", exc_info=True)
+        logging.error(f"HTTPException while listing quizzes: {e.detail}", exc_info=True)
         raise
     except Exception as e:
-        logging.error(f"Unexpected error listing quizzes for course {course_id}: {e}", exc_info=True)
+        logging.error(f"Unexpected error listing quizzes: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred while fetching quizzes."
@@ -115,14 +118,27 @@ def submit_quiz(
     
     try:
         _ensure_enrollment(db, course_id, student_id)
-        logging.info("Enrollment verified.")
-        
+        # If a student has already submitted this quiz, delete the old submission.
         existing_submission = db.exec(
-            select(QuizSubmission).where(QuizSubmission.quiz_id == quiz_id, QuizSubmission.student_id == student_id)
+            select(QuizSubmission).where(
+                QuizSubmission.student_id == student_id,
+                QuizSubmission.quiz_id == quiz_id
+            )
         ).first()
+
         if existing_submission:
-            logging.warning(f"Student {student_id} has already submitted quiz {quiz_id}.")
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You have already submitted this quiz.")
+            logging.info(f"Student {student_id} is re-submitting quiz {quiz_id}. Deleting previous submission.")
+            
+            # Explicitly delete answers associated with the submission to avoid foreign key violations
+            # if cascade delete is not configured.
+            answers_to_delete = db.exec(
+                select(Answer).where(Answer.submission_id == existing_submission.id)
+            ).all()
+            for answer in answers_to_delete:
+                db.delete(answer)
+
+            db.delete(existing_submission)
+            db.commit()
         logging.info("No existing submission found for this student and quiz.")
 
         quiz = db.get(Quiz, quiz_id)

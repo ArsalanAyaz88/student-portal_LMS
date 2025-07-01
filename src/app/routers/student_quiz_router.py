@@ -27,7 +27,7 @@ router = APIRouter(
 
 @router.get(
     "/courses/{course_id}/quizzes",
-    response_model=List[QuizListRead],
+    response_model=List[schemas.QuizListRead],
     summary="List Quizzes for a Student in a Course",
 )
 def student_list_quizzes(
