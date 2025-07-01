@@ -20,12 +20,12 @@ from ..models.quiz import QuizSubmission
 
 # This router will handle all student-facing quiz interactions
 router = APIRouter(
-    prefix="/student/quizzes",
+    prefix="/courses",
     tags=["Student Quizzes"],
 )
 
 @router.get(
-    "/courses/{course_id}/quizzes",
+    "/{course_id}/quizzes",
     response_model=List[QuizListRead],
     summary="List Quizzes for a Student in a Course",
 )
