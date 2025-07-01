@@ -17,6 +17,7 @@ class Quiz(SQLModel, table=True):
     title: str
     description: Optional[str] = None
     due_date: Optional[datetime] = None
+    published: bool = Field(default=False)
 
     questions: List["src.app.models.quiz.Question"] = Relationship(back_populates="quiz", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
     submissions: List["src.app.models.quiz.QuizSubmission"] = Relationship(back_populates="quiz", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
