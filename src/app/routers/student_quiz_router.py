@@ -20,12 +20,11 @@ from ..models.quiz import QuizSubmission
 
 # This router will handle all student-facing quiz interactions
 router = APIRouter(
-    prefix="/courses",
     tags=["Student Quizzes"],
 )
 
 @router.get(
-    "/{course_id}/quizzes",
+    "/courses/{course_id}/quizzes",
     response_model=List[QuizListRead],
     summary="List Quizzes for a Student in a Course",
 )
@@ -40,7 +39,7 @@ def student_list_quizzes(
 
 
 @router.get(
-    "/{course_id}/quizzes/{quiz_id}",
+    "/quizzes/courses/{course_id}/quizzes/{quiz_id}",
     response_model=QuizDetailRead,
     summary="Get a Single Quiz for a Student",
 )
@@ -56,7 +55,7 @@ def student_get_quiz(
 
 
 @router.post(
-    "/{course_id}/quizzes/{quiz_id}/submissions",
+    "/quizzes/courses/{course_id}/quizzes/{quiz_id}/submissions",
     response_model=QuizSubmission,
     status_code=status.HTTP_201_CREATED,
     summary="Submit a Quiz",
@@ -75,7 +74,7 @@ def student_submit_quiz(
 
 
 @router.get(
-    "/{course_id}/quizzes/{quiz_id}/results/{submission_id}",
+    "/quizzes/courses/{course_id}/quizzes/{quiz_id}/results/{submission_id}",
     response_model=QuizResult,
     summary="Get Quiz Result for a Student",
 )
@@ -98,7 +97,7 @@ def get_quiz_result_route(
 
 
 @router.get(
-    "/{course_id}/submissions",
+    "/courses/{course_id}/submissions",
     response_model=List[QuizSubmissionRead],
     summary="List All Quiz Submissions for a Student in a Course",
 )
