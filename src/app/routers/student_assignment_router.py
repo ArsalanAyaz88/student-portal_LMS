@@ -49,7 +49,7 @@ def student_detail(
     response_model=SubmissionResponse,
     status_code=status.HTTP_201_CREATED
 )
-def student_submit(
+async def student_submit(
     course_id: UUID,
     assignment_id: UUID,
     file: UploadFile = File(...),
@@ -57,7 +57,7 @@ def student_submit(
     db: Session = Depends(get_db),
 ):
     # Save file & build payload
-    content_url = save_upload_and_get_url(file, folder="assignments")
+    content_url = await save_upload_and_get_url(file, folder="assignments")
     payload = SubmissionCreate(content_url=content_url)
 
     sub_obj = submit_assignment(db, course_id, assignment_id, user.id, payload)
