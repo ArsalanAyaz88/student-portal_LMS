@@ -120,14 +120,23 @@ def add_question_to_quiz(
     if not db.get(Quiz, quiz_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
 
+    # Create and save the question first to generate its ID
     new_question = Question(text=question_data.text, quiz_id=quiz_id)
-    new_question.options = [
-        Option(text=opt.text, is_correct=opt.is_correct) 
-        for opt in question_data.options
-    ]
-
     db.add(new_question)
     db.commit()
+    db.refresh(new_question)
+
+    # Now, create and add options with the generated question_id
+    for opt_data in question_data.options:
+        new_option = Option(
+            text=opt_data.text, 
+            is_correct=opt_data.is_correct, 
+            question_id=new_question.id
+        )
+        db.add(new_option)
+    
+    db.commit()
+    # Refresh the question to load the newly added options
     db.refresh(new_question)
     return new_question
 
