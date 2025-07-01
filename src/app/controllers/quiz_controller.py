@@ -1,5 +1,6 @@
 # File: application/src/app/controllers/quiz_controller.py
 
+import logging
 from sqlmodel import Session, select
 from sqlalchemy.orm import joinedload
 from uuid import UUID
@@ -45,19 +46,30 @@ def list_quizzes(db: Session, course_id: UUID, student_id: UUID):
 
 
 def get_quiz_detail(db: Session, course_id: UUID, quiz_id: UUID, student_id: UUID):
-    _ensure_enrollment(db, course_id, student_id)
+    logging.info(f"Fetching quiz details for quiz_id: {quiz_id}, student_id: {student_id}")
+    try:
+        _ensure_enrollment(db, course_id, student_id)
+        logging.info(f"Enrollment verified for student_id: {student_id}")
 
-    statement = (
-        select(Quiz)
-        .where(Quiz.id == quiz_id, Quiz.course_id == course_id)
-        .options(joinedload(Quiz.questions).joinedload(Question.options))
-    )
-    quiz = db.exec(statement).first()
+        statement = (
+            select(Quiz)
+            .where(Quiz.id == quiz_id, Quiz.course_id == course_id)
+            .options(joinedload(Quiz.questions).joinedload(Question.options))
+        )
+        quiz = db.exec(statement).first()
 
-    if not quiz:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
+        if not quiz:
+            logging.warning(f"Quiz not found for quiz_id: {quiz_id}")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
 
-    return quiz
+        logging.info(f"Successfully fetched quiz: {quiz.title}")
+        return quiz
+    except HTTPException as e:
+        logging.error(f"HTTPException in get_quiz_detail for quiz_id {quiz_id}: {e.detail}", exc_info=True)
+        raise
+    except Exception as e:
+        logging.error(f"Unexpected error in get_quiz_detail for quiz_id {quiz_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred.")
 
 
 def submit_quiz(
