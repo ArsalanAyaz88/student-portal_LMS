@@ -150,6 +150,8 @@ class QuizListRead(BaseModel):
     due_date: Optional[datetime] = None
     is_submitted: bool = False
     score: Optional[float] = None
+    submission_id: Optional[uuid.UUID] = None
+    total_questions: int = 0
 
     class Config:
         from_attributes = True
