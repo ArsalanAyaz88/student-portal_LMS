@@ -3,6 +3,7 @@
 import logging
 from sqlmodel import Session, select
 from sqlalchemy import func
+from sqlalchemy.orm import joinedload
 from uuid import UUID
 from fastapi import HTTPException, status
 from datetime import datetime
