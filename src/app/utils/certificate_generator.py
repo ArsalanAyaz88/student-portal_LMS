@@ -32,7 +32,7 @@ class CertificateGenerator:
         uid = uuid.uuid4().hex[:8].upper()
         return f"CERT-{ts}-{uid}"
 
-    def generate(self,
+    async def generate(self,
                  username: str,
                  course_title: str,
                  completion_date: str = None,
@@ -193,7 +193,7 @@ class CertificateGenerator:
                 pdf_buffer.seek(0)
                 
                 # Use save_upload_and_get_url with certificates folder
-                url = save_upload_and_get_url(
+                url = await save_upload_and_get_url(
                     file=UploadFile(
                         filename=f"certificate_{certificate_number}.pdf",
                         file=pdf_buffer
