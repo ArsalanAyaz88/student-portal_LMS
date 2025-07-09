@@ -45,6 +45,7 @@ class QuizBase(BaseModel):
     due_date: Optional[datetime] = None
 
 class QuizCreate(QuizBase):
+    course_id: uuid.UUID
     questions: List[QuestionCreate] = []
 
 class QuizCreateWithQuestions(QuizCreate):

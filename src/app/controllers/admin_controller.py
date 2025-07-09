@@ -879,21 +879,20 @@ def admin_update_assignment(
     db.refresh(assignment)
     return assignment
 
-@router.post("/courses/{course_id}/quizzes", response_model=QuizRead, status_code=status.HTTP_201_CREATED)
+@router.post("/admin/quizzes", response_model=QuizRead, status_code=status.HTTP_201_CREATED)
 def create_quiz(
-    course_id: uuid.UUID,
     quiz_data: QuizCreate,
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin_user)
 ):
     # Check if course exists
-    course = db.get(Course, course_id)
+    course = db.get(Course, quiz_data.course_id)
     if not course:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
 
     # Create Quiz instance
     new_quiz = Quiz(
-        course_id=course_id,
+        course_id=quiz_data.course_id,
         title=quiz_data.title,
         description=quiz_data.description,
         due_date=quiz_data.due_date
