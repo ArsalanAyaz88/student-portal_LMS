@@ -20,6 +20,8 @@ from src.app.schemas.course import (
     CourseCreate, CourseUpdate, CourseRead, CourseCreateAdmin
 )
 from src.app.schemas.video import VideoUpdate, VideoRead
+from src.app.schemas.quiz import QuizCreate, QuizReadWithDetails, QuizRead
+from src.app.models.quiz import Quiz, Question, Option
 from src.app.schemas.notification import NotificationRead, AdminNotificationRead
 import uuid
 import re
@@ -876,3 +878,50 @@ def admin_update_assignment(
     db.commit()
     db.refresh(assignment)
     return assignment
+
+@router.post("/courses/{course_id}/quizzes", response_model=QuizRead, status_code=status.HTTP_201_CREATED)
+def create_quiz(
+    course_id: uuid.UUID,
+    quiz_data: QuizCreate,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    # Check if course exists
+    course = db.get(Course, course_id)
+    if not course:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+
+    # Create Quiz instance
+    new_quiz = Quiz(
+        course_id=course_id,
+        title=quiz_data.title,
+        description=quiz_data.description,
+        due_date=quiz_data.due_date
+    )
+    db.add(new_quiz)
+    db.commit()
+    db.refresh(new_quiz)
+
+    # Create Questions and Options
+    for q_data in quiz_data.questions:
+        new_question = Question(
+            quiz_id=new_quiz.id,
+            text=q_data.text,
+            is_multiple_choice=True # You can adjust this based on your needs
+        )
+        db.add(new_question)
+        db.commit()
+        db.refresh(new_question)
+
+        for o_data in q_data.options:
+            new_option = Option(
+                question_id=new_question.id,
+                text=o_data.text,
+                is_correct=o_data.is_correct
+            )
+            db.add(new_option)
+    
+    db.commit()
+    db.refresh(new_quiz) # Refresh to get all nested objects
+
+    return new_quiz

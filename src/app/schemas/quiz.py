@@ -45,7 +45,10 @@ class QuizBase(BaseModel):
     due_date: Optional[datetime] = None
 
 class QuizCreate(QuizBase):
-    pass # No extra fields needed for creation initially
+    questions: List[QuestionCreate] = []
+
+class QuizCreateWithQuestions(QuizCreate):
+    pass
 
 class QuizUpdate(BaseModel):
     title: Optional[str] = None
