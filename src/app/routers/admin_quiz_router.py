@@ -47,21 +47,42 @@ def create_quiz(
     db: Session = Depends(get_db),
     admin_user=Depends(get_current_admin_user)
 ):
-    """Creates a new quiz."""
-    if not hasattr(quiz_data, 'course_id') or not quiz_data.course_id:
-         raise HTTPException(
+    """Creates a new quiz, including its questions and options, in a single transaction."""
+    # Basic validation
+    if not quiz_data.course_id:
+        raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Course ID is required to create a quiz."
+            detail="Course ID is required."
         )
-
     if not db.get(Course, quiz_data.course_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
 
-    new_quiz = Quiz.from_orm(quiz_data)
+    # Separate quiz data from questions data
+    quiz_dict = quiz_data.model_dump(exclude={'questions'})
+    new_quiz = Quiz(**quiz_dict)
     db.add(new_quiz)
-    db.commit()
-    db.refresh(new_quiz)
-    return new_quiz
+
+    # Process questions and options
+    for question_data in quiz_data.questions:
+        question_dict = question_data.model_dump(exclude={'options'})
+        new_question = Question(**question_dict, quiz=new_quiz)
+        db.add(new_question)
+
+        for option_data in question_data.options:
+            new_option = Option(**option_data.model_dump(), question=new_question)
+            db.add(new_option)
+
+    try:
+        db.commit()
+        db.refresh(new_quiz)
+        return new_quiz
+    except Exception as e:
+        db.rollback()
+        logging.error(f"Error creating quiz: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred while creating the quiz."
+        )
 
 @quiz_router.get("/{quiz_id}", response_model=QuizReadWithDetails)
 def get_quiz_details(
