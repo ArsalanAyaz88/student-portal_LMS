@@ -4,4 +4,4 @@ from fastapi import APIRouter
 from ..controllers import course_controller
 
 router = APIRouter()
-router.include_router(course_controller.router) 
+router.include_router(course_controller.router)

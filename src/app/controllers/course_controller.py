@@ -22,6 +22,7 @@ from ..utils.time import get_pakistan_time
 from fastapi import File, UploadFile
 import cloudinary
 import cloudinary.uploader
+from fastapi.logger import logger
 
 router = APIRouter(tags=["Courses"])
 
@@ -364,6 +365,7 @@ async def get_certificate(
     user=Depends(get_current_user),
     session: Session = Depends(get_db)
 ):
+    logger.info(f"Certificate generation request received for name: '{name}'")
     try:
         # Validate course_id format
         try:
@@ -415,7 +417,7 @@ async def get_certificate(
                     raise HTTPException(status_code=400, detail="Full name is required to generate a certificate. Please complete your profile.")
                 certificate_generator = CertificateGenerator()
                 certificate_url = await certificate_generator.generate(
-                    username=name,
+                    username=name,  # Use the name from the query parameter
                     course_title=course.title,
                     completion_date=course_progress.completed_at
                 )

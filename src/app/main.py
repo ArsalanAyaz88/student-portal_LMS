@@ -44,6 +44,9 @@ app = FastAPI(
 # Harmless print statement to trigger a new deployment
 print("FastAPI application starting up...")
 
+# Harmless print statement to trigger a new deployment
+print("FastAPI application starting up...")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Allows all origins
