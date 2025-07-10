@@ -723,27 +723,40 @@ def test_enrollment_expiration(
     summary="Create a new assignment for a course",
 )
 def admin_create_assignment(
-    course_id: str,
+    course_id: UUID,
     payload: AssignmentCreate,
     db: Session = Depends(get_db),
     admin=Depends(get_current_admin_user),
 ):
     """Create a new assignment for a course."""
-    try:
-        assign = Assignment(
-            id=uuid.uuid4(),
-            course_id=uuid.UUID(course_id),
-            title=payload.title,
-            description=payload.description,
-            due_date=payload.due_date
-        )
-        db.add(assign)
-        db.commit()
-        db.refresh(assign)
-        return assign
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(500, f"Error creating assignment: {e}")
+    # 1) Ensure course exists
+    course = db.get(Course, course_id)
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    # 2) Create the assignment instance with all required fields
+    assignment = Assignment(
+        title=payload.title,
+        description=payload.description,
+        due_date=payload.due_date,
+        course_id=course_id,
+        status="pending"  # Set a default status
+    )
+    db.add(assignment)
+    db.commit()
+    db.refresh(assignment)
+
+    # 3) Return a valid AssignmentRead object
+    return AssignmentRead(
+        id=assignment.id,
+        course_id=assignment.course_id,
+        title=assignment.title,
+        description=assignment.description,
+        due_date=assignment.due_date,
+        status='pending',  # Default status for a newly created assignment
+        course_title=course.title,
+        submission=None
+    )
 
 @router.get("/courses/{course_id}/assignments", response_model=List[AssignmentRead])
 def admin_list_assignments(

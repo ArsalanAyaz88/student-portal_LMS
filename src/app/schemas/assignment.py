@@ -6,7 +6,6 @@ from uuid import UUID
 from datetime import datetime
 
 class AssignmentCreate(BaseModel):
-    course_id: UUID
     title: str
     description: str
     due_date: datetime
