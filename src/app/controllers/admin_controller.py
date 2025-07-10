@@ -842,7 +842,7 @@ def admin_list_on_time_submissions(
             grade        = sub.grade,
             feedback     = sub.feedback,
         )
-        for sub in subs
+        for sub in submissions
     ]
 
     # 3) return with the correct schema
