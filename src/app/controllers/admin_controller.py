@@ -745,7 +745,7 @@ def admin_create_assignment(
         db.rollback()
         raise HTTPException(500, f"Error creating assignment: {e}")
 
-@router.get("/admin/courses/{course_id}/assignments", response_model=List[AssignmentRead])
+@router.get("/courses/{course_id}/assignments", response_model=List[AssignmentRead])
 def admin_list_assignments(
     course_id: UUID,
     db: Session = Depends(get_db),
@@ -774,8 +774,9 @@ def admin_list_assignments(
     ]
 
 @router.delete(
-    "/admin/courses/{course_id}/assignments/{assignment_id}",
-    status_code=204
+    "/courses/{course_id}/assignments/{assignment_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Remove an assignment",
 )
 def admin_delete_assignment(
     course_id: str,
