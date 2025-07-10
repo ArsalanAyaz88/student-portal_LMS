@@ -28,7 +28,7 @@ router = APIRouter(
     tags=["student_assignments"],
 )
 
-@router.get("", response_model=List[AssignmentList])
+@router.get("", response_model=List[AssignmentRead])
 def student_list(
     course_id: UUID,
     user=Depends(get_current_user),
