@@ -814,10 +814,11 @@ def admin_list_on_time_submissions(
     db: Session = Depends(get_db),
     admin = Depends(get_current_admin_user),
 ):
-    # 1) load assignment
-    assignment = db.get(Assignment, assignment_id)
-    if not assignment or assignment.course_id != course_id:
-        raise HTTPException(404, "Assignment not found")
+    # 1) load assignment and its course
+    stmt = select(Assignment).where(Assignment.id == assignment_id).options(selectinload(Assignment.course))
+    assignment = db.exec(stmt).first()
+    if not assignment or str(assignment.course_id) != str(course_id):
+        raise HTTPException(status_code=404, detail="Assignment not found in this course")
 
     # 2) load submissions + students
     stmt = (
@@ -825,28 +826,38 @@ def admin_list_on_time_submissions(
         .where(AssignmentSubmission.assignment_id == assignment_id)
         .options(selectinload(AssignmentSubmission.student))
     )
-    submissions = db.exec(stmt).all()
-    submissions = submissions if submissions else []
+    submissions_from_db = db.exec(stmt).all()
 
     students = [
         SubmissionStudent(
-            id           = sub.id,
-            student_id   = sub.student.id,
-            email        = sub.student.email,
-            full_name    = sub.student.full_name,
-            submitted_at = sub.submitted_at,
-            content_url  = sub.content_url,
-            grade        = sub.grade,
-            feedback     = sub.feedback,
+            id=sub.id,
+            student_id=sub.student.id,
+            email=sub.student.email,
+            full_name=sub.student.full_name,
+            submitted_at=sub.submitted_at,
+            content_url=sub.content_url,
+            grade=sub.grade,
+            feedback=sub.feedback
         )
-        for sub in submissions
+        for sub in submissions_from_db if sub.student
     ]
 
     # 3) return with the correct schema
+    assignment_details = AssignmentRead(
+        id=assignment.id,
+        course_id=assignment.course_id,
+        title=assignment.title,
+        description=assignment.description,
+        due_date=assignment.due_date,
+        status='n/a',  # Status is student-specific, not applicable here
+        course_title=assignment.course.title,
+        submission=None
+    )
+
     return SubmissionStudentsResponse(
-        assignment  = AssignmentRead.from_orm(assignment),
-        submissions = students,
-    ) 
+        assignment=assignment_details,
+        submissions=students,
+    )
 
 @router.put(
     "/courses/{course_id}/assignments/{assignment_id}/submissions/{submission_id}/grade",
