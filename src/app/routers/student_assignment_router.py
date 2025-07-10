@@ -1,6 +1,7 @@
 # File: application/src/app/routers/student_assignment_router.py
 
-from fastapi import APIRouter, Depends, UploadFile, File, status
+import logging
+from fastapi import APIRouter, Depends, UploadFile, File, status, HTTPException
 from sqlmodel import Session
 from uuid import UUID
 from typing import List
@@ -57,15 +58,38 @@ async def student_submit(
     user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    # Save file & build payload
-    content_url = await save_upload_and_get_url(file, folder="assignments")
-    payload = SubmissionCreate(content_url=content_url)
+    logger = logging.getLogger(__name__)
+    logger.info(f"Submission attempt for assignment {assignment_id} by user {user.id}")
 
-    submission = submit_assignment(db, course_id, assignment_id, user.id, payload)
-    return {
-        "message": "Assignment submitted successfully!",
-        "submission": submission
-    }
+    try:
+        # 1. Save file & build payload
+        logger.info(f"Uploading file '{file.filename}' to Cloudinary.")
+        content_url = await save_upload_and_get_url(file, folder="assignments")
+        logger.info(f"File uploaded successfully. URL: {content_url}")
+
+        # 2. Create submission payload
+        payload = SubmissionCreate(content_url=content_url)
+        logger.info("Submission payload created.")
+
+        # 3. Call controller to save submission
+        submission = submit_assignment(db, course_id, assignment_id, user.id, payload)
+        logger.info(f"Submission saved to database with ID: {submission.id}")
+
+        # 4. Return success response
+        return {
+            "message": "Assignment submitted successfully!",
+            "submission": submission
+        }
+
+    except HTTPException as e:
+        logger.error(f"HTTP Exception during submission: {e.detail}", exc_info=True)
+        raise
+    except Exception as e:
+        logger.error(f"An unexpected error occurred during submission: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An internal error occurred during submission."
+        )
 
 @router.get("/{assignment_id}/submissions/{submission_id}", response_model=SubmissionRead)
 def get_submission_details(
