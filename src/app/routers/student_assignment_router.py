@@ -61,9 +61,10 @@ async def student_submit(
     content_url = await save_upload_and_get_url(file, folder="assignments")
     payload = SubmissionCreate(content_url=content_url)
 
-    submit_assignment(db, course_id, assignment_id, user.id, payload)
+    submission = submit_assignment(db, course_id, assignment_id, user.id, payload)
     return {
-        "message": "Assignment submitted successfully!"
+        "message": "Assignment submitted successfully!",
+        "submission": submission
     }
 
 @router.get("/{assignment_id}/submissions/{submission_id}", response_model=SubmissionRead)
