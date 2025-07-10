@@ -365,7 +365,6 @@ async def get_certificate(
     user=Depends(get_current_user),
     session: Session = Depends(get_db)
 ):
-    logger.info(f"Certificate generation request received for name: '{name}'")
     try:
         # Validate course_id format
         try:
