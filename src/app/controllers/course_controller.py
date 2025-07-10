@@ -409,6 +409,12 @@ async def get_certificate(
             )
         ).first()
 
+        # If certificate exists, check if name is correct. If not, delete and regenerate.
+        if certificate and certificate.student_name != name:
+            session.delete(certificate)
+            session.commit()
+            certificate = None # Set to None to trigger regeneration
+
         if not certificate:
             # Generate new certificate if it doesn't exist
             try:
@@ -423,6 +429,7 @@ async def get_certificate(
 
                 # Save certificate record
                 certificate = Certificate(
+                    student_name=name, # Save the student's name
                     user_id=user.id,
                     course_id=course_uuid,
                     file_path=certificate_url,
