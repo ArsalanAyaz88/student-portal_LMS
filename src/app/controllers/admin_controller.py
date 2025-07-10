@@ -717,9 +717,10 @@ def test_enrollment_expiration(
     }
 
 @router.post(
-    "/admin/courses/{course_id}/assignments",
+    "/courses/{course_id}/assignments",
     response_model=AssignmentRead,
-    status_code=201
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a new assignment for a course",
 )
 def admin_create_assignment(
     course_id: str,
