@@ -124,7 +124,7 @@ class CertificateGenerator:
             else:
                 c.setFont('Times-Italic', 28)
             c.setFillColor(colors.HexColor('#003399'))  # Elegant blue
-            c.drawCentredString(cx, name_y, recipient_name)
+            c.drawCentredString(cx, name_y, username)
 
             # 5b. Course Title (bold serif, centered, just below recipient name)
             course_title_font = 'Times-Bold'
