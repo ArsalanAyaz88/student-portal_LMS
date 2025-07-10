@@ -17,6 +17,9 @@ class AssignmentRead(BaseModel):
     title: str
     description: str
     due_date: datetime
+    status: str  # 'pending', 'submitted', or 'graded'
+    course_title: str
+    submission: Optional['SubmissionRead'] = None
 
     class Config:
         from_attributes = True
