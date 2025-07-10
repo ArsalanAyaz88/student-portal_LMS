@@ -744,18 +744,33 @@ def admin_create_assignment(
         db.rollback()
         raise HTTPException(500, f"Error creating assignment: {e}")
 
-@router.get(
-    "/admin/courses/{course_id}/assignments",
-    response_model=List[AssignmentRead]
-)
+@router.get("/courses/{course_id}/assignments", response_model=List[AssignmentRead])
 def admin_list_assignments(
-    course_id: str,
+    course_id: UUID,
     db: Session = Depends(get_db),
     admin=Depends(get_current_admin_user),
 ):
-    """List all assignments under a given course."""
-    stmt = select(Assignment).where(Assignment.course_id == uuid.UUID(course_id))
-    return db.exec(stmt).all()
+    """List all assignments under a given course for the admin panel."""
+    query = (
+        select(Assignment)
+        .where(Assignment.course_id == course_id)
+        .options(selectinload(Assignment.course))
+    )
+    assignments = db.exec(query).all()
+
+    return [
+        AssignmentRead(
+            id=a.id,
+            course_id=a.course_id,
+            title=a.title,
+            description=a.description,
+            due_date=a.due_date,
+            status='pending',  # Admin view doesn't have student-specific status
+            course_title=a.course.title if a.course else "N/A",
+            submission=None
+        )
+        for a in assignments
+    ]
 
 @router.delete(
     "/admin/courses/{course_id}/assignments/{assignment_id}",
