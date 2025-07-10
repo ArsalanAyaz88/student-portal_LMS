@@ -744,7 +744,7 @@ def admin_create_assignment(
         db.rollback()
         raise HTTPException(500, f"Error creating assignment: {e}")
 
-@router.get("/courses/{course_id}/assignments", response_model=List[AssignmentRead])
+@router.get("/admin/courses/{course_id}/assignments", response_model=List[AssignmentRead])
 def admin_list_assignments(
     course_id: UUID,
     db: Session = Depends(get_db),
