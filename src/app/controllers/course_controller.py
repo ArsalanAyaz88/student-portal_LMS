@@ -360,6 +360,7 @@ def mark_video_completed(
 @router.get("/courses/{course_id}/certificate")
 async def get_certificate(
     course_id: str,
+    name: str, # from query param
     user=Depends(get_current_user),
     session: Session = Depends(get_db)
 ):
@@ -410,11 +411,9 @@ async def get_certificate(
         if not certificate:
             # Generate new certificate if it doesn't exist
             try:
-                if not user.full_name:
-                    raise HTTPException(status_code=400, detail="Full name is required to generate a certificate. Please complete your profile.")
                 certificate_generator = CertificateGenerator()
                 certificate_url = await certificate_generator.generate(
-                    username=user.full_name,
+                    username=name,
                     course_title=course.title,
                     completion_date=course_progress.completed_at
                 )
