@@ -179,4 +179,4 @@ def submit_assignment(
 
     # To prevent circular dependency issues during serialization,
     # return a new object without the nested 'assignment' relationship.
-    return SubmissionRead.from_orm(sub)
+    return AssignmentSubmission.from_orm(sub)
