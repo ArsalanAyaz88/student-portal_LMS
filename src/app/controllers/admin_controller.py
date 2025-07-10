@@ -822,10 +822,7 @@ def admin_list_on_time_submissions(
     # 2) load submissions + students
     stmt = (
         select(AssignmentSubmission)
-        .where(
-            AssignmentSubmission.assignment_id == assignment_id,
-            AssignmentSubmission.submitted_at <= assignment.due_date
-        )
+        .where(AssignmentSubmission.assignment_id == assignment_id)
         .options(selectinload(AssignmentSubmission.student))
     )
     submissions = db.exec(stmt).all()
