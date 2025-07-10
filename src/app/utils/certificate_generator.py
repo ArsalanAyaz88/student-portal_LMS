@@ -114,7 +114,7 @@ class CertificateGenerator:
             # 5. Recipient Name (blue cursive script, centered, 2 lines below award)
             script_font_path = os.path.join(os.path.dirname(__file__), 'fonts', 'GreatVibes-Regular.ttf')
             name_y = award_y - 0.5 * inch
-            recipient_name = username if username else 'Recipient Name'
+
             if os.path.exists(script_font_path):
                 try:
                     pdfmetrics.registerFont(TTFont('GreatVibes', script_font_path))
