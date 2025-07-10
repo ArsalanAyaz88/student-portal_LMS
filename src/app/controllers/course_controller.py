@@ -376,15 +376,9 @@ async def get_certificate(
             )
 
         # Get course first
-        course = session.exec(
-            select(Course).where(Course.id == course_uuid)
-        ).first()
-
+        course = session.exec(select(Course).where(Course.id == course_uuid)).first()
         if not course:
-            raise HTTPException(
-                status_code=404,
-                detail="Course not found"
-            )
+            raise HTTPException(status_code=404, detail="Course not found")
 
         # Check if course is completed
         course_progress = session.exec(
@@ -401,53 +395,51 @@ async def get_certificate(
                 detail="You must complete the course to get a certificate"
             )
 
-        # Get certificate
-        certificate = session.exec(
+        # Check for an existing certificate and delete it to force regeneration.
+        existing_certificate = session.exec(
             select(Certificate).where(
                 Certificate.user_id == user.id,
                 Certificate.course_id == course_uuid
             )
         ).first()
 
-        # If certificate exists, check if name is correct. If not, delete and regenerate.
-        if certificate and certificate.student_name != name:
-            session.delete(certificate)
+        if existing_certificate:
+            session.delete(existing_certificate)
             session.commit()
-            certificate = None # Set to None to trigger regeneration
 
-        if not certificate:
-            # Generate new certificate if it doesn't exist
-            try:
-                if not user.full_name:
-                    raise HTTPException(status_code=400, detail="Full name is required to generate a certificate. Please complete your profile.")
-                certificate_generator = CertificateGenerator()
-                certificate_url = await certificate_generator.generate(
-                    username=name,  # Use the name from the query parameter
-                    course_title=course.title,
-                    completion_date=course_progress.completed_at
-                )
+        # Always generate a new certificate
+        try:
+            if not user.full_name:
+                raise HTTPException(status_code=400, detail="Full name is required to generate a certificate. Please complete your profile.")
 
-                # Save certificate record
-                certificate = Certificate(
-                    student_name=name, # Save the student's name
-                    user_id=user.id,
-                    course_id=course_uuid,
-                    file_path=certificate_url,
-                    certificate_number=os.path.basename(certificate_url).split('/')[-1].replace('certificate_', '').replace('.pdf', '')
-                )
-                session.add(certificate)
-                session.commit()
-            except Exception as e:
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Error generating certificate: {str(e)}"
-                )
+            certificate_generator = CertificateGenerator()
+            certificate_url = await certificate_generator.generate(
+                username=name,  # Use the name from the query parameter
+                course_title=course.title,
+                completion_date=str(get_pakistan_time().date())
+            )
 
-        # Return the B2 URL directly
-        return {
-            "certificate_url": certificate.file_path,
-            "certificate_number": certificate.certificate_number
-        }
+            # Save the new certificate record
+            new_certificate = Certificate(
+                user_id=user.id,
+                course_id=course_uuid,
+                file_path=certificate_url,
+                certificate_number=os.path.basename(certificate_url).split('/')[-1].replace('certificate_', '').replace('.pdf', '')
+            )
+            session.add(new_certificate)
+            session.commit()
+            session.refresh(new_certificate)
+
+            return {
+                "certificate_url": new_certificate.file_path,
+                "certificate_number": new_certificate.certificate_number
+            }
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error generating certificate: {str(e)}"
+            )
 
     except HTTPException:
         raise
