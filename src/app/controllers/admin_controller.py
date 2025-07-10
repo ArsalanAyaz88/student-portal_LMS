@@ -828,7 +828,8 @@ def admin_list_on_time_submissions(
         )
         .options(selectinload(AssignmentSubmission.student))
     )
-    subs = db.exec(stmt).all()
+    submissions = db.exec(stmt).all()
+    submissions = submissions if submissions else []
 
     students = [
         SubmissionStudent(
