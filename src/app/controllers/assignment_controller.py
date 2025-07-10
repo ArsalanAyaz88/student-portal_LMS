@@ -116,4 +116,7 @@ def submit_assignment(
     db.add(sub)
     db.commit()
     db.refresh(sub)
-    return sub
+
+    # To prevent circular dependency issues during serialization,
+    # return a new object without the nested 'assignment' relationship.
+    return AssignmentSubmission.from_orm(sub)
