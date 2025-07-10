@@ -828,19 +828,21 @@ def admin_list_on_time_submissions(
     )
     submissions_from_db = db.exec(stmt).all()
 
-    students = [
-        SubmissionStudent(
-            id=sub.id,
-            student_id=sub.student.id,
-            email=sub.student.email,
-            full_name=sub.student.full_name,
-            submitted_at=sub.submitted_at,
-            content_url=sub.content_url,
-            grade=sub.grade,
-            feedback=sub.feedback
-        )
-        for sub in submissions_from_db if sub.student
-    ]
+    students = []
+    for sub in submissions_from_db:
+        if sub.student:
+            students.append(
+                SubmissionStudent(
+                    id=sub.id,
+                    student_id=sub.student.id,
+                    email=sub.student.email,
+                    full_name=sub.student.full_name,
+                    submitted_at=sub.submitted_at,
+                    content_url=sub.content_url,
+                    grade=sub.grade,
+                    feedback=sub.feedback
+                )
+            )
 
     # 3) return with the correct schema
     assignment_details = AssignmentRead(
