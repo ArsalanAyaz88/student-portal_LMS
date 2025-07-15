@@ -914,7 +914,7 @@ def admin_update_assignment(
         raise HTTPException(status_code=404, detail="Assignment not found")
 
     # Get the update data, excluding unset fields
-    update_data = payload.model_dump(exclude_unset=True)
+    update_data = payload.dict(exclude_unset=True)
 
     # Update the assignment object with the new data
     for key, value in update_data.items():
