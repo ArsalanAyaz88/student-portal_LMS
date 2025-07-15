@@ -363,53 +363,48 @@ def mark_video_completed(
 @router.get("/courses/{course_id}/certificate")
 async def get_certificate(
     course_id: str,
+    name: str,  # Accept name from query parameter
     user: User = Depends(get_current_user),
     session: Session = Depends(get_db)
 ):
     try:
-        # 1. Validate course_id format
+        # 1. Validate course_id
         try:
             course_uuid = uuid.UUID(course_id)
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid course ID format")
 
-        # 2. Check enrollment and completion status
+        # 2. Check enrollment and completion
         enrollment = session.exec(
             select(Enrollment).where(
-                Enrollment.student_id == user.id,
+                Enrollment.student_id == user.id, 
                 Enrollment.course_id == course_uuid
             )
         ).first()
-
         if not enrollment:
             raise HTTPException(status_code=403, detail="You are not enrolled in this course")
-        
         if not enrollment.is_completed:
             raise HTTPException(status_code=403, detail="You must complete the course to get a certificate")
 
-        # 3. Check if a certificate already exists
+        # 3. Delete existing certificate if it exists
         existing_certificate = session.exec(
             select(Certificate).where(
-                Certificate.user_id == user.id,
+                Certificate.user_id == user.id, 
                 Certificate.course_id == course_uuid
             )
         ).first()
-
         if existing_certificate:
-            return {
-                "certificate_url": existing_certificate.file_path,
-                "certificate_number": existing_certificate.certificate_number
-            }
+            session.delete(existing_certificate)
+            session.commit()
 
-        # 4. If not, generate a new one
+        # 4. Generate a new certificate with the provided name
         course = session.get(Course, course_uuid)
         if not course:
-            # This case should ideally not be hit if enrollment exists, but as a safeguard:
             raise HTTPException(status_code=404, detail="Course not found")
 
-        student_name = user.full_name
+        student_name = name
         if not student_name or student_name.lower() == 'string':
-            raise HTTPException(status_code=400, detail="User profile name is not set. Please update your profile.")
+            raise HTTPException(status_code=400, detail="A valid name is required for the certificate.")
 
         try:
             certificate_generator = CertificateGenerator()
@@ -434,12 +429,16 @@ async def get_certificate(
                 "certificate_number": new_certificate.certificate_number
             }
         except Exception as e:
+            # Log the full error for debugging
+            print(f"Certificate generation failed: {e}")
             raise HTTPException(status_code=500, detail=f"Error generating certificate: {str(e)}")
 
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error retrieving certificate: {str(e)}")
+        # Log the full error for debugging
+        print(f"Certificate retrieval failed: {e}")
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
 
 
 @router.put("/courses/{course_id}/thumbnail", response_model=CourseRead)
