@@ -376,7 +376,7 @@ async def get_certificate(
         # 2. Check enrollment and completion status
         enrollment = session.exec(
             select(Enrollment).where(
-                Enrollment.student_id == user['id'],
+                Enrollment.student_id == user.id,
                 Enrollment.course_id == course_uuid
             )
         ).first()
@@ -390,7 +390,7 @@ async def get_certificate(
         # 3. Check if a certificate already exists
         existing_certificate = session.exec(
             select(Certificate).where(
-                Certificate.user_id == user['id'],
+                Certificate.user_id == user.id,
                 Certificate.course_id == course_uuid
             )
         ).first()
@@ -407,7 +407,7 @@ async def get_certificate(
             # This case should ideally not be hit if enrollment exists, but as a safeguard:
             raise HTTPException(status_code=404, detail="Course not found")
 
-        student_name = user['full_name']
+        student_name = user.full_name
         if not student_name or student_name.lower() == 'string':
             raise HTTPException(status_code=400, detail="User profile name is not set. Please update your profile.")
 
@@ -420,7 +420,7 @@ async def get_certificate(
             )
 
             new_certificate = Certificate(
-                user_id=user['id'],
+                user_id=user.id,
                 course_id=course_uuid,
                 file_path=certificate_url,
                 certificate_number=os.path.basename(certificate_url).split('/')[-1].replace('certificate_', '').replace('.pdf', '')
