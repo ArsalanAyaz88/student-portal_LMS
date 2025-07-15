@@ -38,8 +38,8 @@ async def get_current_user(
     if not user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
     
-    # Explicitly parse the user object to ensure it's a clean Pydantic model
-    # This resolves downstream validation errors in other dependencies.
+    # Explicitly parse the user object to ensure it's a clean Pydantic model.
+    # This resolves downstream validation errors by returning a standard object.
     return User.model_validate(user)
 
 
