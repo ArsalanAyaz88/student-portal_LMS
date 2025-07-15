@@ -92,6 +92,137 @@ def send_enrollment_approved_email(to_email: str, course_title: str, expiration_
         logger.error(f"Unexpected error while sending enrollment approval email: {str(e)}")
         raise
 
+def send_application_approved_email(to_email: str, course_title: str):
+    """
+    Send an email notifying the user that their application has been approved
+    and they can now proceed with payment.
+
+    Args:
+        to_email (str): Recipient's email address
+        course_title (str): Title of the course
+    """
+    try:
+        subject = f"✅ Your Application for {course_title} is Approved!"
+        body = f"""
+        <html>
+        <body style='font-family: Arial, sans-serif; color: #333;'>
+            <div style='max-width: 650px; margin: 0 auto; padding: 20px; background-color: #f4f7fc; border-radius: 8px; border: 1px solid #e1e5eb;'>
+                <div style='text-align: center; padding: 30px 0;'>
+                    <img src="https://res.cloudinary.com/imagesahsan/image/upload/v1748352569/sabri_logo_ki5jkg.png" alt="Logo" style="max-width: 150px;">
+                </div>
+                <h2 style='color: #2c3e50; text-align: center;'>Congratulations! You are Eligible to Enroll</h2>
+                <p style='font-size: 16px; text-align: center; color: #555;'>Hello,</p>
+                <p style='font-size: 16px; color: #555;'>We are pleased to inform you that your application for the course <strong>{course_title}</strong> has been <span style='color: green; font-weight: bold;'>approved</span>.</p>
+                <p style='font-size: 16px; color: #555;'>You are now eligible to enroll. To complete your enrollment, please log in to your account and proceed with the payment.</p>
+
+                <div style='text-align: center; margin: 30px 0;'>
+                    <a href="https://lmsfrontend-neon.vercel.app/login" style='background-color: #007bff; color: #ffffff; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 16px;'>Login and Pay Now</a>
+                </div>
+
+                <p style='font-size: 16px; color: #555; text-align: center;'>We look forward to welcoming you to the course!</p>
+                
+                <hr style='border: none; border-top: 1px solid #ccc; margin: 30px 0;'>
+
+                <p style='font-size: 14px; color: #999; text-align: center;'>
+                    This is an automated message, please do not reply to this email.<br>
+                    If you need any assistance, feel free to contact our support team.
+                </p>
+
+                <div style='text-align: center; margin-top: 30px;'>
+                    <p style='font-size: 14px; color: #2c3e50;'>Powered by <strong>Sabiry Ultrasound Training Institute</strong></p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        msg = MIMEText(body, 'html')
+        msg["Subject"] = subject
+        msg["From"] = SMTP_USER
+        msg["To"] = to_email
+        logger.info(f"Attempting to send application approval email to {to_email}")
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30) as server:
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            server.sendmail(SMTP_USER, [to_email], msg.as_string())
+        logger.info(f"Successfully sent application approval email to {to_email}")
+        return True
+    except smtplib.SMTPAuthenticationError:
+        logger.error("SMTP Authentication Error: Invalid credentials")
+        raise
+    except smtplib.SMTPException as e:
+        logger.error(f"SMTP Error: {str(e)}")
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error while sending application approval email: {str(e)}")
+        raise
+
+def send_enrollment_rejected_email(to_email: str, course_title: str, rejection_reason: str):
+    """
+    Send an enrollment rejection notification email using Gmail SMTP server.
+
+    Args:
+        to_email (str): Recipient's email address
+        course_title (str): Title of the course
+        rejection_reason (str): Reason for rejection
+    """
+    try:
+        subject = f"❌ Enrollment Rejected - {course_title}"
+        body = f"""
+        <html>
+        <body style='font-family: Arial, sans-serif; color: #333;'>
+            <div style='max-width: 650px; margin: 0 auto; padding: 20px; background-color: #f4f7fc; border-radius: 8px; border: 1px solid #e1e5eb;'>
+                <div style='text-align: center; padding: 30px 0;'>
+                    <img src="https://res.cloudinary.com/imagesahsan/image/upload/v1748352569/sabri_logo_ki5jkg.png" alt="Logo" style="max-width: 150px;">
+                </div>
+                <h2 style='color: #2c3e50; text-align: center;'>Enrollment Status Update</h2>
+                <p style='font-size: 16px; text-align: center; color: #555;'>Hello,</p>
+                <p style='font-size: 16px; color: #555;'>We regret to inform you that your enrollment for the course <strong>{course_title}</strong> has been <span style='color: red; font-weight: bold;'>rejected</span>.</p>
+                <div style='background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05); margin: 20px 0;'>
+                    <p style='font-size: 18px; color: #333; font-weight: bold; text-align: center;'>Reason for Rejection</p>
+                    <p style='font-size: 16px; text-align: center; color: #555;'>
+                        {rejection_reason}
+                    </p>
+                </div>
+                <p style='font-size: 16px; color: #555; text-align: center;'>If you believe this is a mistake or have any questions, please contact our support team.</p>
+                
+                <hr style='border: none; border-top: 1px solid #ccc; margin: 30px 0;'>
+
+                <p style='font-size: 14px; color: #999; text-align: center;'>
+                    This is an automated message, please do not reply to this email.
+                </p>
+
+                <div style='text-align: center; margin-top: 30px;'>
+                    <p style='font-size: 14px; color: #2c3e50;'>Powered by <strong>Sabiry Ultrasound Training Institute</strong></p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        msg = MIMEText(body, 'html')
+        msg["Subject"] = subject
+        msg["From"] = SMTP_USER
+        msg["To"] = to_email
+        logger.info(f"Attempting to send enrollment rejection email to {to_email}")
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30) as server:
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            server.sendmail(SMTP_USER, [to_email], msg.as_string())
+        logger.info(f"Successfully sent enrollment rejection email to {to_email}")
+        return True
+    except smtplib.SMTPAuthenticationError:
+        logger.error("SMTP Authentication Error: Invalid credentials")
+        raise
+    except smtplib.SMTPException as e:
+        logger.error(f"SMTP Error: {str(e)}")
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error while sending enrollment rejection email: {str(e)}")
+        raise
+
 def send_reset_pin_email(to_email: str, pin: str):
     """
     Send a password reset PIN email using Gmail SMTP server.

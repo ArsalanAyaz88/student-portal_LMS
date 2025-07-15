@@ -1,7 +1,15 @@
-# File: application/src/app/controllers/enrollment_controller.py
-import uuid
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlmodel import Session, select
+import uuid
+from typing import Optional
+
+from src.app.db.session import get_db
+from src.app.models.user import User
+from src.app.models.course import Course
+from src.app.models.enrollment_application import EnrollmentApplication, ApplicationStatus
+from src.app.schemas.enrollment_application_schema import EnrollmentApplicationCreate, EnrollmentApplicationRead
+from src.app.utils.file import upload_file_to_cloudinary
+from src.app.utils.dependencies import get_current_user
 from ..models.enrollment import Enrollment, get_pakistan_time
 from src.app.models.course import Course
 from ..schemas.payment_proof import ProofCreate
@@ -89,3 +97,60 @@ async def submit_payment_proof(
     session.commit()
     return {"detail": "Payment proof submitted, pending admin approval."}
 
+@router.post("/apply/{course_id}", response_model=EnrollmentApplicationRead)
+async def apply_for_course(
+    course_id: uuid.UUID,
+    first_name: str = Form(...),
+    last_name: str = Form(...),
+    qualification: str = Form(...),
+    contact_number: str = Form(...),
+    ultrasound_experience: Optional[str] = Form(None),
+    certificate: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db)
+) -> EnrollmentApplication:
+    # Check if course exists
+    course = session.get(Course, course_id)
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    # Check if user has already applied for this course
+    existing_application = session.exec(
+        select(EnrollmentApplication).where(
+            EnrollmentApplication.user_id == current_user.id,
+            EnrollmentApplication.course_id == course_id
+        )
+    ).first()
+
+    if existing_application:
+        raise HTTPException(status_code=400, detail="You have already applied for this course.")
+
+    # Upload certificate to Cloudinary
+    file_id = f"enrollment_certificates/{current_user.id}_{course_id}_{uuid.uuid4()}"
+    try:
+        certificate_url = await upload_file_to_cloudinary(certificate.file, public_id=file_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to upload certificate: {str(e)}")
+
+    application_data = EnrollmentApplicationCreate(
+        first_name=first_name,
+        last_name=last_name,
+        qualification=qualification,
+        contact_number=contact_number,
+        ultrasound_experience=ultrasound_experience
+    )
+
+    # Create new enrollment application
+    new_application = EnrollmentApplication(
+        **application_data.dict(),
+        user_id=current_user.id,
+        course_id=course_id,
+        qualification_certificate_url=certificate_url,
+        status=ApplicationStatus.PENDING
+    )
+
+    session.add(new_application)
+    session.commit()
+    session.refresh(new_application)
+
+    return new_application

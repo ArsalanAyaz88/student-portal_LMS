@@ -24,11 +24,13 @@ from src.app.routers import (
     auth_router,
     profile_router,
     course_router,
-    admin_router,
     student_assignment_router as sa_router,
     student_quiz_router as sq_router,
     student_dashboard_router,
     admin_quiz_router,
+
+    enrollment_router,
+    admin_router
 )
 
 # ─── Env setup ─────────────────────────────────────────────
@@ -70,9 +72,9 @@ async def startup_event() -> None:
 # ─── Routers ───────────────────────────────────────────────────
 app.include_router(auth_router.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(profile_router.router, prefix="/api/profile", tags=["Profile"])
-
 app.include_router(course_router.router, prefix="/api/courses", tags=["Courses"])
-app.include_router(enrollment_controller.router, prefix="/api/enrollments", tags=["Enrollments"])
+
+app.include_router(enrollment_router.router, prefix="/api/enrollments", tags=["Enrollments"])
 app.include_router(admin_router.router, prefix="/api/admin", tags=["Admin"])
 app.include_router(sa_router.router, prefix="/api/student/assignments")
 app.include_router(sq_router.router, prefix="/api/student")
