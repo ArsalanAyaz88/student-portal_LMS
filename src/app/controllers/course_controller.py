@@ -363,7 +363,7 @@ def mark_video_completed(
 @router.get("/courses/{course_id}/certificate")
 async def get_certificate(
     course_id: str,
-    user=Depends(get_current_user),
+    user: User = Depends(get_current_user),
     session: Session = Depends(get_db)
 ):
     try:
