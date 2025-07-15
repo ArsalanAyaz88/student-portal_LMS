@@ -10,6 +10,11 @@ class AssignmentCreate(BaseModel):
     description: str
     due_date: datetime
 
+class AssignmentUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    due_date: Optional[datetime] = None
+
 class AssignmentRead(BaseModel):
     id: UUID
     course_id: UUID
