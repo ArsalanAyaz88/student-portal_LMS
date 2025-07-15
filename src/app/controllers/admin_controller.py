@@ -1,7 +1,16 @@
-# File: app/controllers/admin_controller.py
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlmodel import Session, select
+import uuid
+from typing import List
+from fastapi import File, UploadFile, status
 
-from fastapi import APIRouter, Depends, HTTPException, status, Body, Query, File, UploadFile
-from sqlmodel import Session, select, func
+
+from src.app.db.session import get_db
+from src.app.models.enrollment_application import EnrollmentApplication, ApplicationStatus
+from src.app.models.user import User
+from src.app.models.course import Course
+from src.app.schemas.enrollment_application_schema import EnrollmentApplicationAdminRead, ApplicationStatusUpdate, EnrollmentApplicationRead
+from src.app.utils.dependencies import get_current_admin_user
 from typing import List, Optional
 from src.app.models.user import User
 from src.app.models.course import Course
@@ -604,7 +613,7 @@ async def get_course_detail(
             detail=f"Error fetching course details: {str(e)}"
         )
 
-from src.app.utils.email import send_enrollment_approved_email
+from src.app.utils.email import send_application_approved_email, send_enrollment_rejected_email
 
 @router.put("/enrollments/approve")
 def approve_enrollment_by_user(
@@ -965,3 +974,65 @@ def create_quiz(
     db.refresh(new_quiz) # Refresh to get all nested objects
 
     return new_quiz
+def get_admin_user(current_user: User = Depends(get_current_admin_user)) -> User:
+    """Dependency to ensure the user is an admin."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="You do not have permission to access this resource.")
+    return current_user
+
+@router.get("/applications", response_model=List[EnrollmentApplicationAdminRead], dependencies=[Depends(get_admin_user)])
+def get_all_applications(
+    session: Session = Depends(get_db)
+) -> List[EnrollmentApplicationAdminRead]:
+    # This query joins the application with the user and course to get their details
+    statement = select(EnrollmentApplication, User.email, Course.title).join(User).join(Course)
+    results = session.exec(statement).all()
+    
+    # Format the results into the Pydantic schema
+    applications = [
+        EnrollmentApplicationAdminRead(
+            id=app.id,
+            student_email=email,
+            course_title=title,
+            status=app.status
+        )
+        for app, email, title in results
+    ]
+    return applications
+
+@router.patch("/applications/{application_id}/status", response_model=EnrollmentApplicationRead, dependencies=[Depends(get_admin_user)])
+def update_application_status(
+    application_id: uuid.UUID,
+    status_update: ApplicationStatusUpdate,
+    session: Session = Depends(get_db)
+) -> EnrollmentApplication:
+    application = session.get(EnrollmentApplication, application_id)
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    application.status = status_update.status
+    session.add(application)
+    session.commit()
+    session.refresh(application)
+
+    if status_update.status == ApplicationStatus.APPROVED:
+        user = session.get(User, application.user_id)
+        course = session.get(Course, application.course_id)
+        if user and course:
+            send_application_approved_email(
+                to_email=user.email, 
+                course_title=course.title
+            )
+
+    elif status_update.status == ApplicationStatus.REJECTED:
+        user = session.get(User, application.user_id)
+        course = session.get(Course, application.course_id)
+        if user and course:
+            rejection_reason = status_update.message or "No reason provided."
+            send_enrollment_rejected_email(
+                to_email=user.email, 
+                course_title=course.title, 
+                rejection_reason=rejection_reason
+            )
+
+    return application    
