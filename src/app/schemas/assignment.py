@@ -1,6 +1,6 @@
 # File: application/src/app/schemas/assignment.py
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List
 from uuid import UUID
 from datetime import datetime
@@ -10,6 +10,11 @@ class AssignmentCreate(BaseModel):
     description: str
     due_date: datetime
 
+class AssignmentUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    due_date: Optional[datetime] = None
+
 class AssignmentRead(BaseModel):
     id: UUID
     course_id: UUID
@@ -17,7 +22,7 @@ class AssignmentRead(BaseModel):
     description: str
     due_date: datetime
     status: str  # 'pending', 'submitted', or 'graded'
-    course_title: str
+    course_title: str = Field(..., alias="course_title")
     submission: Optional['SubmissionRead'] = None
 
     class Config:

@@ -41,7 +41,7 @@ from src.app.models.assignment import Assignment, AssignmentSubmission
 from typing import List
 from fastapi import Form
 from src.app.utils.file import save_upload_and_get_url
-from src.app.schemas.assignment import AssignmentCreate, AssignmentRead, AssignmentList, SubmissionRead, SubmissionGrade, SubmissionStudent, SubmissionStudentsResponse
+from src.app.schemas.assignment import AssignmentCreate, AssignmentUpdate, AssignmentRead, AssignmentList, SubmissionRead, SubmissionGrade, SubmissionStudent, SubmissionStudentsResponse
 
 import logging
 
@@ -913,21 +913,37 @@ def admin_grade_submission(
 def admin_update_assignment(
     course_id: str,
     assignment_id: str,
-    payload: AssignmentCreate,
+    payload: AssignmentUpdate,  # Changed from AssignmentCreate
     db: Session = Depends(get_db),
-    admin = Depends(get_current_admin_user),
+    admin=Depends(get_current_admin_user),
 ):
     """Update an assignment's title, description, and due date."""
     assignment = db.get(Assignment, assignment_id)
     if not assignment or str(assignment.course_id) != course_id:
         raise HTTPException(status_code=404, detail="Assignment not found")
-    assignment.title = payload.title
-    assignment.description = payload.description
-    assignment.due_date = payload.due_date
+
+    # Get the update data, excluding unset fields
+    update_data = payload.dict(exclude_unset=True)
+
+    # Update the assignment object with the new data
+    for key, value in update_data.items():
+        setattr(assignment, key, value)
+
     db.add(assignment)
     db.commit()
     db.refresh(assignment)
-    return assignment
+
+    # Manually construct the response to include the course_title
+    return AssignmentRead(
+        id=assignment.id,
+        course_id=assignment.course_id,
+        title=assignment.title,
+        description=assignment.description,
+        due_date=assignment.due_date,
+        status='n/a',  # Status is not relevant in this context
+        course_title=assignment.course.title,
+        submission=None
+    )
 
 @router.post("/admin/quizzes", response_model=QuizRead, status_code=status.HTTP_201_CREATED)
 def create_quiz(
