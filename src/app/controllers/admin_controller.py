@@ -923,7 +923,18 @@ def admin_update_assignment(
     db.add(assignment)
     db.commit()
     db.refresh(assignment)
-    return assignment
+
+    # Manually construct the response to include the course_title
+    return AssignmentRead(
+        id=assignment.id,
+        course_id=assignment.course_id,
+        title=assignment.title,
+        description=assignment.description,
+        due_date=assignment.due_date,
+        status='n/a',  # Status is not relevant in this context
+        course_title=assignment.course.title,
+        submission=None
+    )
 
 @router.post("/admin/quizzes", response_model=QuizRead, status_code=status.HTTP_201_CREATED)
 def create_quiz(
