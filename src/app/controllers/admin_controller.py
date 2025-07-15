@@ -3,8 +3,6 @@ from sqlmodel import Session, select
 import uuid
 from typing import List
 from fastapi import File, UploadFile, status
-
-
 from src.app.db.session import get_db
 from src.app.models.enrollment_application import EnrollmentApplication, ApplicationStatus
 from src.app.models.user import User
@@ -12,15 +10,12 @@ from src.app.models.course import Course
 from src.app.schemas.enrollment_application_schema import EnrollmentApplicationAdminRead, ApplicationStatusUpdate, EnrollmentApplicationRead
 from src.app.utils.dependencies import get_current_admin_user
 from typing import List, Optional
-from src.app.models.user import User
-from src.app.models.course import Course
 from src.app.models.video import Video
 from src.app.models.enrollment import Enrollment
 from src.app.models.notification import Notification
 from src.app.models.video_progress import VideoProgress
 from src.app.models.course_progress import CourseProgress
-from src.app.db.session import get_db
-from src.app.utils.dependencies import get_current_admin_user
+from src.app.db.session import get_db 
 from uuid import UUID
 from sqlalchemy.orm import selectinload 
 from src.app.schemas.user import UserRead

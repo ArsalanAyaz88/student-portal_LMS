@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlmodel import Session, select
 import uuid
 from typing import Optional
-
 from src.app.db.session import get_db
 from src.app.models.user import User
 from src.app.models.course import Course
@@ -14,11 +13,9 @@ from ..models.enrollment import Enrollment, get_pakistan_time
 from src.app.models.course import Course
 from ..schemas.payment_proof import ProofCreate
 from ..db.session import get_db
-from ..utils.dependencies import get_current_user
 from ..models.payment_proof import PaymentProof
 from ..models.notification import Notification
 from datetime import datetime, timedelta
-from ..utils.time import get_pakistan_time
 import os
 from uuid import uuid4
 from ..schemas.enrollment import EnrollmentStatus
