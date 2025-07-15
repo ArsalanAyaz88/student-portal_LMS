@@ -25,7 +25,7 @@ class EnrollmentApplicationRead(BaseModel):
     status: ApplicationStatus
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # Schema for the admin to see a list of applications
 class EnrollmentApplicationAdminRead(BaseModel):
@@ -35,7 +35,7 @@ class EnrollmentApplicationAdminRead(BaseModel):
     status: ApplicationStatus
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # Schema for updating the status
 class ApplicationStatusUpdate(BaseModel):

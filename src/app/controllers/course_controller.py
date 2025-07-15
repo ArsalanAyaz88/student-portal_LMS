@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
 from sqlalchemy.orm import selectinload
 from src.app.models.course import Course
+from src.app.models.user import User
 from ..models.enrollment import Enrollment
 from ..models.video import Video
 from ..models.video_progress import VideoProgress
