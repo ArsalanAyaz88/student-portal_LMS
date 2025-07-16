@@ -5,7 +5,7 @@ from datetime import datetime
 from src.app.utils.time import get_pakistan_time
 from typing import Optional, TYPE_CHECKING
 
-if TYPE_CHECKING:
+if TYPE_CHECKING: 
     from src.app.models.quiz import Quiz
 
 class QuizAuditLog(SQLModel, table=True):

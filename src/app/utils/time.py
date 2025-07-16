@@ -17,4 +17,4 @@ def convert_to_pakistan_time(dt: datetime) -> datetime:
 def format_pakistan_time(dt: datetime) -> str:
     """Format datetime in Pakistan timezone with timezone info"""
     pakistan_time = convert_to_pakistan_time(dt)
-    return pakistan_time.strftime('%Y-%m-%d %H:%M:%S %Z') 
+    return pakistan_time.strftime('%Y-%m-%d %H:%M:%S %Z')  

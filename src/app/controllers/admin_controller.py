@@ -96,88 +96,51 @@ def admin_list_courses(db: Session = Depends(get_db), admin=Depends(get_current_
         ) for c in courses
     ]
 
-# 1b. Create a new course with preview video and videos
 @router.post("/courses", status_code=status.HTTP_201_CREATED, response_model=AdminCourseDetail)
 async def create_course(
-    course_data: CourseCreateAdmin,
+    title: str = Form(...),
+    description: str = Form(...),
+    price: float = Form(...),
+    status: str = Form("active"),
+    thumbnail_url: Optional[str] = Form(None),
+    difficulty_level: Optional[str] = Form(None),
+    outcomes: Optional[str] = Form(None),
+    prerequisites: Optional[str] = Form(None),
+    curriculum: Optional[str] = Form(None),
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin_user),
 ):
     """Create a new course.
-
-    This endpoint is used by an Admin to create a new course.
-    The request should be standard JSON.
+    
+    Note: Videos should be uploaded separately using the /api/v1/courses/{course_id}/videos endpoint.
     """
-    session = db
     try:
-        # Safely construct the course payload, adding optional fields only if they have a value.
-        course_payload = {
-            "title": course_data.title,
-            "description": course_data.description,
-            "price": course_data.price,
-            "status": course_data.status,
-            "created_by": admin.id,
-            "updated_by": admin.id,
-        }
-
-        if getattr(course_data, 'thumbnail_url', None):
-            course_payload['thumbnail_url'] = course_data.thumbnail_url
-        if getattr(course_data, 'difficulty_level', None):
-            course_payload['difficulty_level'] = course_data.difficulty_level
-        if getattr(course_data, 'outcomes', None):
-            course_payload['outcomes'] = course_data.outcomes
-        if getattr(course_data, 'prerequisites', None):
-            course_payload['prerequisites'] = course_data.prerequisites
-        if getattr(course_data, 'curriculum', None):
-            course_payload['curriculum'] = course_data.curriculum
-
-        new_course = Course(**course_payload)
-        session.add(new_course)
-        session.flush()  # Flush to generate and retrieve the new_course.id
-
-        # 2. Now create and associate videos with the correct course_id
-        videos_to_add = []
-        preview_video_obj = None
-        if course_data.preview_video:
-            preview_video_data = course_data.preview_video
-            preview_video_obj = Video(
-                youtube_url=str(preview_video_data.youtube_url),
-                title=preview_video_data.title,
-                description=preview_video_data.description,
-                is_preview=True,
-                course_id=new_course.id  # Use the generated course_id
-            )
-            videos_to_add.append(preview_video_obj)
-
-        if course_data.videos:
-            for video_data in course_data.videos:
-                video = Video(
-                    youtube_url=str(video_data.youtube_url),
-                    title=video_data.title,
-                    description=video_data.description,
-                    is_preview=False,
-                    course_id=new_course.id  # Use the generated course_id
-                )
-                videos_to_add.append(video)
+        # Create the course
+        course = Course(
+            title=title,
+            description=description,
+            price=price,
+            status=status,
+            thumbnail_url=thumbnail_url,
+            difficulty_level=difficulty_level,
+            outcomes=outcomes,
+            prerequisites=prerequisites,
+            curriculum=curriculum,
+            created_by=admin.id,
+            updated_by=admin.id
+        )
         
-        if videos_to_add:
-            session.add_all(videos_to_add)
-            session.flush() # Flush to generate video IDs
-
-        # 3. Link the preview video to the course using its ID
-        if preview_video_obj:
-            new_course.preview_video_id = preview_video_obj.id
-
-        session.commit()  # Commit the entire transaction
-        session.refresh(new_course)
-        return new_course
-
+        db.add(course)
+        db.commit()
+        db.refresh(course)
+        return course
+        
     except Exception as e:
-        session.rollback() # Rollback the transaction on any error
+        db.rollback()
         logging.error(f"Error creating course: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"An unexpected error occurred on the server: {e}",
+            detail=f"Failed to create course: {str(e)}"
         )
 
 
@@ -202,7 +165,7 @@ def get_course_detail(
     if not course:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
 
-    return course
+    return course 
 
 
 # 2. Notifications
@@ -640,6 +603,7 @@ def approve_enrollment_by_user(
     # Notify student with expiration date
     notif = Notification(
         user_id=enrollment.user_id,
+        course_id=enrollment.course_id,
         event_type="enrollment_approved",
         details=f"Enrollment approved for course ID {enrollment.course_id}. Access granted until {enrollment.expiration_date.strftime('%Y-%m-%d %H:%M:%S %Z')} ({enrollment.days_remaining} days remaining)",
     ) 

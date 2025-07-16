@@ -1,39 +1,9 @@
 # File: app/schemas/course.py
-from pydantic import BaseModel, Field, validator, HttpUrl
-from typing import List, Optional, Any
+from pydantic import BaseModel, Field
+from typing import List, Optional
 from datetime import datetime
 import uuid
-from ..schemas.video import VideoUpdate
-
-class VideoCreate(BaseModel):
-    youtube_url: str = Field(..., description="YouTube video URL", example="https://www.youtube.com/watch?v=dQw4w9WgXcQ")
-    title: Optional[str] = Field(None, description="Video title", example="Course Introduction")
-    description: Optional[str] = Field(None, description="Video description", example="A brief overview of the course content.")
-
-    @validator('youtube_url')
-    def validate_youtube_url(cls, v):
-        if not v.startswith(('https://www.youtube.com/', 'https://youtu.be/')):
-            raise ValueError('Invalid YouTube URL format')
-        return v
-
-class VideoRead(BaseModel):
-    id: uuid.UUID = Field(..., description="Video ID")
-    youtube_url: str = Field(..., description="YouTube video URL")
-    title: Optional[str] = Field(None, description="Video title")
-    description: Optional[str] = Field(None, description="Video description")
-
-    class Config:
-        from_attributes = True
-
-class VideoWithCheckpoint(BaseModel):
-    id: str = Field(..., description="Video ID")
-    youtube_url: str = Field(..., description="YouTube video URL")
-    title: Optional[str] = Field(None, description="Video title")
-    description: Optional[str] = Field(None, description="Video description")
-    watched: bool = Field(..., description="Whether the video has been watched")
-
-    class Config:
-        from_attributes = True
+from src.app.schemas.video import VideoRead
 
 class CourseBase(BaseModel):
     title: str = Field(..., example="The Complete Web Development Bootcamp")
@@ -50,8 +20,6 @@ class CourseCreate(CourseBase):
 
 class CourseCreateAdmin(CourseBase):
     """Schema for creating a course by admin with additional fields"""
-    preview_video: Optional[VideoCreate] = None
-    videos: List[VideoCreate] = []
     # created_by is set automatically from the current admin user
     status: str = "active"
 
@@ -91,7 +59,7 @@ class CourseCurriculumDetail(BaseModel):
     curriculum: str
 
 class CourseDetail(CourseRead):
-    videos: List["VideoRead"] = []
+    videos: List[VideoRead] = []
 
 class CourseBasicDetail(BaseModel):
     id: uuid.UUID

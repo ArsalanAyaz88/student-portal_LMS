@@ -28,7 +28,7 @@ from src.app.routers import (
     student_quiz_router as sq_router,
     student_dashboard_router,
     admin_quiz_router,
-
+    video_router,
     enrollment_router,
     admin_router
 )
@@ -37,7 +37,7 @@ from src.app.routers import (
 load_dotenv()
 
 # ─── FastAPI app ───────────────────────────────────────────────
-app = FastAPI(
+app = FastAPI(  
     title="Student Portal LMS",
     description="API for EduTech platform",
     version="1.0.0",
@@ -88,6 +88,9 @@ app.include_router(
 app.include_router(admin_quiz_router.quiz_router, prefix="/api/admin/quizzes")
 app.include_router(admin_quiz_router.question_router, prefix="/api/admin/questions")
 app.include_router(admin_quiz_router.submission_router, prefix="/api/admin/submissions")
+
+# Include video router
+app.include_router(video_router.router)
 
 # ─── Simple endpoints ──────────────────────────────────────────
 @app.get("/")

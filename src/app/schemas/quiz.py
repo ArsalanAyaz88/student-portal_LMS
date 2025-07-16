@@ -8,7 +8,7 @@ from datetime import datetime
 
 class OptionBase(BaseModel):
     text: str
-    is_correct: bool
+    is_correct: bool 
 
 class OptionCreate(OptionBase):
     pass

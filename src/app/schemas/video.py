@@ -4,15 +4,18 @@ from typing import Optional
 import uuid
 
 class VideoBase(BaseModel):
-    youtube_url: str
+    cloudinary_url: str
+    title: Optional[str] = None
+    description: Optional[str] = None
+    duration: Optional[int] = None
+    is_preview: bool = False
+
+class VideoCreate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
 
-class VideoCreate(VideoBase):
-    pass
-
 class VideoUpdate(VideoBase):
-    youtube_url: Optional[str] = None
+    cloudinary_url: Optional[str] = None
 
 class VideoRead(VideoBase):
     id: uuid.UUID
@@ -20,3 +23,7 @@ class VideoRead(VideoBase):
 
     class Config:
         from_attributes = True
+
+class VideoWithProgress(VideoRead):
+    watched: bool = False
+ 

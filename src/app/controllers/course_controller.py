@@ -10,7 +10,8 @@ from ..models.video_progress import VideoProgress
 from ..models.course_progress import CourseProgress
 from ..models.certificate import Certificate
 from ..schemas.course import CourseRead, CourseListRead, CourseExploreList, CourseExploreDetail, CourseCurriculumDetail, CourseDetail, CurriculumSchema, OutcomesSchema, PrerequisitesSchema, CourseBasicDetail, DescriptionSchema
-from ..schemas.course import VideoWithCheckpoint, CourseProgress as CourseProgressSchema
+from ..schemas.course import CourseProgress as CourseProgressSchema
+from ..schemas.video import VideoWithProgress
 from ..db.session import get_db
 from ..utils.dependencies import get_current_user
 from ..utils.certificate_generator import CertificateGenerator
@@ -156,17 +157,15 @@ def get_course_description(course_id: str, session: Session = Depends(get_db)):
     return DescriptionSchema(description=course.description or "")
 
 
-@router.get("/my-courses/{course_id}/videos-with-checkpoint", response_model=list[VideoWithCheckpoint])
-def get_course_videos_with_checkpoint(
+@router.get("/my-courses/{course_id}/videos-with-progress", response_model=list[VideoWithProgress])
+def get_course_videos_with_progress(
     course_id: str,
     user=Depends(get_current_user),
     session: Session = Depends(get_db)
 ):
     try:
-        # Convert course_id to UUID
         course_uuid = uuid.UUID(course_id)
         
-        # Fetch the enrollment record
         enrollment = session.exec(
             select(Enrollment).where(
                 Enrollment.user_id == user.id,
@@ -175,36 +174,12 @@ def get_course_videos_with_checkpoint(
             )
         ).first()
 
-        if not enrollment:
-            raise HTTPException(
-                status_code=403,
-                detail="You are not enrolled in this course."
-            )
-
-        # Get current time in Pakistan timezone
-        current_time = get_pakistan_time()
-        
-        # An enrollment is not accessible if it has an expiration date that is in the past
-        if enrollment.expiration_date:
-            # Make both datetimes timezone-naive for comparison
-            expiration_date = enrollment.expiration_date
-            if expiration_date.tzinfo is not None:
-                expiration_date = expiration_date.replace(tzinfo=None)
-            
-            if expiration_date < current_time.replace(tzinfo=None):
-                raise HTTPException(
-                    status_code=403,
-                    detail="Your access to this course has expired."
-                )
-        
-        # Also respect the is_accessible flag which might be set to false for other reasons.
-        if not enrollment.is_accessible:
+        if not enrollment or not enrollment.is_accessible:
             raise HTTPException(
                 status_code=403,
                 detail="You do not have access to this course."
             )
 
-        # Get course videos
         course = session.exec(
             select(Course)
             .where(Course.id == course_uuid)
@@ -214,12 +189,10 @@ def get_course_videos_with_checkpoint(
         if not course:
             raise HTTPException(status_code=404, detail="Course not found")
 
-        # Get all video IDs
         video_ids = [video.id for video in course.videos]
         if not video_ids:
             return []
 
-        # Get video progress
         progresses = session.exec(
             select(VideoProgress).where(
                 VideoProgress.user_id == user.id,
@@ -227,18 +200,19 @@ def get_course_videos_with_checkpoint(
             )
         ).all()
         
-        # Create progress map using UUIDs
-        progress_map = {str(p.video_id): p.completed for p in progresses}
+        progress_map = {p.video_id: p.completed for p in progresses}
 
-        # Build response
         result = []
         for video in course.videos:
-            result.append(VideoWithCheckpoint(
-                id=str(video.id),
-                youtube_url=video.youtube_url,
+            result.append(VideoWithProgress(
+                id=video.id,
+                cloudinary_url=video.cloudinary_url,
                 title=video.title,
                 description=video.description,
-                watched=progress_map.get(str(video.id), False)
+                duration=video.duration,
+                is_preview=video.is_preview,
+                course_id=video.course_id,
+                watched=progress_map.get(video.id, False)
             ))
         return result
 
