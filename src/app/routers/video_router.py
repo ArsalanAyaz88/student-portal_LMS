@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
-from sqlmodel import Session
+from sqlmodel import Session, select
 from typing import List, Optional
 import logging
 from uuid import UUID
@@ -8,6 +8,7 @@ import os
 from ..db.session import get_db
 from ..models.video import Video
 from ..models.course import Course
+from ..models.quiz import Quiz
 from ..schemas.video import VideoRead, VideoCreate, VideoUpdate
 from ..utils.dependencies import get_current_admin_user
 from ..utils.file import save_upload_and_get_url
@@ -151,3 +152,91 @@ def delete_video(
     db.delete(video)
     db.commit()
     return {"ok": True}
+
+@router.patch("/videos/{video_id}/quiz/{quiz_id}", response_model=VideoRead)
+async def associate_quiz_with_video(
+    video_id: UUID,
+    quiz_id: UUID,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    """
+    Associate a quiz with a video.
+    Only admins can perform this action.
+    """
+    # Get the video
+    video = db.get(Video, video_id)
+    if not video:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Video not found"
+        )
+    
+    # Get the quiz
+    quiz = db.get(Quiz, quiz_id)
+    if not quiz:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Quiz not found"
+        )
+    
+    # Verify quiz belongs to the same course as video
+    if quiz.course_id != video.course_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Quiz must belong to the same course as the video"
+        )
+    
+    # Associate quiz with video
+    video.quiz_id = quiz.id
+    db.add(video)
+    db.commit()
+    db.refresh(video)
+    
+    return video
+
+@router.delete("/videos/{video_id}/quiz", response_model=VideoRead)
+async def remove_quiz_from_video(
+    video_id: UUID,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    """
+    Remove quiz association from a video.
+    Only admins can perform this action.
+    """
+    video = db.get(Video, video_id)
+    if not video:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Video not found"
+        )
+    
+    video.quiz_id = None
+    db.add(video)
+    db.commit()
+    db.refresh(video)
+    
+    return video
+
+@router.get("/videos/{video_id}/quiz")
+async def get_video_quiz(
+    video_id: UUID,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    """
+    Get the quiz associated with a video.
+    Only admins can access this endpoint.
+    """
+    video = db.get(Video, video_id)
+    if not video:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Video not found"
+        )
+    
+    if not video.quiz_id:
+        return {"quiz_id": None}
+    
+    return {"quiz_id": video.quiz_id}

@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from src.app.models.course import Course
     from src.app.models.quiz_audit_log import QuizAuditLog
     from src.app.models.user import User
+    from src.app.models.video import Video
 
 class Quiz(SQLModel, table=True):
     __table_args__ = {"extend_existing": True}
@@ -22,6 +23,7 @@ class Quiz(SQLModel, table=True):
     submissions: List["QuizSubmission"] = Relationship(back_populates="quiz", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
     audit_logs: List["src.app.models.quiz_audit_log.QuizAuditLog"] = Relationship(back_populates="quiz", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
     course: "Course" = Relationship(back_populates="quizzes")
+    videos: List["Video"] = Relationship(back_populates="quiz")
 
 class Question(SQLModel, table=True):
     __table_args__ = {"extend_existing": True}

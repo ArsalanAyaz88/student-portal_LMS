@@ -162,36 +162,79 @@ def add_question_to_quiz(
 ):
     """Add a new question to a specific quiz."""
     try:
+        # Validate input data
+        if not question_data.text or not question_data.text.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Question text cannot be empty"
+            )
+            
+        if not question_data.options:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="At least one option is required"
+            )
+            
+        # Verify quiz exists
         quiz = db.get(Quiz, quiz_id)
         if not quiz:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Quiz with ID {quiz_id} not found"
+            )
 
-        # Create the question and its options in a single transaction
+        # Validate there's exactly one correct option
+        correct_options = [opt for opt in question_data.options if opt.is_correct]
+        if len(correct_options) != 1:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Exactly one correct option is required"
+            )
+
+        # Create the question
         new_question = Question(
-            text=question_data.text, 
+            text=question_data.text.strip(),
             quiz_id=quiz_id,
-            is_multiple_choice=False
+            is_multiple_choice=len(question_data.options) > 1
         )
         
-        # Prepare options to be added
-        options_to_add = [
-            Option(text=opt.text, is_correct=opt.is_correct, question=new_question)
-            for opt in question_data.options
-        ]
+        # Validate and prepare options
+        options_to_add = []
+        for i, opt in enumerate(question_data.options):
+            if not opt.text or not opt.text.strip():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Option {i+1} text cannot be empty"
+                )
+            options_to_add.append(
+                Option(
+                    text=opt.text.strip(),
+                    is_correct=opt.is_correct,
+                    question=new_question
+                )
+            )
         
+        # Add to database
         db.add(new_question)
         db.add_all(options_to_add)
-        
         db.commit()
         db.refresh(new_question)
         
+        # Eager load options for the response
+        db.refresh(new_question, ['options'])
+        
         return new_question
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+        
     except Exception as e:
-        logging.error(f"Error adding question to quiz {quiz_id}: {e}", exc_info=True)
+        logging.error(f"Error adding question to quiz {quiz_id}: {str(e)}", exc_info=True)
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred while adding the question."
+            detail=f"Failed to add question: {str(e)}"
         )
 
 
