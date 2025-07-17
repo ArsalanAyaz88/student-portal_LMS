@@ -1,17 +1,19 @@
 # File: application/src/app/controllers/course_controller.py
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlmodel import Session, select
-from sqlalchemy.orm import selectinload
+from sqlmodel import Session, select, or_
+from sqlalchemy.orm import selectinload, joinedload
 from src.app.models.course import Course
+from src.app.models.video import Video
+from src.app.models.quiz import Quiz, QuizSubmission, Question, Option
+from src.app.schemas.video import VideoWithProgress, VideoCreate, VideoUpdate
+from src.app.schemas.quiz import QuizRead, QuizSubmissionCreate, QuizSubmissionRead
+from src.app.schemas.course import CourseRead, CourseListRead, CourseExploreList, CourseExploreDetail, CourseCurriculumDetail, CourseDetail, CurriculumSchema, OutcomesSchema, PrerequisitesSchema, CourseBasicDetail, DescriptionSchema, CourseProgress as CourseProgressSchema
 from src.app.models.user import User
 from ..models.enrollment import Enrollment
-from ..models.video import Video
 from ..models.video_progress import VideoProgress
 from ..models.course_progress import CourseProgress
 from ..models.certificate import Certificate
-from ..schemas.course import CourseRead, CourseListRead, CourseExploreList, CourseExploreDetail, CourseCurriculumDetail, CourseDetail, CurriculumSchema, OutcomesSchema, PrerequisitesSchema, CourseBasicDetail, DescriptionSchema
-from ..schemas.course import CourseProgress as CourseProgressSchema
-from ..schemas.video import VideoWithProgress
 from ..db.session import get_db
 from ..utils.dependencies import get_current_user
 from ..utils.certificate_generator import CertificateGenerator
@@ -157,6 +159,66 @@ def get_course_description(course_id: str, session: Session = Depends(get_db)):
     return DescriptionSchema(description=course.description or "")
 
 
+def get_next_available_video(course_id: uuid.UUID, user_id: uuid.UUID, session: Session) -> tuple[Optional[Video], bool]:
+    """
+    Find the next video that should be shown to the user based on their progress.
+    Returns a tuple of (next_video, all_completed)
+    """
+    # Get all videos in order
+    videos = session.exec(
+        select(Video)
+        .where(Video.course_id == course_id)
+        .order_by(Video.created_at.asc())
+        .options(selectinload(Video.quiz))
+    ).all()
+    
+    if not videos:
+        return None, False
+        
+    # Get all video progresses for the user
+    video_progresses = {
+        vp.video_id: vp 
+        for vp in session.exec(
+            select(VideoProgress)
+            .where(
+                VideoProgress.user_id == user_id,
+                VideoProgress.video_id.in_([v.id for v in videos])
+            )
+        ).all()
+    }
+    
+    # Get all quiz submissions for the user in this course
+    quiz_submissions = {
+        qs.quiz_id: qs
+        for qs in session.exec(
+            select(QuizSubmission)
+            .where(
+                QuizSubmission.student_id == user_id,
+                QuizSubmission.quiz_id.in_([v.quiz_id for v in videos if v.quiz_id])
+            )
+        ).all()
+    }
+    
+    # Find the first video that's not completed or whose quiz is not passed
+    for i, video in enumerate(videos):
+        progress = video_progresses.get(video.id)
+        
+        # If video has a quiz, check if it's passed
+        if video.quiz_id:
+            submission = quiz_submissions.get(video.quiz_id)
+            quiz_passed = bool(submission and submission.score >= 0.7)  # Assuming 70% is passing
+            
+            # If quiz is not passed, this is the next video to show
+            if not quiz_passed:
+                return video, False
+                
+        # If no quiz or quiz passed, check if video is completed
+        if not progress or not progress.completed:
+            return video, False
+            
+    # All videos and quizzes completed
+    return None, True
+
 @router.get("/my-courses/{course_id}/videos-with-progress", response_model=list[VideoWithProgress])
 def get_course_videos_with_progress(
     course_id: str,
@@ -180,40 +242,113 @@ def get_course_videos_with_progress(
                 detail="You do not have access to this course."
             )
 
-        course = session.exec(
-            select(Course)
-            .where(Course.id == course_uuid)
-            .options(selectinload(Course.videos))
-        ).first()
+        # Get all videos for the course with their quizzes
+        videos = session.exec(
+            select(Video)
+            .where(Video.course_id == course_uuid)
+            .order_by(Video.created_at.asc())
+            .options(joinedload(Video.quiz))  # Use joinedload instead of selectinload
+        ).unique().all()  # Add unique() to avoid duplicate rows
         
-        if not course:
-            raise HTTPException(status_code=404, detail="Course not found")
-
-        video_ids = [video.id for video in course.videos]
-        if not video_ids:
+        if not videos:
             return []
-
-        progresses = session.exec(
-            select(VideoProgress).where(
-                VideoProgress.user_id == user.id,
-                VideoProgress.video_id.in_(video_ids)
-            )
-        ).all()
+            
+        # Get all video progresses for the user
+        video_progresses = {
+            vp.video_id: vp 
+            for vp in session.exec(
+                select(VideoProgress)
+                .where(
+                    VideoProgress.user_id == user.id,
+                    VideoProgress.video_id.in_([v.id for v in videos])
+                )
+            ).all()
+        }
         
-        progress_map = {p.video_id: p.completed for p in progresses}
-
+        # Get all quiz submissions for the user in this course
+        quiz_submissions = {
+            qs.quiz_id: qs
+            for qs in session.exec(
+                select(QuizSubmission)
+                .where(
+                    QuizSubmission.student_id == user.id,
+                    QuizSubmission.quiz_id.in_([v.quiz_id for v in videos if v.quiz_id])
+                )
+            ).all()
+        }
+        
+        # Find the next available video
+        next_video, all_completed = get_next_available_video(course_uuid, user.id, session)
+        
+        # Prepare the response
         result = []
-        for video in course.videos:
+        for i, video in enumerate(videos):
+            progress = video_progresses.get(video.id)
+            quiz = None
+            quiz_passed = False
+            
+            # Get quiz info if exists
+            quiz_data = None
+            quiz_passed = False
+            
+            if video.quiz_id:
+                # Make sure we have the quiz data
+                if not hasattr(video, 'quiz') or not video.quiz:
+                    video.quiz = session.get(Quiz, video.quiz_id)
+                
+                if video.quiz:
+                    quiz_data = video.quiz
+                    submission = quiz_submissions.get(video.quiz_id)
+                    quiz_passed = bool(submission and submission.score >= 0.7)  # 70% passing score
+            
+            # Determine if this video is accessible
+            is_accessible = True
+            required_quiz_passed = True
+            previous_quiz_passed = True
+            
+            # If there's a previous video with a quiz, check if it was passed
+            if i > 0 and videos[i-1].quiz_id:
+                prev_submission = quiz_submissions.get(videos[i-1].quiz_id)
+                prev_quiz_passed = bool(prev_submission and prev_submission.score >= 0.7)
+                required_quiz_passed = prev_quiz_passed
+                previous_quiz_passed = prev_quiz_passed
+                is_accessible = prev_quiz_passed
+            
+            # If this is the next available video, mark it as such
+            is_next_available = next_video and video.id == next_video.id
+            
+            # If all videos are completed, the last video is the next available
+            if all_completed and i == len(videos) - 1:
+                is_next_available = True
+            
+            # If this video is before the next available one, it's accessible
+            if next_video and video.created_at < next_video.created_at:
+                is_accessible = True
+            
+            # If this is the first video, it's always accessible
+            if i == 0:
+                is_accessible = True
+                required_quiz_passed = True
+            
             result.append(VideoWithProgress(
                 id=video.id,
+                course_id=video.course_id,
                 cloudinary_url=video.cloudinary_url,
                 title=video.title,
                 description=video.description,
                 duration=video.duration,
                 is_preview=video.is_preview,
-                course_id=video.course_id,
-                watched=progress_map.get(video.id, False)
+                quiz_id=video.quiz_id,
+                quiz=quiz_data,
+                watched=bool(progress and progress.completed),
+                quiz_passed=quiz_passed,
+                is_accessible=is_accessible,
+                is_next_available=is_next_available,
+                next_video_id=next_video.id if next_video and i < len(videos) - 1 else None,
+                required_quiz_passed=required_quiz_passed,
+                previous_quiz_passed=previous_quiz_passed
             ))
+        
         return result
 
     except ValueError:
