@@ -201,12 +201,37 @@ def get_notifications(session: Session = Depends(get_db), admin=Depends(get_curr
 # 3. Course Management
 @router.put("/courses/{course_id}")
 async def update_course(
+    request: Request,
     course_id: str,
-    course_update: CourseUpdate,
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin_user)
 ):
     """Update an existing course with comprehensive validation"""
+    # ─── Logging for Vercel Debugging ────────────────────────────────────────
+    logging.basicConfig(level=logging.INFO)
+    logging.info(f"--- Admin Course Update Request ---")
+    logging.info(f"Received request for course_id: {course_id}")
+    logging.info(f"Request Headers: {request.headers}")
+
+    try:
+        body = await request.body()
+        logging.info(f"Raw Request Body: {body.decode('utf-8', errors='ignore')}")
+    except Exception as e:
+        logging.error(f"Error reading request body: {e}")
+
+    try:
+        # Parse form data since the frontend is sending multipart/form-data
+        form_data = await request.form()
+        logging.info(f"Parsed Form Data: {form_data}")
+        course_update = CourseUpdate.parse_obj(form_data)
+    except Exception as e:
+        logging.error(f"Error parsing form data: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Could not parse form data: {e}"
+        )
+    # ────────────────────────────────────────────────────────────────────────
+
     try:
         # Validate course_id format
         try:
