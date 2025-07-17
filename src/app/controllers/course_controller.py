@@ -613,3 +613,57 @@ def upload_course_thumbnail(
             status_code=500,
             detail=f"An error occurred during thumbnail upload: {str(e)}"
         )
+
+
+@router.post("/quizzes/{quiz_id}/submit", response_model=QuizSubmissionRead)
+def submit_quiz(
+    quiz_id: uuid.UUID,
+    submission: QuizSubmissionCreate,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_db)
+):
+    quiz = session.get(Quiz, quiz_id)
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+
+    # Check for previous submission
+    existing_submission = session.exec(
+        select(QuizSubmission).where(
+            QuizSubmission.quiz_id == quiz_id, 
+            QuizSubmission.user_id == user.id
+        )
+    ).first()
+
+    if existing_submission:
+        raise HTTPException(status_code=400, detail="You have already submitted this quiz.")
+
+    total_questions = len(quiz.questions)
+    if total_questions == 0:
+        raise HTTPException(status_code=400, detail="This quiz has no questions.")
+
+    correct_answers = 0
+    for answer in submission.answers:
+        question = session.get(Question, answer.question_id)
+        if not question or question.quiz_id != quiz_id:
+            continue # or raise HTTPException for invalid question_id
+
+        correct_option = next((opt for opt in question.options if opt.is_correct), None)
+        if correct_option and correct_option.id == answer.option_id:
+            correct_answers += 1
+
+    score = (correct_answers / total_questions) * 100
+    passed = score >= 70  # Passing score threshold
+
+    new_submission = QuizSubmission(
+        quiz_id=quiz_id,
+        user_id=user.id,
+        score=score,
+        passed=passed,
+        answers_data=submission.dict() # Storing the submission for review
+    )
+
+    session.add(new_submission)
+    session.commit()
+    session.refresh(new_submission)
+
+    return new_submission

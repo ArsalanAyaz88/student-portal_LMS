@@ -4,11 +4,12 @@ from typing import List, Optional
 import logging
 from uuid import UUID
 import os
+import json
 
 from ..db.session import get_db
 from ..models.video import Video
 from ..models.course import Course
-from ..models.quiz import Quiz
+from ..models.quiz import Quiz, Question, Option
 from ..schemas.video import VideoRead, VideoCreate, VideoUpdate
 from ..utils.dependencies import get_current_admin_user
 from ..utils.file import save_upload_and_get_url
@@ -25,45 +26,76 @@ async def upload_course_video(
     video_file: UploadFile = File(...),
     title: Optional[str] = Form(None),
     description: Optional[str] = Form(None),
+    quiz: Optional[str] = Form(None),  # Accept quiz data as a JSON string
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin_user)
 ):
     """
-    Upload a video for a specific course.
+    Upload a video for a specific course, optionally with a quiz.
     
     - **course_id**: ID of the course to add the video to
-    - **video_file**: The video file to upload (MP4, MOV, etc.)
-    - **title**: Optional title for the video (defaults to filename)
+    - **video_file**: The video file to upload
+    - **title**: Optional title for the video
     - **description**: Optional description for the video
+    - **quiz**: Optional JSON string representing the quiz data
     """
-    # Verify course exists
     course = db.get(Course, course_id)
     if not course:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Course not found"
-        )
-    
-    # Validate file type
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+
     allowed_types = ["video/mp4", "video/quicktime", "video/x-msvideo", "video/x-matroska"]
     if video_file.content_type not in allowed_types:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported file type. Supported types: {', '.join([t.split('/')[-1] for t in allowed_types])}"
+            detail=f"Unsupported file type: {video_file.content_type}"
         )
-    
+
     try:
-        # Upload to Cloudinary
         folder = f"courses/{course_id}/videos"
         video_url = await save_upload_and_get_url(file=video_file, folder=folder)
-        
-        # Create video record
+
+        quiz_id = None
+        if quiz:
+            try:
+                quiz_data = json.loads(quiz)
+                if quiz_data and quiz_data.get('questions'):
+                    new_quiz = Quiz(
+                        course_id=course_id,
+                        title=quiz_data.get('title', 'Video Quiz'),
+                        description=quiz_data.get('description'),
+                    )
+                    db.add(new_quiz)
+                    db.flush()  # Flush to get the new_quiz.id
+
+                    for q_data in quiz_data['questions']:
+                        new_question = Question(
+                            quiz_id=new_quiz.id,
+                            text=q_data['text'],
+                            is_multiple_choice=True
+                        )
+                        db.add(new_question)
+                        db.flush()  # Flush to get new_question.id
+
+                        for o_data in q_data['options']:
+                            new_option = Option(
+                                question_id=new_question.id,
+                                text=o_data['text'],
+                                is_correct=o_data['is_correct']
+                            )
+                            db.add(new_option)
+                    
+                    quiz_id = new_quiz.id
+
+            except json.JSONDecodeError:
+                raise HTTPException(status_code=400, detail="Invalid JSON format for quiz data.")
+
         video = Video(
             course_id=course_id,
             cloudinary_url=video_url,
             title=title or os.path.splitext(video_file.filename)[0],
             description=description,
-            is_preview=False
+            is_preview=False,
+            quiz_id=quiz_id
         )
         
         db.add(video)
@@ -77,7 +109,7 @@ async def upload_course_video(
         logging.error(f"Error uploading video: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to upload video"
+            detail=f"Failed to upload video: {str(e)}"
         )
 
 @router.get("/courses/{course_id}/videos", response_model=List[VideoRead])
