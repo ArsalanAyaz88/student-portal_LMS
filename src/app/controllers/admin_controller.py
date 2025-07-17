@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select
+from sqlalchemy import func
 import uuid
 from typing import List
 from fastapi import File, UploadFile, status
