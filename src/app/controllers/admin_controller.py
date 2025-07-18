@@ -103,12 +103,7 @@ async def create_course(
     title: str = Form(...),
     description: str = Form(...),
     price: float = Form(...),
-    status: str = Form("active"),
     thumbnail_url: Optional[str] = Form(None),
-    difficulty_level: Optional[str] = Form(None),
-    outcomes: Optional[str] = Form(None),
-    prerequisites: Optional[str] = Form(None),
-    curriculum: Optional[str] = Form(None),
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin_user),
 ):
@@ -122,12 +117,7 @@ async def create_course(
             title=title,
             description=description,
             price=price,
-            status=status,
             thumbnail_url=thumbnail_url,
-            difficulty_level=difficulty_level,
-            outcomes=outcomes,
-            prerequisites=prerequisites,
-            curriculum=curriculum,
             created_by=admin.id,
             updated_by=admin.id
         )
