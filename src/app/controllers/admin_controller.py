@@ -145,6 +145,49 @@ async def create_course(
         )
 
 
+@router.post("/courses/{course_id}/videos", response_model=VideoRead, status_code=status.HTTP_201_CREATED)
+async def upload_video_for_course(
+    course_id: UUID,
+    title: str = Form(...),
+    description: str = Form(None),
+    is_preview: bool = Form(False),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    """
+    Upload a video for a specific course.
+    """
+    course = db.get(Course, course_id)
+    if not course:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+
+    try:
+        # The save_upload_and_get_url function handles the upload and returns a public URL.
+        video_url = await save_upload_and_get_url(file, resource_type="video")
+
+        # Create video record in the database
+        new_video = Video(
+            title=title,
+            description=description,
+            cloudinary_url=video_url,
+            course_id=course_id,
+            is_preview=is_preview
+        )
+        db.add(new_video)
+        db.commit()
+        db.refresh(new_video)
+        return new_video
+
+    except Exception as e:
+        db.rollback()
+        logging.error(f"Error uploading video for course {course_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to upload video: {str(e)}"
+        )
+
+
 @router.get("/courses/{course_id}", response_model=AdminCourseDetail)
 def get_course_detail(
     course_id: UUID,
