@@ -83,20 +83,27 @@ async def upload_image(
 @router.get("/courses", response_model=list[AdminCourseList])
 def admin_list_courses(db: Session = Depends(get_db), admin=Depends(get_current_admin_user)):
     courses = db.exec(select(Course)).all()
-    # You can add more logic to calculate enrollments, progress, etc. if needed
-    return [
-        AdminCourseList(
-            id=c.id,
-            title=c.title,
-            price=c.price,
-            total_enrollments=0,  # Replace with actual logic if needed
-            active_enrollments=0, # Replace with actual logic if needed
-            average_progress=0.0, # Replace with actual logic if needed
-            status=c.status,
-            created_at=c.created_at,
-            updated_at=c.updated_at
-        ) for c in courses
-    ]
+    
+    course_list = []
+    for c in courses:
+        total_enrollments = db.exec(
+            select(func.count(Enrollment.id)).where(Enrollment.course_id == c.id)
+        ).one()
+
+        course_list.append(
+            AdminCourseList(
+                id=c.id,
+                title=c.title,
+                price=c.price,
+                total_enrollments=total_enrollments,
+                active_enrollments=0, # Placeholder
+                average_progress=0.0, # Placeholder
+                status=c.status,
+                created_at=c.created_at,
+                updated_at=c.updated_at
+            )
+        )
+    return course_list
 
 @router.post("/courses", status_code=status.HTTP_201_CREATED, response_model=AdminCourseDetail)
 async def create_course(
@@ -104,6 +111,11 @@ async def create_course(
     description: str = Form(...),
     price: float = Form(...),
     thumbnail_url: Optional[str] = Form(None),
+    difficulty_level: Optional[str] = Form(None),
+    outcomes: Optional[str] = Form(None),
+    prerequisites: Optional[str] = Form(None),
+    curriculum: Optional[str] = Form(None),
+    status: str = Form("active"),
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin_user),
 ):
@@ -123,6 +135,11 @@ async def create_course(
             description=description,
             price=price,
             thumbnail_url=thumbnail_url,
+            difficulty_level=difficulty_level,
+            outcomes=outcomes,
+            prerequisites=prerequisites,
+            curriculum=curriculum,
+            status=status,
             created_by=session_admin.id,
             updated_by=session_admin.id
         )
