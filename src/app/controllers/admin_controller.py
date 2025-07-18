@@ -112,14 +112,19 @@ async def create_course(
     Note: Videos should be uploaded separately using the /api/v1/courses/{course_id}/videos endpoint.
     """
     try:
+        # Ensure the admin user is in the current session
+        session_admin = db.get(User, admin.id)
+        if not session_admin:
+            raise HTTPException(status_code=404, detail="Admin user not found in session")
+
         # Create the course instance
         course = Course(
             title=title,
             description=description,
             price=price,
             thumbnail_url=thumbnail_url,
-            created_by=admin.id,
-            updated_by=admin.id
+            created_by=session_admin.id,
+            updated_by=session_admin.id
         )
 
         db.add(course)
