@@ -15,10 +15,11 @@ class Video(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     course_id: uuid.UUID = Field(foreign_key="course.id")
     
-    cloudinary_url: str = Field(index=True)
+    url: str = Field(index=True)
+    public_id: Optional[str] = Field(default=None, index=True) # Cloudinary public ID
     title: Optional[str] = None
     description: Optional[str] = None
-    duration: Optional[int] = None  # Duration in seconds
+    duration: Optional[float] = None  # Duration in seconds
     is_preview: bool = Field(default=False)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 

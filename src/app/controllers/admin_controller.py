@@ -30,6 +30,8 @@ from src.app.models.quiz import Quiz, Question, Option
 from src.app.schemas.notification import NotificationRead, AdminNotificationRead
 import uuid
 import re
+import time
+import cloudinary
 from datetime import datetime, timedelta
 from src.app.utils.time import get_pakistan_time
 from src.app.models.assignment import Assignment, AssignmentSubmission
@@ -146,12 +148,52 @@ async def create_course(
 
 
 @router.post("/courses/{course_id}/videos", response_model=VideoRead, status_code=status.HTTP_201_CREATED)
+@router.post("/generate-video-upload-signature", response_model=dict)
+async def generate_video_upload_signature(admin: User = Depends(get_current_admin_user)):
+    """
+    Generates a signature for a direct video upload to Cloudinary.
+    """
+    timestamp = int(time.time())
+    try:
+        api_secret = cloudinary.config().api_secret
+        if not api_secret:
+            raise ValueError("Cloudinary API secret is not configured.")
+        
+        # Define parameters for the signature
+        # 'videos' folder is a good practice for organization
+        # 'eager' can be used to pre-generate different video qualities
+        params_to_sign = {
+            "timestamp": timestamp,
+            "folder": "videos",
+            "resource_type": "video",
+            "eager": "sp_hd/mp4|sp_sd/mp4", # Example transformations for HD and SD
+            "eager_async": True
+        }
+
+        # Generate the signature
+        signature = cloudinary.utils.api_sign_request(params_to_sign, api_secret)
+
+        return {
+            "signature": signature,
+            "timestamp": timestamp,
+            "api_key": cloudinary.config().api_key
+        }
+    except Exception as e:
+        logging.error(f"Error generating Cloudinary signature: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not generate upload signature."
+        )
+
+@router.post("/courses/{course_id}/videos", response_model=VideoRead)
 async def upload_video_for_course(
     course_id: UUID,
     title: str = Form(...),
     description: str = Form(None),
     is_preview: bool = Form(False),
-    file: UploadFile = File(...),
+    video_url: str = Form(...),  # Changed from 'file' to 'video_url'
+    public_id: str = Form(...), # To store the Cloudinary public_id
+    duration: float = Form(...), # Video duration in seconds
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin_user)
 ):
@@ -163,14 +205,14 @@ async def upload_video_for_course(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
 
     try:
-        # The save_upload_and_get_url function handles the upload and returns a public URL.
-        video_url = await save_upload_and_get_url(file, folder="course_videos")
-
-        # Create video record in the database
+        # The video is already uploaded to Cloudinary. We just save its metadata.
+        # The 'video_url' is the secure URL from the Cloudinary upload response.
         new_video = Video(
             title=title,
             description=description,
-            cloudinary_url=video_url,
+            url=video_url,
+            public_id=public_id,
+            duration=duration,
             course_id=course_id,
             is_preview=is_preview
         )
