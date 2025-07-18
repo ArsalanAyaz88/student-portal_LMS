@@ -47,6 +47,14 @@ router = APIRouter(
     tags=["Admin"]
 )
 
+# 1. Enrollment Management
+@router.get("/users", response_model=List[UserRead])
+def list_students(session: Session = Depends(get_db), admin=Depends(get_current_admin_user)):
+    query = select(User).where(User.role == "student")
+    return session.exec(query).all()
+
+
+
 @router.post("/upload/image", response_model=dict)
 async def upload_image(
     file: UploadFile = File(...), 
@@ -63,8 +71,7 @@ async def upload_image(
         )
     
     try:
-        # This utility function handles the upload and returns a public URL.
-        image_url = await save_upload_and_get_url(file=file)
+        image_url = await save_upload_and_get_url(file=file, folder="course_thumbnails")
         return {"url": image_url}
     except Exception as e:
         logging.error(f"Error uploading image: {e}")
@@ -72,14 +79,6 @@ async def upload_image(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred while uploading the image: {str(e)}"
         )
-
-# 1. Enrollment Management
-@router.get("/users", response_model=List[UserRead])
-def list_students(session: Session = Depends(get_db), admin=Depends(get_current_admin_user)):
-    query = select(User).where(User.role == "student")
-    return session.exec(query).all()
-
-
 
 @router.get("/courses", response_model=list[AdminCourseList])
 def admin_list_courses(db: Session = Depends(get_db), admin=Depends(get_current_admin_user)):
@@ -147,43 +146,32 @@ async def create_course(
         )
 
 
-@router.post("/courses/{course_id}/videos", response_model=VideoRead, status_code=status.HTTP_201_CREATED)
 @router.post("/generate-video-upload-signature", response_model=dict)
 async def generate_video_upload_signature(admin: User = Depends(get_current_admin_user)):
     """
     Generates a signature for a direct video upload to Cloudinary.
     """
-    timestamp = int(time.time())
     try:
-        api_secret = cloudinary.config().api_secret
-        if not api_secret:
-            raise ValueError("Cloudinary API secret is not configured.")
-        
-        # Define parameters for the signature
-        # 'videos' folder is a good practice for organization
-        # 'eager' can be used to pre-generate different video qualities
+        timestamp = int(time.time())
         params_to_sign = {
             "timestamp": timestamp,
             "folder": "videos",
-            "resource_type": "video",
-            "eager": "sp_hd/mp4|sp_sd/mp4", # Example transformations for HD and SD
-            "eager_async": True
         }
-
-        # Generate the signature
-        signature = cloudinary.utils.api_sign_request(params_to_sign, api_secret)
-
+        signature = cloudinary.utils.api_sign_request(params_to_sign, cloudinary.config().api_secret)
         return {
             "signature": signature,
             "timestamp": timestamp,
             "api_key": cloudinary.config().api_key
         }
     except Exception as e:
-        logging.error(f"Error generating Cloudinary signature: {e}")
+        logging.error(f"Error generating video upload signature: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Could not generate upload signature."
         )
+
+
+
 
 @router.post("/courses/{course_id}/videos", response_model=VideoRead)
 async def upload_video_for_course(
