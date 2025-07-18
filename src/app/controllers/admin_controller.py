@@ -42,6 +42,9 @@ from fastapi import Form
 from src.app.utils.file import save_upload_and_get_url
 from src.app.schemas.assignment import AssignmentCreate, AssignmentUpdate, AssignmentRead, AssignmentList, SubmissionRead, SubmissionGrade, SubmissionStudent, SubmissionStudentsResponse
 
+import logging
+
+router = APIRouter()
 
 # ─── Cloudinary Signature ────────────────────────────────────────────────────────────────
 
@@ -64,12 +67,6 @@ def create_upload_signature(folder: str = Form("videos")):
     except Exception as e:
         logging.error(f"Error creating Cloudinary signature: {e}")
         raise HTTPException(status_code=500, detail="Could not create upload signature.")
-
-import logging
-
-router = APIRouter(
-    tags=["Admin"]
-)
 
 # 1. Enrollment Management
 @router.get("/users", response_model=List[UserRead])
