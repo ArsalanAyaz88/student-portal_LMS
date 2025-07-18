@@ -1,39 +1,60 @@
 # File: app/schemas/video.py
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
+from typing import Optional, List
 import uuid
 from src.app.schemas.quiz import QuizRead
 
+# Base schema with common fields
 class VideoBase(BaseModel):
-    cloudinary_url: str
+    title: str = Field(..., example="Introduction to FastAPI")
+    description: Optional[str] = Field(default=None, example="A quick overview of the FastAPI framework.")
+    url: str = Field(..., example="https://res.cloudinary.com/demo/video/upload/dog.mp4")
+    duration: Optional[float] = Field(default=None, example=360.5)
+    is_preview: bool = Field(default=False)
+
+# Schema for creating a new video
+class VideoCreate(BaseModel):
+    title: str
+    description: Optional[str] = None
+    url: str # This will be the Cloudinary URL
+    public_id: Optional[str] = None # Cloudinary public ID
+    duration: Optional[float] = None
+    course_id: uuid.UUID
+
+# Schema for updating an existing video
+class VideoUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
-    duration: Optional[int] = None
-    is_preview: bool = False
+    url: Optional[str] = None
+    public_id: Optional[str] = None
+    duration: Optional[float] = None
+    is_preview: Optional[bool] = None
 
-class VideoCreate(BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None  
-
-class VideoUpdate(VideoBase):
-    cloudinary_url: Optional[str] = None
-
+# Schema for reading video data (e.g., in API responses)
 class VideoRead(VideoBase):
     id: uuid.UUID
     course_id: uuid.UUID
     quiz_id: Optional[uuid.UUID] = None
-    quiz: Optional[QuizRead] = None
 
     class Config:
         from_attributes = True
 
-class VideoWithProgress(VideoRead):
+# Schema for reading video data for the admin panel
+class VideoAdminRead(BaseModel):
+    id: uuid.UUID
+    title: str
+    description: Optional[str]
+    url: str
+
+    class Config:
+        from_attributes = True
+
+# Schema for video with student's progress
+class VideoWithProgress(VideoBase):
+    id: uuid.UUID
+    course_id: uuid.UUID
+    quiz_id: Optional[uuid.UUID] = None
     watched: bool = False
-    quiz_passed: bool = False
-    is_accessible: bool = False
+    quiz_status: Optional[str] = None  # 'passed', 'failed', or 'not_taken'
+    is_accessible: bool = True
     is_next_available: bool = False
-    next_video_id: Optional[uuid.UUID] = None
-    required_quiz_passed: bool = True  # Whether the previous quiz needs to be passed
-    previous_quiz_passed: bool = True  # Whether the previous quiz was passed
-    
-    # This will inherit quiz field from VideoRead

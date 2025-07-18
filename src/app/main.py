@@ -30,7 +30,8 @@ from src.app.routers import (
     admin_quiz_router,
     video_router,
     enrollment_router,
-    admin_router
+    admin_router,
+    admin_video_router
 )
 
 # ─── Env setup ─────────────────────────────────────────────
@@ -92,6 +93,7 @@ app.include_router(admin_quiz_router.submission_router, prefix="/api/admin/submi
 
 # Include video router
 app.include_router(video_router.router)
+app.include_router(admin_video_router.router)
 
 # ─── Simple endpoints ──────────────────────────────────────────
 @app.get("/")

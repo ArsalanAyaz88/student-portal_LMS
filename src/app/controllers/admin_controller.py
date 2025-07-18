@@ -25,13 +25,14 @@ from src.app.schemas.course import (
     CourseCreate, CourseUpdate, CourseRead, CourseCreateAdmin
 )
 from src.app.schemas.video import VideoUpdate, VideoRead
-from src.app.schemas.quiz import QuizCreate, QuizReadWithDetails, QuizRead
+from src.app.schemas.quiz import QuizCreate, QuizReadWithDetails, QuizRead, QuizCreateForVideo
 from src.app.models.quiz import Quiz, Question, Option
 from src.app.schemas.notification import NotificationRead, AdminNotificationRead
 import uuid
 import re
 import time
 import cloudinary
+import cloudinary.utils
 from datetime import datetime, timedelta
 from src.app.utils.time import get_pakistan_time
 from src.app.models.assignment import Assignment, AssignmentSubmission
@@ -40,6 +41,29 @@ from typing import List
 from fastapi import Form
 from src.app.utils.file import save_upload_and_get_url
 from src.app.schemas.assignment import AssignmentCreate, AssignmentUpdate, AssignmentRead, AssignmentList, SubmissionRead, SubmissionGrade, SubmissionStudent, SubmissionStudentsResponse
+
+
+# ─── Cloudinary Signature ────────────────────────────────────────────────────────────────
+
+@router.post("/create-upload-signature")
+def create_upload_signature(folder: str = Form("videos")):
+    """
+    Generate a signature for direct Cloudinary upload.
+    """
+    timestamp = int(time.time())
+    try:
+        params_to_sign = {"timestamp": timestamp, "folder": folder}
+        signature = cloudinary.utils.api_sign_request(params_to_sign, cloudinary.config().api_secret)
+        return {
+            "signature": signature,
+            "timestamp": timestamp,
+            "api_key": cloudinary.config().api_key,
+            "cloud_name": cloudinary.config().cloud_name,
+            "folder": folder
+        }
+    except Exception as e:
+        logging.error(f"Error creating Cloudinary signature: {e}")
+        raise HTTPException(status_code=500, detail="Could not create upload signature.")
 
 import logging
 
@@ -1015,6 +1039,93 @@ def admin_update_assignment(
         course_title=assignment.course.title,
         submission=None
     )
+
+@router.post("/videos/{video_id}/quiz", response_model=QuizReadWithDetails)
+def upsert_quiz_for_video(
+    video_id: UUID,
+    quiz_data: QuizCreateForVideo,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    """
+    Create or update a quiz for a specific video.
+    """
+    # Check if video exists
+    video = db.get(Video, video_id)
+    if not video:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found")
+
+    # Check for existing quiz for this video
+    quiz = db.exec(select(Quiz).where(Quiz.video_id == video_id)).first()
+
+    if quiz:
+        # Update existing quiz
+        quiz.title = quiz_data.title
+        quiz.description = quiz_data.description
+
+        # Simple approach: delete old questions and options, then recreate
+        # This is easier than diffing, but might be inefficient for large quizzes
+        for question in quiz.questions:
+            for option in question.options:
+                db.delete(option)
+            db.delete(question)
+        db.commit()
+
+    else:
+        # Create new quiz
+        quiz = Quiz(video_id=video_id, title=quiz_data.title, description=quiz_data.description)
+        db.add(quiz)
+        db.commit()
+        db.refresh(quiz)
+
+    # Add new questions and options
+    for q_data in quiz_data.questions:
+        new_question = Question(quiz_id=quiz.id, text=q_data.text)
+        db.add(new_question)
+        db.commit()
+        db.refresh(new_question)
+
+        for o_data in q_data.options:
+            new_option = Option(
+                question_id=new_question.id,
+                text=o_data.text,
+                is_correct=o_data.is_correct
+            )
+            db.add(new_option)
+    
+    db.commit()
+    db.refresh(quiz)
+    
+    # Eagerly load the relationships to return them in the response
+    updated_quiz = db.exec(
+        select(Quiz)
+        .where(Quiz.id == quiz.id)
+        .options(selectinload(Quiz.questions).selectinload(Question.options))
+    ).one()
+
+    return updated_quiz
+
+
+@router.get("/videos/{video_id}/quiz", response_model=QuizReadWithDetails)
+def get_quiz_by_video(
+    video_id: UUID,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    """
+    Get the quiz associated with a specific video.
+    """
+    quiz = db.exec(
+        select(Quiz)
+        .where(Quiz.video_id == video_id)
+        .options(selectinload(Quiz.questions).selectinload(Question.options))
+    ).first()
+
+    if not quiz:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found for this video.")
+    
+    return quiz
+
 
 @router.post("/admin/quizzes", response_model=QuizRead, status_code=status.HTTP_201_CREATED)
 def create_quiz(

@@ -48,6 +48,9 @@ class QuizCreate(QuizBase):
     course_id: uuid.UUID
     questions: List[QuestionCreate] = []
 
+class QuizCreateForVideo(QuizBase):
+    questions: List[QuestionCreate] = []
+
 class QuizCreateWithQuestions(QuizCreate):
     pass
 
