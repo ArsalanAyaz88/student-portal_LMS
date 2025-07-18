@@ -108,11 +108,11 @@ async def create_course(
     admin: User = Depends(get_current_admin_user),
 ):
     """Create a new course.
-    
+
     Note: Videos should be uploaded separately using the /api/v1/courses/{course_id}/videos endpoint.
     """
     try:
-        # Create the course
+        # Create the course instance
         course = Course(
             title=title,
             description=description,
@@ -121,18 +121,19 @@ async def create_course(
             created_by=admin.id,
             updated_by=admin.id
         )
-        
+
         db.add(course)
         db.commit()
         db.refresh(course)
         return course
-        
+
     except Exception as e:
         db.rollback()
-        logging.error(f"Error creating course: {e}")
+        # Log the full error for debugging
+        logging.error(f"Error creating course: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create course: {str(e)}"
+            detail=f"An unexpected error occurred on the server: {str(e)}"
         )
 
 
