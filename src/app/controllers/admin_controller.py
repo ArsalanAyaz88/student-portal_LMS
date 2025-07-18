@@ -164,7 +164,7 @@ async def upload_video_for_course(
 
     try:
         # The save_upload_and_get_url function handles the upload and returns a public URL.
-        video_url = await save_upload_and_get_url(file, resource_type="video")
+        video_url = await save_upload_and_get_url(file, folder="course_videos")
 
         # Create video record in the database
         new_video = Video(
