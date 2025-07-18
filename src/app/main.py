@@ -51,7 +51,7 @@ print("FastAPI application starting up...")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
+    allow_origins=["https://lmsfrontend-neon.vercel.app", "http://localhost:5173", "http://localhost:3000"],  # Allows specific origins
     allow_credentials=True, # Allows credentials (e.g., Authorization headers)
     allow_methods=["*"],  # Allows all methods
     allow_headers=["*"],  # Allows all headers
