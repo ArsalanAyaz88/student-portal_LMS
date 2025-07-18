@@ -258,16 +258,63 @@ def toggle_video_completion(
 ):
     try:
         video_uuid = uuid.UUID(video_id)
-            session.commit()
-            session.refresh(new_certificate)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid video ID format.")
 
-            return {
-                "certificate_url": new_certificate.file_path,
-                "certificate_number": new_certificate.certificate_number
-            }
-        except Exception as e:
-            # Log the full error for debugging
-            print(f"Certificate generation failed: {e}")
+    video = session.get(Video, video_uuid)
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found.")
+
+    enrollment = session.exec(
+        select(Enrollment).where(Enrollment.course_id == video.course_id, Enrollment.student_id == user.id)
+    ).first()
+
+    if not enrollment:
+        raise HTTPException(status_code=403, detail="You are not enrolled in this course.")
+
+    if enrollment.access_expires_on and enrollment.access_expires_on < get_pakistan_time().date():
+        raise HTTPException(status_code=403, detail="Your access to this course has expired.")
+
+    progress = session.exec(
+        select(VideoProgress).where(VideoProgress.video_id == video_uuid, VideoProgress.user_id == user.id)
+    ).first()
+
+    if progress:
+        progress.is_completed = not progress.is_completed
+        status_message = "completed" if progress.is_completed else "incomplete"
+    else:
+        progress = VideoProgress(video_id=video_uuid, user_id=user.id, is_completed=True)
+        session.add(progress)
+        status_message = "completed"
+
+    session.commit()
+    session.refresh(progress)
+
+    # Update course progress
+    completed_videos_count = session.exec(
+        select(func.count(VideoProgress.id))
+        .join(Video, Video.id == VideoProgress.video_id)
+        .where(Video.course_id == video.course_id, VideoProgress.user_id == user.id, VideoProgress.is_completed == True)
+    ).one()
+
+    total_videos_count = session.exec(
+        select(func.count(Video.id)).where(Video.course_id == video.course_id)
+    ).one()
+
+    course_progress = session.exec(
+        select(CourseProgress).where(CourseProgress.course_id == video.course_id, CourseProgress.user_id == user.id)
+    ).first()
+
+    if not course_progress:
+        course_progress = CourseProgress(course_id=video.course_id, user_id=user.id)
+        session.add(course_progress)
+
+    course_progress.completion_percentage = (completed_videos_count / total_videos_count) * 100 if total_videos_count > 0 else 0
+    course_progress.last_updated = get_pakistan_time()
+
+    session.commit()
+
+    return {"message": f"Video marked as {status_message}", "is_completed": progress.is_completed}
             raise HTTPException(status_code=500, detail=f"Error generating certificate: {str(e)}")
 
     except HTTPException:
