@@ -76,6 +76,7 @@ app.include_router(course_router.router, prefix="/api/courses", tags=["Courses"]
 
 app.include_router(enrollment_router.router, prefix="/api/enrollments", tags=["Enrollments"])
 app.include_router(admin_router.router, prefix="/api/admin", tags=["Admin"])
+app.include_router(admin_router.router, prefix="/api", tags=["Admin"])
 app.include_router(sa_router.router, prefix="/api/student/assignments")
 app.include_router(sq_router.router, prefix="/api/student")
 app.include_router(
