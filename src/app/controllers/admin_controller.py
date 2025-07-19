@@ -234,7 +234,7 @@ async def upload_video_for_course(
         new_video = Video(
             title=title,
             description=description,
-            url=video_url,
+            video_url=video_url,
             public_id=public_id,
             duration=duration,
             course_id=course_id,
