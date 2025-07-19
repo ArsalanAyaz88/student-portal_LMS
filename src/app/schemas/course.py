@@ -126,7 +126,6 @@ class AdminCourseDetail(BaseModel):
     created_at: datetime = Field(..., description="Course creation date")
     updated_at: datetime = Field(..., description="Last update date")
     status: str = Field(..., description="Course status")
-    videos: List[VideoRead] = Field(..., description="Course videos")
 
     class Config:
         from_attributes = True
