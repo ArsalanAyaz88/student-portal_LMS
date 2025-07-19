@@ -384,20 +384,129 @@ def delete_course(
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin_user)
 ):
-    """
-    Deletes a course and all its related data (hard delete).
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+    logger.info(f"--- Admin Course Deletion: START for course_id: {course_id} ---")
 
-    This function first finds the course by its ID. It then manually sets the
-    `preview_video_id` to `None` to break a potential circular dependency
-    that can prevent deletion. After committing this change, it proceeds to
-    delete the course. The `cascade="all, delete-orphan"` settings in the
-    SQLModel relationships will handle the deletion of all related entities
-    like videos, enrollments, quizzes, etc.
-    """
-    # Find the course using a direct lookup by primary key
-    course = db.get(Course, course_id)
-    
-    if not course:
+    try:
+        # 1. Validate UUID
+        try:
+            course_uuid = UUID(course_id)
+        except ValueError:
+            logger.error(f"Invalid UUID format for course_id: '{course_id}'")
+            raise HTTPException(status_code=400, detail="Invalid course ID format.")
+
+        # 2. Fetch the course
+        course = db.get(Course, course_uuid)
+        if not course:
+            logger.warning(f"Course with ID {course_uuid} not found for deletion.")
+            raise HTTPException(status_code=404, detail="Course not found")
+        logger.info(f"Found course '{course.title}' for deletion.")
+
+        # 3. Manually delete related entities to avoid constraint violations.
+        # This is more explicit and safer than relying solely on cascades.
+
+        # Delete related enrollments
+        enrollments = db.exec(select(Enrollment).where(Enrollment.course_id == course.id)).all()
+        if enrollments:
+            logger.info(f"Deleting {len(enrollments)} associated enrollments.")
+            for enrollment in enrollments:
+                db.delete(enrollment)
+        
+        # Delete related videos
+        videos = db.exec(select(Video).where(Video.course_id == course.id)).all()
+        if videos:
+            logger.info(f"Deleting {len(videos)} associated videos.")
+            for video in videos:
+                db.delete(video)
+
+        # Delete related quizzes
+        quizzes = db.exec(select(Quiz).where(Quiz.course_id == course.id)).all()
+        if quizzes:
+            logger.info(f"Deleting {len(quizzes)} associated quizzes.")
+            for quiz in quizzes:
+                db.delete(quiz)
+        
+        # Commit deletions of related entities before deleting the course itself
+        db.commit()
+
+        # 4. Delete the course itself
+        logger.info(f"Proceeding to delete the course object.")
+        db.delete(course)
+        db.commit()
+
+        logger.info(f"Successfully deleted course '{course.title}' (ID: {course.id}).")
+        return {"detail": "Course deleted successfully"}
+
+    except HTTPException as http_exc:
+        logger.error(f"HTTP Exception in delete_course: {http_exc.detail}")
+        db.rollback()
+        raise http_exc
+    except Exception as e:
+        logger.error(f"Unexpected error during course deletion: {e}", exc_info=True)
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"An unexpected internal server error occurred: {str(e)}"
+        )
+
+@router.get("/dashboard/stats", response_model=dict)
+async def get_dashboard_stats(
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    """Get overall platform statistics for admin dashboard"""
+    try:
+        # Get total courses
+        total_courses = db.exec(select(func.count(Course.id))).first()
+        
+        # Get total enrollments
+        total_enrollments = db.exec(select(func.count(Enrollment.id))).first()
+        
+        # Get active enrollments (last 30 days)
+        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+        active_enrollments = db.exec(
+            select(func.count(Enrollment.id))
+            .where(
+                Enrollment.status == "approved",
+                Enrollment.is_accessible == True
+            )
+        ).first()
+        
+        # Get total revenue
+        total_revenue = db.exec(
+            select(func.sum(Course.price))
+            .join(Enrollment)
+            .where(Enrollment.status == "approved")
+        ).first() or 0
+        
+        # Get completion rate
+        completed_courses = db.exec(
+            select(func.count(CourseProgress.id))
+            .where(CourseProgress.completed == True)
+        ).first()
+        
+        completion_rate = (completed_courses / total_enrollments * 100) if total_enrollments > 0 else 0
+        
+        # Get recent enrollments (last 30 days)
+        recent_enrollments = db.exec(
+            select(func.count(Enrollment.id))
+            .where(
+                Enrollment.status == "approved",
+                Enrollment.is_accessible == True
+            )
+        ).first()
+        
+        return {
+            "total_courses": total_courses,
+            "total_enrollments": total_enrollments,
+            "active_enrollments": active_enrollments,
+            "recent_enrollments": recent_enrollments,
+            "total_revenue": round(total_revenue, 2),
+            "completion_rate": round(completion_rate, 2),
+            "last_updated": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Course not found"
