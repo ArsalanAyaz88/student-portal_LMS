@@ -308,7 +308,7 @@ def get_notifications(session: Session = Depends(get_db), admin=Depends(get_curr
     return response_data
 
 # 3. Course Management
-@router.put("/admin/courses/{course_id}", response_model=CourseRead)
+@router.put("/courses/{course_id}", response_model=CourseRead)
 async def update_course(
     request: Request,
     course_id: str, 
