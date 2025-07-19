@@ -315,7 +315,6 @@ def toggle_video_completion(
     session.commit()
 
     return {"message": f"Video marked as {status_message}", "is_completed": progress.is_completed}
-            raise HTTPException(status_code=500, detail=f"Error generating certificate: {str(e)}")
 
     except HTTPException:
         raise
