@@ -308,13 +308,41 @@ def get_notifications(session: Session = Depends(get_db), admin=Depends(get_curr
     return response_data
 
 # 3. Course Management
-@router.put("/courses/{course_id}")
+@router.put("/admin/courses/{course_id}", response_model=CourseRead)
 async def update_course(
     request: Request,
-    course_id: str,
-    db: Session = Depends(get_db),
+    course_id: str, 
+    db: Session = Depends(get_db), 
     admin: User = Depends(get_current_admin_user)
 ):
+    """Update an existing course with comprehensive validation"""
+    logging.info(f"Attempting to update course with raw ID: {course_id}")
+    
+    try:
+        # Validate the UUID format
+        course_uuid = UUID(course_id)
+    except (ValueError, AttributeError):
+        logging.error(f"Invalid UUID format for course_id: '{course_id}'")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid course ID format: '{course_id}'. ID must be a valid UUID."
+        )
+
+    # Fetch the existing course from the database
+    db_course = db.get(Course, course_uuid)
+    if not db_course:
+        logging.warning(f"Course with ID {course_uuid} not found in the database.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+    logging.info(f"Attempting to update course with ID: {course_id}")
+    try:
+        # Attempt to convert to UUID to validate format early
+        course_uuid = uuid.UUID(course_id)
+    except ValueError:
+        logging.error(f"Invalid UUID format for course_id: {course_id}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid course ID format: '{course_id}'. Must be a valid UUID."
+        )
     """Update an existing course with comprehensive validation"""
     # ─── Logging for Vercel Debugging ────────────────────────────────────────
     logging.basicConfig(level=logging.INFO)
