@@ -15,7 +15,7 @@ class Video(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     course_id: uuid.UUID = Field(foreign_key="course.id")
     
-    video_url: str = Field(index=True)
+    url: str = Field(index=True)
     public_id: Optional[str] = Field(default=None, index=True) # Cloudinary public ID
     title: Optional[str] = None
     description: Optional[str] = None
