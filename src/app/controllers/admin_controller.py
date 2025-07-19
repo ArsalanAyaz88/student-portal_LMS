@@ -144,6 +144,8 @@ async def create_course(
 
     Note: Videos should be uploaded separately using the /api/v1/courses/{course_id}/videos endpoint.
     """
+    logging.info(f"--- Creating new course: {title} ---")
+    logging.info(f"Received form data - Title: {title}, Price: {price}, Thumbnail URL: {thumbnail_url}")
     try:
         # Ensure the admin user is in the current session
         session_admin = db.get(User, admin.id)
