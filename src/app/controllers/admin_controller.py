@@ -306,156 +306,75 @@ def get_notifications(session: Session = Depends(get_db), admin=Depends(get_curr
             )
         )
     return response_data
-
-# 3. Course Management
 @router.put("/courses/{course_id}", response_model=CourseRead)
 async def update_course(
     request: Request,
-    course_id: str, 
-    db: Session = Depends(get_db), 
+    course_id: str,
+    db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin_user)
 ):
-    """Update an existing course with comprehensive validation"""
-    logging.info(f"Attempting to update course with raw ID: {course_id}")
-    
-    try:
-        # Validate the UUID format
-        course_uuid = UUID(course_id)
-    except (ValueError, AttributeError):
-        logging.error(f"Invalid UUID format for course_id: '{course_id}'")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid course ID format: '{course_id}'. ID must be a valid UUID."
-        )
-
-    # Fetch the existing course from the database
-    db_course = db.get(Course, course_uuid)
-    if not db_course:
-        logging.warning(f"Course with ID {course_uuid} not found in the database.")
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
-    logging.info(f"Attempting to update course with ID: {course_id}")
-    try:
-        # Attempt to convert to UUID to validate format early
-        course_uuid = uuid.UUID(course_id)
-    except ValueError:
-        logging.error(f"Invalid UUID format for course_id: {course_id}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid course ID format: '{course_id}'. Must be a valid UUID."
-        )
-    """Update an existing course with comprehensive validation"""
-    # ─── Logging for Vercel Debugging ────────────────────────────────────────
     logging.basicConfig(level=logging.INFO)
-    logging.info(f"--- Admin Course Update Request ---")
-    logging.info(f"Received request for course_id: {course_id}")
-    logging.info(f"Request Headers: {request.headers}")
+    logger = logging.getLogger(__name__)
+    logger.info(f"--- Admin Course Update: START for course_id: {course_id} ---")
 
     try:
-        body = await request.body()
-        logging.info(f"Raw Request Body: {body.decode('utf-8', errors='ignore')}")
-    except Exception as e:
-        logging.error(f"Error reading request body: {e}")
-
-    try:
-        # Parse form data since the frontend is sending multipart/form-data
-        form_data = await request.form()
-        logging.info(f"Parsed Form Data: {form_data}")
-        course_update = CourseUpdate.parse_obj(form_data)
-    except Exception as e:
-        logging.error(f"Error parsing form data: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Could not parse form data: {e}"
-        )
-    # ────────────────────────────────────────────────────────────────────────
-
-    try:
-        # Validate course_id format
+        # 1. Validate UUID format
         try:
-            course_uuid = uuid.UUID(course_id)
+            course_uuid = UUID(course_id)
         except ValueError:
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid course ID format"
-            )
+            logger.error(f"Invalid UUID format for course_id: '{course_id}'")
+            raise HTTPException(status_code=400, detail="Invalid course ID format.")
 
-        # Get existing course
-        course = db.exec(
-            select(Course).where(Course.id == course_uuid)
-        ).first()
-        
-        if not course:
-            raise HTTPException(
-                status_code=404,
-                detail="Course not found"
-            )
+        # 2. Fetch existing course
+        db_course = db.get(Course, course_uuid)
+        if not db_course:
+            logger.warning(f"Course with ID {course_uuid} not found.")
+            raise HTTPException(status_code=404, detail="Course not found")
+        logger.info(f"Found course '{db_course.title}' for update.")
 
-        # Validate update data
-        update_data = course_update.dict(exclude_unset=True)
-        
-        if "title" in update_data:
-            if not update_data["title"] or len(update_data["title"].strip()) < 3:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Course title must be at least 3 characters long"
-                )
-            # Check for duplicate title
-            existing_course = db.exec(
-                select(Course)
-                .where(
-                    Course.title == update_data["title"],
-                    Course.id != course_uuid
-                )
-            ).first()
-            if existing_course:
-                raise HTTPException(
-                    status_code=400,
-                    detail="A course with this title already exists"
-                )
+        # 3. Parse form data
+        form_data = await request.form()
+        update_data = {key: value for key, value in form_data.items()}
+        logger.info(f"Received form data for update: {update_data}")
 
-        if "description" in update_data and len(update_data["description"].strip()) < 10:
-            raise HTTPException(
-                status_code=400,
-                detail="Course description must be at least 10 characters long"
-            )
-
-        if "price" in update_data and update_data["price"] < 0:
-            raise HTTPException(
-                status_code=400,
-                detail="Course price cannot be negative"
-            )
-
-        # Update course fields
+        # 4. Update course fields
         for key, value in update_data.items():
-            setattr(course, key, value)
-            
-        course.updated_by = admin.email
-        course.updated_at = datetime.utcnow()
-        
-        try:
-            db.add(course)
-            db.commit()
-            db.refresh(course)
-            
-            # Return simple success message
-            return {
-                "message": "Course updated successfully"
-            }
-            
-        except Exception as e:
-            db.rollback()
-            raise HTTPException(
-                status_code=500,
-                detail=f"Error updating course in database: {str(e)}"
-            )
+            if hasattr(db_course, key):
+                # Coerce price to float if present
+                if key == 'price' and value is not None:
+                    try:
+                        setattr(db_course, key, float(value))
+                    except (ValueError, TypeError):
+                        logger.warning(f"Could not convert price '{value}' to float.")
+                        # Skip if conversion fails, or handle as an error
+                        continue 
+                else:
+                    setattr(db_course, key, value)
+            else:
+                logger.warning(f"Field '{key}' not found in Course model, skipping.")
 
-    except HTTPException:
-        raise
+        db_course.updated_at = get_pakistan_time()
+        db_course.updated_by = admin.id
+
+        # 5. Commit changes to the database
+        db.add(db_course)
+        db.commit()
+        db.refresh(db_course)
+
+        logger.info(f"Successfully updated course '{db_course.title}' (ID: {db_course.id})")
+        return db_course
+
+    except HTTPException as http_exc:
+        # Re-raise FastAPI's HTTP exceptions directly
+        logger.error(f"HTTP Exception in update_course: {http_exc.detail}")
+        raise http_exc
     except Exception as e:
+        # Catch any other unexpected errors
+        logger.error(f"Unexpected error in update_course: {e}", exc_info=True)
         db.rollback()
         raise HTTPException(
             status_code=500,
-            detail=f"Unexpected error updating course: {str(e)}"
+            detail="An unexpected internal server error occurred."
         )
 
 # Delete a course (hard delete)
