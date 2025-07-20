@@ -1167,6 +1167,35 @@ def upsert_quiz_for_video(
         logging.info(f"Database transaction rolled back for video {video_id}.")
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred while saving the quiz.")
 
+@router.get("/videos/{video_id}/quiz", response_model=QuizReadWithDetails)
+def get_quiz_for_video(
+    video_id: UUID,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    logging.info(f"Fetching quiz for video {video_id}")
+    video = db.get(Video, video_id)
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    if not video.quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found for this video.")
+
+    # Eagerly load questions and options
+    quiz = db.exec(
+        select(Quiz)
+        .where(Quiz.id == video.quiz_id)
+        .options(selectinload(Quiz.questions).selectinload(Question.options))
+    ).first()
+
+    if not quiz:
+        # This case should be rare if video.quiz_id is set
+        raise HTTPException(status_code=404, detail="Quiz not found.")
+
+    logging.info(f"Successfully fetched quiz {quiz.id} for video {video_id}")
+    return quiz
+
+
 # ... (rest of the code remains the same)
     # Eagerly load the relationships to return them in the response
     updated_quiz = db.exec(
