@@ -20,6 +20,7 @@ class Video(SQLModel, table=True):
     title: Optional[str] = None
     description: Optional[str] = None
     duration: Optional[float] = None  # Duration in seconds
+    order: int = Field(default=0)  # Order of the video in the course
     is_preview: bool = Field(default=False)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 

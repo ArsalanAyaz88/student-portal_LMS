@@ -176,9 +176,9 @@ def get_course_videos_with_progress(
     try:
         course_uuid = uuid.UUID(course_id)
     except ValueError:
-        logger.error(f"Invalid UUID format for course_id: {course_id}")
-        raise HTTPException(status_code=400, detail=f"Invalid course ID format: {course_id}")
+        raise HTTPException(status_code=400, detail="Invalid course ID format")
 
+    # Check if the user is enrolled and approved
     enrollment = session.exec(
         select(Enrollment).where(
             Enrollment.user_id == user.id,
@@ -187,71 +187,78 @@ def get_course_videos_with_progress(
         )
     ).first()
 
-    if not enrollment or not enrollment.is_accessible:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have access to this course.")
+    if not enrollment:
+        raise HTTPException(status_code=403, detail="You are not enrolled in this course.")
 
+    # Get all videos for the course, ordered by the 'order' field
     videos = session.exec(
-        select(Video)
-        .where(Video.course_id == course_uuid)
-        .order_by(Video.created_at.asc())
-        .options(selectinload(Video.quiz))
+        select(Video).where(Video.course_id == course_uuid).order_by(Video.order)
     ).all()
 
     if not videos:
         return []
 
-    video_ids = [v.id for v in videos]
-    quiz_ids = [v.quiz_id for v in videos if v.quiz_id]
+    # Get all of the user's progress for this course in one go
+    progress_records = session.exec(
+        select(VideoProgress).where(
+            VideoProgress.user_id == user.id,
+            VideoProgress.video_id.in_([v.id for v in videos])
+        )
+    ).all()
+    watched_video_ids = {p.video_id for p in progress_records}
 
-    video_progress_map = {vp.video_id: vp for vp in session.exec(
-        select(VideoProgress).where(VideoProgress.user_id == user.id, VideoProgress.video_id.in_(video_ids))
-    ).all()}
-
-    quiz_submission_map = {qs.quiz_id: qs for qs in session.exec(
-        select(QuizSubmission).where(QuizSubmission.student_id == user.id, QuizSubmission.quiz_id.in_(quiz_ids))
-    ).all()}
+    # Get all of the user's quiz submissions for this course
+    quiz_submissions = session.exec(
+        select(QuizSubmission).where(
+            QuizSubmission.user_id == user.id,
+            QuizSubmission.quiz_id.in_([v.quiz_id for v in videos if v.quiz_id])
+        )
+    ).all()
+    passed_quiz_ids = {s.quiz_id for s in quiz_submissions if s.passed}
 
     response_videos = []
-    is_next_video_found = False
-    previous_video_quiz_passed = True
+    previous_video_unlocked = True  # The first video is always accessible
 
     for video in videos:
-        quiz_status = "not_taken"
-        is_quiz_passed = False
+        is_accessible = False
+        if previous_video_unlocked:
+            is_accessible = True
+
+        watched = video.id in watched_video_ids
+        quiz_passed = video.quiz_id in passed_quiz_ids if video.quiz_id else True
+
+        # Determine if the next video should be unlocked
+        previous_video_unlocked = is_accessible and watched and quiz_passed
+
+        quiz_status = 'not_taken'
         if video.quiz_id:
-            submission = quiz_submission_map.get(video.quiz_id)
-            if submission:
-                passing_score = video.quiz.passing_percentage if video.quiz and video.quiz.passing_percentage is not None else 70
-                is_quiz_passed = submission.score is not None and submission.score >= passing_score
-                quiz_status = "passed" if is_quiz_passed else "failed"
-        else:
-            is_quiz_passed = True
+            if video.quiz_id in passed_quiz_ids:
+                quiz_status = 'passed'
+            # Check if there is any submission, to mark as 'failed'
+            elif any(s.quiz_id == video.quiz_id for s in quiz_submissions):
+                quiz_status = 'failed'
 
-        is_accessible = video.is_preview or previous_video_quiz_passed
-
-        is_next_available = False
-        if is_accessible and not is_next_video_found:
-            progress = video_progress_map.get(video.id)
-            video_completed = progress and progress.completed
-            if not video_completed or not is_quiz_passed:
-                is_next_available = True
-                is_next_video_found = True
-
-        response_videos.append(VideoWithProgress(
-            id=video.id, course_id=video.course_id, title=video.title, description=video.description,
-            url=video.url, duration=video.duration, is_preview=video.is_preview, quiz_id=video.quiz_id,
-            watched=video_progress_map.get(video.id, VideoProgress(completed=False)).completed,
-            quiz_status=quiz_status, is_accessible=is_accessible, is_next_available=is_next_available
-        ))
-        previous_video_quiz_passed = is_quiz_passed
-
-    if not is_next_video_found and response_videos:
-        response_videos[-1].is_next_available = True
+        response_videos.append(
+            VideoWithProgress(
+                id=video.id,
+                title=video.title,
+                description=video.description,
+                url=video.video_url, # Assuming url is the field name in VideoWithProgress
+                duration=video.duration,
+                order=video.order,
+                is_preview=video.is_preview,
+                course_id=video.course_id,
+                quiz_id=video.quiz_id,
+                watched=watched,
+                quiz_status=quiz_status,
+                is_accessible=is_accessible
+            )
+        )
 
     return response_videos
 
 
-@router.post("/videos/{video_id}/complete", response_model=dict)
+@router.post("/videos/{video_id}/complete", status_code=status.HTTP_200_OK)
 def toggle_video_completion(
     video_id: str,
     user: User = Depends(get_current_user),

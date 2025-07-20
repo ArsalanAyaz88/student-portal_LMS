@@ -10,6 +10,7 @@ class VideoBase(BaseModel):
     description: Optional[str] = Field(default=None, example="A quick overview of the FastAPI framework.")
     url: str = Field(..., example="https://res.cloudinary.com/demo/video/upload/dog.mp4")
     duration: Optional[float] = Field(default=None, example=360.5)
+    order: int = Field(default=0, example=1)
     is_preview: bool = Field(default=False)
 
 # Schema for creating a new video
@@ -20,6 +21,7 @@ class VideoCreate(BaseModel):
     public_id: Optional[str] = None # Cloudinary public ID
     duration: Optional[float] = None
     course_id: uuid.UUID
+    order: Optional[int] = 0
 
 # Schema for updating an existing video
 class VideoUpdate(BaseModel):
@@ -29,6 +31,7 @@ class VideoUpdate(BaseModel):
     public_id: Optional[str] = None
     duration: Optional[float] = None
     is_preview: Optional[bool] = None
+    order: Optional[int] = None
 
 # Schema for reading video data (e.g., in API responses)
 class VideoRead(VideoBase):
@@ -45,6 +48,7 @@ class VideoAdminRead(BaseModel):
     title: str
     description: Optional[str]
     url: str
+    order: int
 
     class Config:
         from_attributes = True
