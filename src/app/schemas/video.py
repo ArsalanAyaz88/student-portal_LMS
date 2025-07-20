@@ -43,12 +43,8 @@ class VideoRead(VideoBase):
         from_attributes = True
 
 # Schema for reading video data for the admin panel
-class VideoAdminRead(BaseModel):
+class VideoAdminRead(VideoBase):
     id: uuid.UUID
-    title: str
-    description: Optional[str]
-    url: str
-    order: int
 
     class Config:
         from_attributes = True
