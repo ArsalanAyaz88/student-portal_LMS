@@ -292,7 +292,9 @@ def create_video(video: VideoCreate, db: Session = Depends(get_db), admin: User 
     max_order = db.exec(select(func.max(Video.order)).where(Video.course_id == video.course_id)).one_or_none()
     new_order = (max_order or 0) + 1
 
-    db_video = Video.model_validate(video, update={'order': new_order})
+    video_data = video.model_dump()
+    video_data['order'] = new_order
+    db_video = Video(**video_data)
     db.add(db_video)
     db.commit()
     db.refresh(db_video)
