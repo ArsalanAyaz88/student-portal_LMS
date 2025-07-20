@@ -378,15 +378,28 @@ def delete_video(
     admin: User = Depends(get_current_admin_user)
 ):
     """
-    Delete a video.
+    Delete a video with detailed error logging.
     """
-    db_video = db.get(Video, video_id)
-    if not db_video:
-        raise HTTPException(status_code=404, detail="Video not found")
+    import logging
+    logging.info(f"[ADMIN] Attempting to delete video with ID: {video_id}")
+    try:
+        db_video = db.get(Video, video_id)
+        if not db_video:
+            logging.warning(f"[ADMIN] Video not found for deletion: {video_id}")
+            raise HTTPException(status_code=404, detail="Video not found")
 
-    db.delete(db_video)
-    db.commit()
-    return
+        logging.info(f"[ADMIN] Deleting video: {db_video.id} - {getattr(db_video, 'title', '')}")
+        db.delete(db_video)
+        db.commit()
+        logging.info(f"[ADMIN] Successfully deleted video: {video_id}")
+        return
+    except HTTPException as e:
+        logging.error(f"[ADMIN] HTTPException during video deletion: {e.detail}", exc_info=True)
+        raise
+    except Exception as e:
+        logging.error(f"[ADMIN] Unexpected error during video deletion: {e}", exc_info=True)
+        db.rollback()
+        raise HTTPException(status_code=500, detail="An unexpected error occurred while deleting the video.")
 
 
 # 2. Notifications
