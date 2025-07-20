@@ -1135,12 +1135,26 @@ def get_cloudinary_signature(admin: User = Depends(get_current_admin_user)):
 
 @router.get("/videos/{video_id}/quiz", response_model=QuizReadWithDetails, name="get_quiz_for_video")
 def get_quiz_for_video(video_id: UUID, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
-    logging.info(f"Fetching quiz for video_id: {video_id}")
-    quiz = db.exec(select(Quiz).where(Quiz.video_id == video_id).options(selectinload(Quiz.questions).selectinload(Question.options))).first()
-    if not quiz:
-        raise HTTPException(status_code=404, detail="Quiz not found for this video")
-    logging.info(f"Found quiz: {quiz.id} for video {video_id}")
-    return quiz
+    logging.info(f"Attempting to fetch quiz for video_id: {video_id}")
+    try:
+        quiz = db.exec(
+            select(Quiz)
+            .where(Quiz.video_id == video_id)
+            .options(
+                selectinload(Quiz.questions)
+                .selectinload(Question.options)
+            )
+        ).first()
+
+        if not quiz:
+            logging.warning(f"No quiz found for video_id: {video_id}. Returning 404.")
+            raise HTTPException(status_code=404, detail="Quiz not found for this video")
+
+        logging.info(f"Successfully found quiz {quiz.id} for video {video_id}")
+        return quiz
+    except Exception as e:
+        logging.error(f"An unexpected error occurred while fetching quiz for video {video_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="An internal server error occurred.")
 
 @router.post("/videos/{video_id}/quiz", response_model=QuizReadWithDetails)
 def upsert_quiz_for_video(
