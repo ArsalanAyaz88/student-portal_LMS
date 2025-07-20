@@ -1152,6 +1152,8 @@ def get_quiz_for_video(video_id: UUID, db: Session = Depends(get_db), admin: Use
 
         logging.info(f"Successfully found quiz {quiz.id} for video {video_id}")
         return quiz
+    except HTTPException:
+        raise  # Let FastAPI handle HTTPException (404, etc.) correctly
     except Exception as e:
         logging.error(f"An unexpected error occurred while fetching quiz for video {video_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="An internal server error occurred.")
