@@ -979,6 +979,19 @@ def admin_grade_submission(
     # 3) Apply grade & feedback
     submission.grade = payload.grade
     submission.feedback = payload.feedback
+
+    db.add(submission)
+    db.commit()
+    db.refresh(submission)
+
+    # 4) Return the updated submission
+    return submission
+
+@router.put("/courses/{course_id}/assignments/{assignment_id}", response_model=AssignmentRead)
+def admin_update_assignment(
+    course_id: str,
+    assignment_id: str,
+    payload: AssignmentUpdate,  # Changed from AssignmentCreate
     db: Session = Depends(get_db),
     admin=Depends(get_current_admin_user),
 ):
