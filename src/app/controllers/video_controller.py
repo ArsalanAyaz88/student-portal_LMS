@@ -13,7 +13,7 @@ from src.app.utils.dependencies import get_current_user, get_current_admin_user
 
 router = APIRouter()
 
-@router.post("/videos", response_model=VideoRead, status_code=status.HTTP_201_CREATED)
+@router.post("/courses/{course_id}/videos", response_model=VideoRead, status_code=status.HTTP_201_CREATED)
 def create_video(video: VideoCreate, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
     logging.info(f"Attempting to create video with payload: {video.model_dump_json()}")
     """

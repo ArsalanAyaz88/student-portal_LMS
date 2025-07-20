@@ -16,7 +16,6 @@ from ..utils.file import save_upload_and_get_url
 from ..models.user import User
 
 router = APIRouter(
-    prefix="/api/v1",
     tags=["videos"]
 )
 
