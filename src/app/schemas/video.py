@@ -8,7 +8,7 @@ from src.app.schemas.quiz import QuizRead
 class VideoBase(BaseModel):
     title: str = Field(..., example="Introduction to FastAPI")
     description: Optional[str] = Field(default=None, example="A quick overview of the FastAPI framework.")
-    url: str = Field(..., example="https://res.cloudinary.com/demo/video/upload/dog.mp4")
+    video_url: str = Field(..., example="https://res.cloudinary.com/demo/video/upload/dog.mp4")
     duration: Optional[float] = Field(default=None, example=360.5)
     order: int = Field(default=0, example=1)
     is_preview: bool = Field(default=False)
@@ -17,7 +17,7 @@ class VideoBase(BaseModel):
 class VideoCreate(BaseModel):
     title: str
     description: Optional[str] = None
-    url: str # This will be the Cloudinary URL
+    video_url: str
     public_id: Optional[str] = None # Cloudinary public ID
     duration: Optional[float] = None
     course_id: uuid.UUID
