@@ -1083,14 +1083,7 @@ def admin_update_assignment(
     db.commit()
     db.refresh(assignment)
 
-    # Manually construct the response to include the course_title
-    return AssignmentRead(
-        id=assignment.id,
-        course_id=assignment.course_id,
-        title=assignment.title,
-        description=assignment.description,
-        due_date=assignment.due_date,
-        status='n/a',  # Status is not relevant in this context
+    return assignment
 
 @router.post("/videos/{video_id}/quiz", response_model=QuizReadWithDetails)
 def upsert_quiz_for_video(
