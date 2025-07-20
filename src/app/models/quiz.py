@@ -22,8 +22,12 @@ class Quiz(SQLModel, table=True):
     questions: List["Question"] = Relationship(back_populates="quiz", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
     submissions: List["QuizSubmission"] = Relationship(back_populates="quiz", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
     audit_logs: List["src.app.models.quiz_audit_log.QuizAuditLog"] = Relationship(back_populates="quiz", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+    video_id: uuid.UUID = Field(foreign_key="video.id", unique=True)
+    video: "Video" = Relationship(back_populates="quiz")
+
+    # The relationship to Course might be redundant if Quiz is always tied to a Video,
+    # which is already tied to a Course. For now, we leave it.
     course: "Course" = Relationship(back_populates="quizzes")
-    videos: List["Video"] = Relationship(back_populates="quiz")
 
 class Question(SQLModel, table=True):
     __table_args__ = {"extend_existing": True}
