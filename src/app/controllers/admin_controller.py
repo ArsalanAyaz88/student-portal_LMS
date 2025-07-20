@@ -1091,9 +1091,6 @@ def admin_update_assignment(
         description=assignment.description,
         due_date=assignment.due_date,
         status='n/a',  # Status is not relevant in this context
-        course_title=assignment.course.title,
-        submission=None
-    )
 
 @router.post("/videos/{video_id}/quiz", response_model=QuizReadWithDetails)
 def upsert_quiz_for_video(
@@ -1105,52 +1102,70 @@ def upsert_quiz_for_video(
     """
     Create or update a quiz for a specific video.
     """
-    # Check if video exists
-    video = db.get(Video, video_id)
-    if not video:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found")
+    logging.info(f"Received request to create/update quiz for video {video_id}")
+    logging.debug(f"Quiz payload: {quiz_data.model_dump_json()}")
+    try:
+        # Check if video exists
+        video = db.get(Video, video_id)
+        if not video:
+            logging.warning(f"Video with id {video_id} not found.")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found")
 
-    # Check for existing quiz for this video
-    quiz = db.exec(select(Quiz).where(Quiz.video_id == video_id)).first()
+        # Check for existing quiz for this video
+        quiz = db.exec(select(Quiz).where(Quiz.video_id == video_id)).first()
 
-    if quiz:
-        # Update existing quiz
-        quiz.title = quiz_data.title
-        quiz.description = quiz_data.description
+        if quiz:
+            logging.info(f"Updating existing quiz {quiz.id} for video {video_id}")
+            quiz.title = quiz_data.title
+            quiz.description = quiz_data.description
 
-        # Simple approach: delete old questions and options, then recreate
-        # This is easier than diffing, but might be inefficient for large quizzes
-        for question in quiz.questions:
-            for option in question.options:
-                db.delete(option)
-            db.delete(question)
-        db.commit()
+            # Simple approach: delete old questions and options, then recreate
+            # This is easier than diffing, but might be inefficient for large quizzes
+            for question in quiz.questions:
+                for option in question.options:
+                    db.delete(option)
+                db.delete(question)
+            db.commit()
 
-    else:
-        # Create new quiz
-        quiz = Quiz(video_id=video_id, title=quiz_data.title, description=quiz_data.description)
-        db.add(quiz)
+        else:
+            logging.info(f"Creating new quiz for video {video_id}")
+            quiz = Quiz(video_id=video_id, title=quiz_data.title, description=quiz_data.description)
+            db.add(quiz)
+            db.commit()
+            db.refresh(quiz)
+
+        # Add new questions and options
+        for q_data in quiz_data.questions:
+            new_question = Question(quiz_id=quiz.id, text=q_data.text)
+            db.add(new_question)
+            db.commit()
+            db.refresh(new_question)
+
+            for o_data in q_data.options:
+                new_option = Option(
+                    question_id=new_question.id,
+                    text=o_data.text,
+                    is_correct=o_data.is_correct
+                )
+                db.add(new_option)
+        
         db.commit()
         db.refresh(quiz)
+        logging.info(f"Successfully created/updated quiz {quiz.id} for video {video_id}")
+        
+        # Eagerly load the relationships to return them in the response
+        updated_quiz = db.exec(
+            select(Quiz)
+            .where(Quiz.id == quiz.id)
+            .options(selectinload(Quiz.questions).selectinload(Question.options))
+        ).one()
 
-    # Add new questions and options
-    for q_data in quiz_data.questions:
-        new_question = Question(quiz_id=quiz.id, text=q_data.text)
-        db.add(new_question)
-        db.commit()
-        db.refresh(new_question)
+        return updated_quiz
+    except Exception as e:
+        logging.error(f"Error processing quiz for video {video_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="An internal error occurred while processing the quiz.")
 
-        for o_data in q_data.options:
-            new_option = Option(
-                question_id=new_question.id,
-                text=o_data.text,
-                is_correct=o_data.is_correct
-            )
-            db.add(new_option)
-    
-    db.commit()
-    db.refresh(quiz)
-    
+# ... (rest of the code remains the same)
     # Eagerly load the relationships to return them in the response
     updated_quiz = db.exec(
         select(Quiz)
