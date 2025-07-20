@@ -618,7 +618,7 @@ async def get_dashboard_stats(
         thirty_days_ago = get_pakistan_time() - timedelta(days=30)
         recent_enrollments = db.exec(
             select(func.count(Enrollment.id))
-            .where(Enrollment.enrollment_date >= thirty_days_ago)
+            .where(Enrollment.enroll_date >= thirty_days_ago)
         ).one_or_none()
         recent_enrollments = recent_enrollments if recent_enrollments is not None else 0
         logging.info(f"[ADMIN DASHBOARD] Recent enrollments (30d): {recent_enrollments}")
