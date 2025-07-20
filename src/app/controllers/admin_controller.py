@@ -579,42 +579,44 @@ async def get_dashboard_stats(
     admin: User = Depends(get_current_admin_user)
 ):
     """Get overall platform statistics for admin dashboard"""
+    import logging
+    logging.info("[ADMIN DASHBOARD] /dashboard/stats endpoint called by admin: %s", getattr(admin, 'email', str(admin)))
     try:
         # Get total courses
         total_courses = db.exec(select(func.count(Course.id))).scalar_one_or_none() or 0
-        
+        logging.info(f"[ADMIN DASHBOARD] Total courses: {total_courses}")
         # Get total enrollments
         total_enrollments = db.exec(select(func.count(Enrollment.id))).scalar_one_or_none() or 0
-        
+        logging.info(f"[ADMIN DASHBOARD] Total enrollments: {total_enrollments}")
         # Get active enrollments
         active_enrollments = db.exec(
             select(func.count(Enrollment.id))
             .where(Enrollment.is_accessible == True)
         ).scalar_one_or_none() or 0
-        
+        logging.info(f"[ADMIN DASHBOARD] Active enrollments: {active_enrollments}")
         # Get total revenue
         total_revenue = db.exec(
             select(func.sum(Course.price))
             .join(Enrollment, Course.id == Enrollment.course_id)
             .where(Enrollment.status == "approved")
         ).scalar_one_or_none() or 0
-        
+        logging.info(f"[ADMIN DASHBOARD] Total revenue: {total_revenue}")
         # Get completion rate
         completed_courses = db.exec(
             select(func.count(CourseProgress.id))
             .where(CourseProgress.completed == True)
         ).scalar_one_or_none() or 0
-        
+        logging.info(f"[ADMIN DASHBOARD] Completed courses: {completed_courses}")
         completion_rate = (completed_courses / total_enrollments * 100) if total_enrollments > 0 else 0
-        
+        logging.info(f"[ADMIN DASHBOARD] Completion rate: {completion_rate}")
         # Get recent enrollments (last 30 days)
         thirty_days_ago = get_pakistan_time() - timedelta(days=30)
         recent_enrollments = db.exec(
             select(func.count(Enrollment.id))
             .where(Enrollment.enrollment_date >= thirty_days_ago)
         ).scalar_one_or_none() or 0
-        
-        return {
+        logging.info(f"[ADMIN DASHBOARD] Recent enrollments (30d): {recent_enrollments}")
+        result = {
             "total_courses": total_courses,
             "total_enrollments": total_enrollments,
             "active_enrollments": active_enrollments,
@@ -623,7 +625,12 @@ async def get_dashboard_stats(
             "completion_rate": round(completion_rate, 2),
             "last_updated": get_pakistan_time().isoformat()
         }
+        logging.info(f"[ADMIN DASHBOARD] Returning stats: {result}")
+        return result
     except Exception as e:
+        import traceback
+        logging.error(f"[ADMIN DASHBOARD] Error fetching dashboard stats: {e}", exc_info=True)
+        logging.error(traceback.format_exc())
         raise HTTPException(
             status_code=500,
             detail=f"Error fetching dashboard stats: {str(e)}"
