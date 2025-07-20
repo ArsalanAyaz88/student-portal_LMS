@@ -1133,6 +1133,15 @@ def get_cloudinary_signature(admin: User = Depends(get_current_admin_user)):
         logging.error(f"Error generating Cloudinary signature: {e}")
         raise HTTPException(status_code=500, detail="Could not generate upload signature.")
 
+@router.get("/videos/{video_id}/quiz", response_model=QuizReadWithDetails, name="get_quiz_for_video")
+def get_quiz_for_video(video_id: UUID, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
+    logging.info(f"Fetching quiz for video_id: {video_id}")
+    quiz = db.exec(select(Quiz).where(Quiz.video_id == video_id).options(selectinload(Quiz.questions).selectinload(Question.options))).first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found for this video")
+    logging.info(f"Found quiz: {quiz.id} for video {video_id}")
+    return quiz
+
 @router.post("/videos/{video_id}/quiz", response_model=QuizReadWithDetails)
 def upsert_quiz_for_video(
     video_id: UUID,
