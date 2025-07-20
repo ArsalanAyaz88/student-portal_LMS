@@ -584,11 +584,11 @@ async def get_dashboard_stats(
     try:
         # Get total courses
         total_courses = db.exec(select(func.count(Course.id))).one_or_none()
-total_courses = total_courses[0] if total_courses else 0
+        total_courses = total_courses[0] if total_courses else 0
         logging.info(f"[ADMIN DASHBOARD] Total courses: {total_courses}")
         # Get total enrollments
         total_enrollments = db.exec(select(func.count(Enrollment.id))).one_or_none()
-total_enrollments = total_enrollments[0] if total_enrollments else 0
+        total_enrollments = total_enrollments[0] if total_enrollments else 0
         logging.info(f"[ADMIN DASHBOARD] Total enrollments: {total_enrollments}")
         # Get active enrollments
         active_enrollments = db.exec(
