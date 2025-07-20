@@ -90,7 +90,7 @@ app.include_router(admin_quiz_router.question_router, prefix="/api/admin/questio
 app.include_router(admin_quiz_router.submission_router, prefix="/api/admin/submissions")
 
 # Include video router
-app.include_router(video_router.router)
+app.include_router(video_router.router, prefix="/api/v1", tags=["Videos"])
 
 # ─── Simple endpoints ──────────────────────────────────────────
 @app.get("/")

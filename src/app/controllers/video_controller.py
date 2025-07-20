@@ -15,18 +15,21 @@ router = APIRouter()
 
 @router.post("/videos", response_model=VideoRead, status_code=status.HTTP_201_CREATED)
 def create_video(video: VideoCreate, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
+    logging.info(f"Attempting to create video with payload: {video.model_dump_json()}")
     """
     Create a new video and associate it with a course.
     """
     # Check if the course exists
     course = db.get(Course, video.course_id)
     if not course:
+        logging.error(f"Course not found with ID: {video.course_id}")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
 
     db_video = Video.model_validate(video)
     db.add(db_video)
     db.commit()
     db.refresh(db_video)
+    logging.info(f"Successfully created video with ID: {db_video.id} for course ID: {video.course_id}")
     return db_video
 
 @router.get("/videos", response_model=List[VideoAdminRead])
