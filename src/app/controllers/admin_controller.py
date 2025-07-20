@@ -282,30 +282,37 @@ def get_course_detail(
 
 @router.post("/videos", response_model=VideoAdminRead, status_code=status.HTTP_201_CREATED)
 def create_video(video: VideoCreate, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
-    logging.info(f"Attempting to create video with payload: {video.model_dump_json()}")
-    course = db.get(Course, video.course_id)
-    if not course:
-        logging.error(f"Course not found with ID: {video.course_id}")
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+    logging.info(f"Received request to create video for course {video.course_id}")
+    logging.debug(f"Video creation payload: {video.model_dump_json()}")
+    try:
+        # Check if the course exists
+        course = db.get(Course, video.course_id)
+        if not course:
+            logging.warning(f"Course with ID {video.course_id} not found.")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
 
-    # Get the highest order for the current course and add 1
-    max_order = db.exec(select(func.max(Video.order)).where(Video.course_id == video.course_id)).one_or_none()
-    new_order = (max_order or 0) + 1
+        # Get the highest order for the current course and add 1
+        max_order = db.exec(select(func.max(Video.order)).where(Video.course_id == video.course_id)).one_or_none()
+        new_order = (max_order or 0) + 1
 
-    video_data = video.model_dump()
-    video_data['order'] = new_order
-    db_video = Video(
-        title=video.title,
-        description=video.description,
-        cloudinary_url=video.cloudinary_url, # Use the correct field name
-        course_id=video.course_id,
-        order=new_order
-    )
-    db.add(db_video)
-    db.commit()
-    db.refresh(db_video)
-    logging.info(f"Successfully created video with ID: {db_video.id} for course ID: {video.course_id}")
-    return db_video
+        video_data = video.model_dump()
+        video_data['order'] = new_order
+        db_video = Video(
+            title=video.title,
+            description=video.description,
+            cloudinary_url=video.cloudinary_url, # Use the correct field name
+            course_id=video.course_id,
+            order=new_order
+        )
+        db.add(db_video)
+        db.commit()
+        db.refresh(db_video)
+        logging.info(f"Successfully created video with ID {db_video.id} for course {video.course_id}")
+        return db_video
+    except Exception as e:
+        logging.error(f"Error creating video for course {video.course_id}: {e}", exc_info=True)
+        db.rollback()
+        raise HTTPException(status_code=500, detail="An unexpected error occurred while creating the video.")
 
 
 @router.get("/videos", response_model=List[VideoAdminRead])
@@ -336,21 +343,27 @@ def update_video(
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin_user)
 ):
-    """
-    Update a video's details.
-    """
-    db_video = db.get(Video, video_id)
-    if not db_video:
-        raise HTTPException(status_code=404, detail="Video not found")
+    logging.info(f"Received request to update video {video_id}")
+    logging.debug(f"Video update payload: {video_update.model_dump_json(exclude_unset=True)}")
+    try:
+        db_video = db.get(Video, video_id)
+        if not db_video:
+            logging.warning(f"Video with ID {video_id} not found for update.")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found")
 
-    video_data = video_update.model_dump(exclude_unset=True)
-    for key, value in video_data.items():
-        setattr(db_video, key, value)
+        video_data = video_update.model_dump(exclude_unset=True)
+        for key, value in video_data.items():
+            setattr(db_video, key, value)
 
-    db.add(db_video)
-    db.commit()
-    db.refresh(db_video)
-    return db_video
+        db.add(db_video)
+        db.commit()
+        db.refresh(db_video)
+        logging.info(f"Successfully updated video {video_id}")
+        return db_video
+    except Exception as e:
+        logging.error(f"Error updating video {video_id}: {e}", exc_info=True)
+        db.rollback()
+        raise HTTPException(status_code=500, detail="An unexpected error occurred while updating the video.")
 
 
 @router.delete("/videos/{video_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -1092,61 +1105,67 @@ def upsert_quiz_for_video(
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin_user)
 ):
-    logging.info(f"Upserting quiz for video {video_id}")
+    logging.info(f"Starting quiz upsert for video {video_id}.")
     logging.debug(f"Quiz payload: {quiz_data.model_dump_json()}")
-    try:
-        video = db.get(Video, video_id)
-        if not video:
-            logging.warning(f"Video with id {video_id} not found.")
-            raise HTTPException(status_code=404, detail="Video not found")
+    
+    video = db.get(Video, video_id)
+    if not video:
+        logging.warning(f"Video with id {video_id} not found during quiz upsert.")
+        raise HTTPException(status_code=404, detail="Video not found")
 
+    try:
         quiz = video.quiz
 
         if quiz:
-            logging.info(f"Updating existing quiz {quiz.id} for video {video_id}")
+            # UPDATE existing quiz
+            logging.info(f"Updating existing quiz {quiz.id} for video {video_id}.")
             quiz.title = quiz_data.title
             quiz.description = quiz_data.description
             
-            # Delete old questions and options
-            for question in quiz.questions:
-                db.query(Option).filter(Option.question_id == question.id).delete()
+            logging.info(f"Deleting old questions and options for quiz {quiz.id}.")
+            for question in list(quiz.questions): # Use list to avoid issues with collection modification during iteration
+                for option in list(question.options):
+                    db.delete(option)
                 db.delete(question)
-            db.commit()
+            db.flush() # Apply deletions to the session
 
         else:
-            logging.info(f"Creating new quiz for video {video_id}")
+            # CREATE new quiz
+            logging.info(f"Creating new quiz for video {video_id}.")
             quiz = Quiz(
                 title=quiz_data.title,
                 description=quiz_data.description,
                 course_id=video.course_id
             )
             db.add(quiz)
-            db.commit()
-            db.refresh(quiz)
+            db.flush() # Flush to get the new quiz ID
             
             video.quiz_id = quiz.id
             db.add(video)
-            db.commit()
+            logging.info(f"New quiz {quiz.id} created and linked to video {video_id}.")
 
-        # Create new questions and options
+        # CREATE new questions and options
+        logging.info(f"Creating new questions and options for quiz {quiz.id}.")
         for q_data in quiz_data.questions:
             question = Question(text=q_data.text, quiz_id=quiz.id)
             db.add(question)
-            db.commit()
-            db.refresh(question)
+            db.flush() # Flush to get the new question ID
 
+            options_to_create = []
             for o_data in q_data.options:
-                option = Option(text=o_data.text, is_correct=o_data.is_correct, question_id=question.id)
-                db.add(option)
-            db.commit()
+                options_to_create.append(Option(text=o_data.text, is_correct=o_data.is_correct, question_id=question.id))
+            db.add_all(options_to_create)
 
-        db.refresh(quiz)
-        logging.info(f"Successfully upserted quiz {quiz.id} for video {video_id}")
+        db.commit()
+        db.refresh(quiz) # Refresh to load all new nested objects
+        logging.info(f"Successfully committed upsert for quiz {quiz.id} for video {video_id}.")
         return quiz
 
     except Exception as e:
-        logging.error(f"Error upserting quiz for video {video_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to upsert quiz: {e}")
+        logging.error(f"Error during quiz upsert for video {video_id}: {e}", exc_info=True)
+        db.rollback()
+        logging.info(f"Database transaction rolled back for video {video_id}.")
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred while saving the quiz.")
 
 # ... (rest of the code remains the same)
     # Eagerly load the relationships to return them in the response
