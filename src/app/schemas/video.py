@@ -14,12 +14,8 @@ class VideoBase(BaseModel):
     is_preview: bool = Field(default=False)
 
 # Schema for creating a new video
-class VideoCreate(BaseModel):
-    title: str
-    description: Optional[str] = None
-    video_url: str
-    public_id: Optional[str] = None # Cloudinary public ID
-    duration: Optional[float] = None
+class VideoCreate(VideoBase):
+
     course_id: uuid.UUID
     order: Optional[int] = 0
 
