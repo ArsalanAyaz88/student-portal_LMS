@@ -24,7 +24,7 @@ from src.app.schemas.course import (
     AdminCourseList, AdminCourseDetail, AdminCourseStats,
     CourseCreate, CourseUpdate, CourseRead, CourseCreateAdmin
 )
-from src.app.schemas.video import VideoAdminRead, VideoCreate, VideoRead, VideoAdminRead
+from src.app.schemas.video import VideoAdminRead, VideoCreate, VideoRead, VideoUpdate
 from src.app.schemas.quiz import QuizCreate, QuizReadWithDetails, QuizRead, QuizCreateForVideo
 from src.app.models.quiz import Quiz, Question, Option
 from src.app.schemas.notification import NotificationRead, AdminNotificationRead
@@ -327,6 +327,48 @@ def get_admin_videos_for_course(
     videos = db.exec(statement).all()
     
     return videos
+
+
+@router.put("/videos/{video_id}", response_model=VideoRead)
+def update_video(
+    video_id: UUID,
+    video_update: VideoUpdate,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    """
+    Update a video's details.
+    """
+    db_video = db.get(Video, video_id)
+    if not db_video:
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    video_data = video_update.model_dump(exclude_unset=True)
+    for key, value in video_data.items():
+        setattr(db_video, key, value)
+
+    db.add(db_video)
+    db.commit()
+    db.refresh(db_video)
+    return db_video
+
+
+@router.delete("/videos/{video_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_video(
+    video_id: UUID,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    """
+    Delete a video.
+    """
+    db_video = db.get(Video, video_id)
+    if not db_video:
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    db.delete(db_video)
+    db.commit()
+    return
 
 
 # 2. Notifications

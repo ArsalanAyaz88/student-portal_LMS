@@ -26,7 +26,7 @@ class VideoCreate(BaseModel):
 class VideoUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
-    url: Optional[str] = None
+    cloudinary_url: Optional[str] = None
     public_id: Optional[str] = None
     duration: Optional[float] = None
     is_preview: Optional[bool] = None
