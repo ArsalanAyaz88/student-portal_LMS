@@ -48,7 +48,9 @@ class QuizCreate(QuizBase):
     course_id: uuid.UUID
     questions: List[QuestionCreate] = []
 
-class QuizCreateForVideo(QuizBase):
+class QuizCreateForVideo(BaseModel):
+    title: str
+    description: Optional[str] = None
     questions: List[QuestionCreate] = []
 
 class QuizCreateWithQuestions(QuizCreate):
