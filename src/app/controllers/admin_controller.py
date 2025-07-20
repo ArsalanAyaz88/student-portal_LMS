@@ -1098,6 +1098,36 @@ def admin_update_assignment(
 
     return assignment
 
+@router.get("/cloudinary-signature")
+def get_cloudinary_signature(admin: User = Depends(get_current_admin_user)):
+    """
+    Generate a signature for direct uploads to Cloudinary.
+    """
+    try:
+        folder = "lms_videos"
+        timestamp = int(time.time())
+        payload_to_sign = {
+            "timestamp": timestamp,
+            "folder": folder
+        }
+        # Ensure you have CLOUDINARY_API_SECRET set in your environment
+        api_secret = os.getenv("CLOUDINARY_API_SECRET")
+        if not api_secret:
+            raise HTTPException(status_code=500, detail="Cloudinary API secret is not configured.")
+
+        signature = cloudinary.utils.api_sign_request(payload_to_sign, api_secret)
+        
+        return {
+            "api_key": os.getenv("CLOUDINARY_API_KEY"),
+            "timestamp": timestamp,
+            "signature": signature,
+            "folder": folder,
+            "cloud_name": os.getenv("CLOUDINARY_CLOUD_NAME")
+        }
+    except Exception as e:
+        logging.error(f"Error generating Cloudinary signature: {e}")
+        raise HTTPException(status_code=500, detail="Could not generate upload signature.")
+
 @router.post("/videos/{video_id}/quiz", response_model=QuizReadWithDetails)
 def upsert_quiz_for_video(
     video_id: UUID,
