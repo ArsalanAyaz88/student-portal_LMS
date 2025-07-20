@@ -294,7 +294,13 @@ def create_video(video: VideoCreate, db: Session = Depends(get_db), admin: User 
 
     video_data = video.model_dump()
     video_data['order'] = new_order
-    db_video = Video(**video_data)
+    db_video = Video(
+        title=video.title,
+        description=video.description,
+        cloudinary_url=video.cloudinary_url, # Use the correct field name
+        course_id=video.course_id,
+        order=new_order
+    )
     db.add(db_video)
     db.commit()
     db.refresh(db_video)
