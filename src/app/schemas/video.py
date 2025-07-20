@@ -14,8 +14,11 @@ class VideoBase(BaseModel):
     is_preview: bool = Field(default=False)
 
 # Schema for creating a new video
-class VideoCreate(VideoBase):
+class VideoCreate(BaseModel):
 
+    title: str
+    description: Optional[str] = None
+    video_url: str
     course_id: uuid.UUID
     order: Optional[int] = 0
 
