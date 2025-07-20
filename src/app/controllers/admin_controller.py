@@ -24,7 +24,7 @@ from src.app.schemas.course import (
     AdminCourseList, AdminCourseDetail, AdminCourseStats,
     CourseCreate, CourseUpdate, CourseRead, CourseCreateAdmin
 )
-from src.app.schemas.video import VideoUpdate, VideoRead
+from src.app.schemas.video import VideoUpdate, VideoRead, VideoAdminRead
 from src.app.schemas.quiz import QuizCreate, QuizReadWithDetails, QuizRead, QuizCreateForVideo
 from src.app.models.quiz import Quiz, Question, Option
 from src.app.schemas.notification import NotificationRead, AdminNotificationRead
@@ -275,7 +275,28 @@ def get_course_detail(
     if not course:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
 
-    return course 
+    return course
+
+
+@router.get("/videos", response_model=List[VideoAdminRead])
+def get_admin_videos_for_course(
+    course_id: UUID = Query(..., description="The ID of the course to fetch videos for"),
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    """
+    Get all videos for a specific course for the admin panel, ordered by the 'order' field.
+    """
+    # Ensure the course exists to avoid fetching videos for a non-existent course
+    course = db.get(Course, course_id)
+    if not course:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Course with ID {course_id} not found")
+
+    # Query videos for the given course_id, ordered by the 'order' field
+    statement = select(Video).where(Video.course_id == course_id).order_by(Video.order)
+    videos = db.exec(statement).all()
+    
+    return videos
 
 
 # 2. Notifications
@@ -449,7 +470,6 @@ def delete_course(
             status_code=500,
             detail=f"An unexpected internal server error occurred: {str(e)}"
         )
-
 @router.get("/dashboard/stats", response_model=dict)
 async def get_dashboard_stats(
     db: Session = Depends(get_db),
@@ -458,44 +478,38 @@ async def get_dashboard_stats(
     """Get overall platform statistics for admin dashboard"""
     try:
         # Get total courses
-        total_courses = db.exec(select(func.count(Course.id))).first()
+        total_courses = db.exec(select(func.count(Course.id))).scalar_one_or_none() or 0
         
         # Get total enrollments
-        total_enrollments = db.exec(select(func.count(Enrollment.id))).first()
+        total_enrollments = db.exec(select(func.count(Enrollment.id))).scalar_one_or_none() or 0
         
-        # Get active enrollments (last 30 days)
-        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+        # Get active enrollments
         active_enrollments = db.exec(
             select(func.count(Enrollment.id))
-            .where(
-                Enrollment.status == "approved",
-                Enrollment.is_accessible == True
-            )
-        ).first()
+            .where(Enrollment.is_accessible == True)
+        ).scalar_one_or_none() or 0
         
         # Get total revenue
         total_revenue = db.exec(
             select(func.sum(Course.price))
-            .join(Enrollment)
+            .join(Enrollment, Course.id == Enrollment.course_id)
             .where(Enrollment.status == "approved")
-        ).first() or 0
+        ).scalar_one_or_none() or 0
         
         # Get completion rate
         completed_courses = db.exec(
             select(func.count(CourseProgress.id))
             .where(CourseProgress.completed == True)
-        ).first()
+        ).scalar_one_or_none() or 0
         
         completion_rate = (completed_courses / total_enrollments * 100) if total_enrollments > 0 else 0
         
         # Get recent enrollments (last 30 days)
+        thirty_days_ago = get_pakistan_time() - timedelta(days=30)
         recent_enrollments = db.exec(
             select(func.count(Enrollment.id))
-            .where(
-                Enrollment.status == "approved",
-                Enrollment.is_accessible == True
-            )
-        ).first()
+            .where(Enrollment.enrollment_date >= thirty_days_ago)
+        ).scalar_one_or_none() or 0
         
         return {
             "total_courses": total_courses,
@@ -504,94 +518,7 @@ async def get_dashboard_stats(
             "recent_enrollments": recent_enrollments,
             "total_revenue": round(total_revenue, 2),
             "completion_rate": round(completion_rate, 2),
-            "last_updated": datetime.utcnow().isoformat()
-        }
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Course not found"
-        )
-    
-    try:
-        # Manually break the circular dependency with the preview video.
-        # This is necessary because the foreign key in the database might not
-        # have ON DELETE SET NULL. Setting it to None here resolves the conflict
-        # before the deletion is attempted.
-        if course.preview_video_id is not None:
-            course.preview_video_id = None
-            db.add(course)
-            db.commit()
-
-        # Now, delete the course. The cascade rules in the models
-        # will handle the deletion of related entities.
-        db.delete(course)
-        db.commit()
-        
-        return {"message": "Course deleted successfully"}
-
-    except Exception as e:
-        # If any error occurs during the process, rollback the transaction
-        # to leave the database in a consistent state.
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"An error occurred while deleting the course: {str(e)}"
-        )
-@router.get("/dashboard/stats", response_model=dict)
-async def get_dashboard_stats(
-    db: Session = Depends(get_db),
-    admin: User = Depends(get_current_admin_user)
-):
-    """Get overall platform statistics for admin dashboard"""
-    try:
-        # Get total courses
-        total_courses = db.exec(select(func.count(Course.id))).first()
-        
-        # Get total enrollments
-        total_enrollments = db.exec(select(func.count(Enrollment.id))).first()
-        
-        # Get active enrollments (last 30 days)
-        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-        active_enrollments = db.exec(
-            select(func.count(Enrollment.id))
-            .where(
-                Enrollment.status == "approved",
-                Enrollment.is_accessible == True
-            )
-        ).first()
-        
-        # Get total revenue
-        total_revenue = db.exec(
-            select(func.sum(Course.price))
-            .join(Enrollment)
-            .where(Enrollment.status == "approved")
-        ).first() or 0
-        
-        # Get completion rate
-        completed_courses = db.exec(
-            select(func.count(CourseProgress.id))
-            .where(CourseProgress.completed == True)
-        ).first()
-        
-        completion_rate = (completed_courses / total_enrollments * 100) if total_enrollments > 0 else 0
-        
-        # Get recent enrollments (last 30 days)
-        recent_enrollments = db.exec(
-            select(func.count(Enrollment.id))
-            .where(
-                Enrollment.status == "approved",
-                Enrollment.is_accessible == True
-            )
-        ).first()
-        
-        return {
-            "total_courses": total_courses,
-            "total_enrollments": total_enrollments,
-            "active_enrollments": active_enrollments,
-            "recent_enrollments": recent_enrollments,
-            "total_revenue": round(total_revenue, 2),
-            "completion_rate": round(completion_rate, 2),
-            "last_updated": datetime.utcnow().isoformat()
+            "last_updated": get_pakistan_time().isoformat()
         }
     except Exception as e:
         raise HTTPException(
@@ -1052,18 +979,6 @@ def admin_grade_submission(
     # 3) Apply grade & feedback
     submission.grade = payload.grade
     submission.feedback = payload.feedback
-
-    db.add(submission)
-    db.commit()
-    db.refresh(submission)
-
-    # 4) Return the updated submission
-    return submission           
-@router.put("/courses/{course_id}/assignments/{assignment_id}", response_model=AssignmentRead)
-def admin_update_assignment(
-    course_id: str,
-    assignment_id: str,
-    payload: AssignmentUpdate,  # Changed from AssignmentCreate
     db: Session = Depends(get_db),
     admin=Depends(get_current_admin_user),
 ):
