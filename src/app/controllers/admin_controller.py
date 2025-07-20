@@ -50,6 +50,7 @@ router = APIRouter()
 
 @router.post("/create-upload-signature")
 def create_upload_signature(folder: str = Form("videos")):
+    logging.info(f"Creating Cloudinary upload signature for folder: {folder}")
     """
     Generate a signature for direct Cloudinary upload.
     """
@@ -57,6 +58,7 @@ def create_upload_signature(folder: str = Form("videos")):
     try:
         params_to_sign = {"timestamp": timestamp, "folder": folder}
         signature = cloudinary.utils.api_sign_request(params_to_sign, cloudinary.config().api_secret)
+        logging.info("Successfully created Cloudinary signature.")
         return {
             "signature": signature,
             "timestamp": timestamp,
@@ -65,7 +67,7 @@ def create_upload_signature(folder: str = Form("videos")):
             "folder": folder
         }
     except Exception as e:
-        logging.error(f"Error creating Cloudinary signature: {e}")
+        logging.error(f"Error creating Cloudinary signature: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Could not create upload signature.")
 
 # 1. Enrollment Management
