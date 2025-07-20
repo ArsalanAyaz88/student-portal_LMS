@@ -24,7 +24,7 @@ from src.app.schemas.course import (
     AdminCourseList, AdminCourseDetail, AdminCourseStats,
     CourseCreate, CourseUpdate, CourseRead, CourseCreateAdmin
 )
-from src.app.schemas.video import VideoUpdate, VideoRead, VideoAdminRead
+from src.app.schemas.video import VideoAdminRead, VideoCreate, VideoRead, VideoAdminRead
 from src.app.schemas.quiz import QuizCreate, QuizReadWithDetails, QuizRead, QuizCreateForVideo
 from src.app.models.quiz import Quiz, Question, Option
 from src.app.schemas.notification import NotificationRead, AdminNotificationRead
@@ -278,6 +278,26 @@ def get_course_detail(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
 
     return course
+
+
+@router.post("/videos", response_model=VideoAdminRead, status_code=status.HTTP_201_CREATED)
+def create_video(video: VideoCreate, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
+    logging.info(f"Attempting to create video with payload: {video.model_dump_json()}")
+    course = db.get(Course, video.course_id)
+    if not course:
+        logging.error(f"Course not found with ID: {video.course_id}")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+
+    # Get the highest order for the current course and add 1
+    max_order = db.exec(select(func.max(Video.order)).where(Video.course_id == video.course_id)).one_or_none()
+    new_order = (max_order or 0) + 1
+
+    db_video = Video.model_validate(video, update={'order': new_order})
+    db.add(db_video)
+    db.commit()
+    db.refresh(db_video)
+    logging.info(f"Successfully created video with ID: {db_video.id} for course ID: {video.course_id}")
+    return db_video
 
 
 @router.get("/videos", response_model=List[VideoAdminRead])
