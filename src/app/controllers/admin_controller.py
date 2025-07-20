@@ -1195,13 +1195,11 @@ def upsert_quiz_for_video(
             quiz = Quiz(
                 title=quiz_data.title,
                 description=quiz_data.description,
-                course_id=video.course_id
+                course_id=video.course_id,
+                video_id=video.id
             )
             db.add(quiz)
             db.flush() # Flush to get the new quiz ID
-            
-            video.quiz_id = quiz.id
-            db.add(video)
             logging.info(f"New quiz {quiz.id} created and linked to video {video_id}.")
 
         # CREATE new questions and options
