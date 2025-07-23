@@ -3,7 +3,7 @@ import os
 import re
 import time
 import logging
-from uuid import UUID
+import uuid
 from datetime import datetime, timedelta
 from typing import List, Optional
 
