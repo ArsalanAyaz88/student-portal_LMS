@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlmodel import Session, select
+from typing import Optional
 from datetime import datetime, timedelta
 import uuid
 
