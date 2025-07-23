@@ -37,7 +37,7 @@ class VideoUpdate(BaseModel):
 class VideoRead(VideoBase):
         id: uuid.UUID
         course_id: uuid.UUID
-        quiz: Optional["QuizRead"] = None
+        quiz: Optional['quiz.QuizRead'] = None
 
         class Config:
             from_attributes = True
@@ -61,20 +61,15 @@ class VideoPreview(BaseModel):
 
 
 
-from pydantic import create_model
+class VideoWithProgress(VideoBase):
+    id: uuid.UUID
+    course_id: uuid.UUID
+    quiz_id: Optional[uuid.UUID] = None
+    watched: bool = False
+    quiz_status: Optional[str] = None  # 'passed', 'failed', or 'not_taken'
+    is_accessible: bool = True
+    is_next_available: bool = False
+    quiz: Optional['quiz.QuizRead'] = None
 
-# Defer the creation of this model to prevent circular import errors at startup.
-# It will be finalized in main.py after all modules are loaded.
-VideoWithProgress = create_model(
-    'VideoWithProgress',
-    __base__=VideoBase,
-    id=(uuid.UUID, ...),
-    course_id=(uuid.UUID, ...),
-    quiz_id=(Optional[uuid.UUID], None),
-    watched=(bool, False),
-    quiz_status=(Optional[str], None), # 'passed', 'failed', or 'not_taken'
-    is_accessible=(bool, True),
-    is_next_available=(bool, False),
-    quiz=(Optional['quiz.QuizRead'], None),
-    __config__=dict(from_attributes=True)
-)
+    class Config:
+        from_attributes = True
