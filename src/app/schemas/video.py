@@ -73,3 +73,11 @@ class VideoWithProgress(VideoBase):
 
     class Config:
         from_attributes = True
+
+# The following import and model_rebuild calls are at the end of the file
+# to resolve circular dependencies after all models in this file are defined.
+# This is the standard Pydantic approach.
+from . import quiz
+
+VideoRead.model_rebuild()
+VideoWithProgress.model_rebuild()
