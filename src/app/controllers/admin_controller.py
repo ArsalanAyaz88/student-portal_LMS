@@ -11,7 +11,7 @@ from typing import List, Optional
 import cloudinary
 import cloudinary.uploader
 import cloudinary.utils
-from fastapi import APIRouter, Depends, HTTPException, Query, status, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status, UploadFile, File, Form
 from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import selectinload
