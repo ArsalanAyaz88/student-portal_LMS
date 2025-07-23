@@ -43,6 +43,8 @@ class VideoRead(VideoBase):
     class Config:
         from_attributes = True
 
+VideoRead.model_rebuild()
+
 
 
 # Schema for reading video data for the admin panel

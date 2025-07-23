@@ -72,6 +72,8 @@ class QuizRead(QuizBase):
 class QuizReadWithDetails(QuizRead):
     questions: List[QuestionRead] = []
 
+QuizReadWithDetails.model_rebuild()
+
 # --- Submission and Grading Schemas ---
 
 class StudentRead(BaseModel):
