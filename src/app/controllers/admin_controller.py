@@ -3,7 +3,8 @@ import time
 import cloudinary
 import cloudinary.uploader
 import cloudinary.utils
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from pydantic import BaseModel
 from sqlmodel import Session, select
 from sqlalchemy import func
 import uuid
