@@ -48,7 +48,7 @@ from src.app.utils.file import save_upload_and_get_url
 from src.app.schemas.assignment import AssignmentCreate, AssignmentUpdate, AssignmentRead, AssignmentList, SubmissionRead, SubmissionGrade, SubmissionStudent, SubmissionStudentsResponse
 
 import logging
-from src.app.utils.email import send_email
+from src.app.utils.email import send_application_approved_email, send_enrollment_rejected_email
 
 router = APIRouter()
 
