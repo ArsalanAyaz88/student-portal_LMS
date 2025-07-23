@@ -172,3 +172,13 @@ class QuizListRead(BaseModel):
 # --- Aliases for router responses ---
 QuizDetailRead = QuizReadWithDetails
 
+# The following imports and model_rebuild calls are at the end of the file
+# to resolve circular dependencies after all models in this file are defined.
+from . import video, course, enrollment, submission
+
+QuizRead.model_rebuild()
+QuizReadWithDetails.model_rebuild()
+QuizListRead.model_rebuild()
+QuizSubmissionRead.model_rebuild()
+QuizSubmissionReadWithStudent.model_rebuild()
+QuizSubmissionReadWithDetails.model_rebuild()
