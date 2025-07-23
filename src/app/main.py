@@ -33,6 +33,17 @@ from src.app.routers import (
     admin_router
 )
 
+# ─── Local imports ─────────────────────────────────────────────
+from src.app.schemas import course, enrollment_application_schema, video
+
+# ─── Pydantic model rebuild ──────────────────────────────────
+# Resolve forward references for Pydantic models
+course.CourseExploreDetail.model_rebuild()
+course.CourseDetail.model_rebuild()
+enrollment_application_schema.EnrollmentApplicationRead.model_rebuild()
+video.VideoRead.model_rebuild()
+video.VideoWithProgress.model_rebuild()
+
 # ─── Env setup ─────────────────────────────────────────────
 load_dotenv()
 
