@@ -22,7 +22,7 @@ from ..models.payment_proof import PaymentProof
 from ..models.bank_account import BankAccount
 from ..schemas.enrollment_application_schema import EnrollmentApplicationCreate, EnrollmentApplicationRead
 from ..utils.dependencies import get_current_user
-from ..utils.file import upload_file_to_cloudinary
+from ..utils.file import upload_file_to_cloudinary, save_upload_and_get_url
 from ..utils.dependencies import get_current_admin_user
 from ..schemas.enrollment_application_schema import EnrollmentApplicationUpdate
 from ..models.enrollment import Enrollment
@@ -75,6 +75,27 @@ def get_purchase_info(course_id: uuid.UUID, session: Session = Depends(get_db)):
         "account_number": bank_account.account_number,
         "bank_name": bank_account.bank_name
     }
+
+@router.post("/upload-certificate")
+async def upload_certificate(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Upload a qualification certificate and return the URL.
+    This is a preliminary step before submitting the full application.
+    """
+    try:
+        # The same utility used for avatar uploads
+        url = await save_upload_and_get_url(file, folder="certificates")
+        return {"certificate_url": url}
+    except Exception as e:
+        logger.error(f"Error uploading certificate: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to upload certificate: {str(e)}"
+        )
+
 
 @router.post("/apply", response_model=EnrollmentApplicationRead)
 def apply_for_enrollment(
