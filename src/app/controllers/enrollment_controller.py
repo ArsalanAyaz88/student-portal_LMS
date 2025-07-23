@@ -18,11 +18,7 @@ from ..models.notification import Notification
 from datetime import datetime, timedelta
 import os
 from uuid import uuid4
-from ..schemas.enrollment import EnrollmentStatus
-from ..utils.file import save_upload_and_get_url
-from ..utils.dependencies import get_current_user
-from ..models.enrollment_application import EnrollmentApplication, ApplicationStatus
-from ..schemas.enrollment_application_schema import EnrollmentApplicationRead
+
 
 router = APIRouter(
     prefix="/api/enrollments",
@@ -30,6 +26,31 @@ router = APIRouter(
 )
 
 from ..models.bank_account import BankAccount
+from ..models.user import User
+import uuid
+
+
+@router.get("/application-status/{course_id}", response_model=dict)
+def get_application_status(
+    course_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Check the enrollment application status for a specific course for the current user.
+    """
+    application = db.exec(
+        select(EnrollmentApplication).where(
+            EnrollmentApplication.course_id == course_id,
+            EnrollmentApplication.user_id == current_user.id
+        )
+    ).first()
+
+    if not application:
+        return {"status": "not_found"}
+    
+    return {"status": application.status.value}
+
 
 @router.get("/courses/{course_id}/purchase-info")
 def get_purchase_info(course_id: str, session: Session = Depends(get_db)):
