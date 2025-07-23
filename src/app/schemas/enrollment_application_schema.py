@@ -14,6 +14,7 @@ class EnrollmentApplicationBase(BaseModel):
 # Schema for creating a new application
 class EnrollmentApplicationCreate(EnrollmentApplicationBase):
     course_id: uuid.UUID
+    qualification_certificate_url: str
 
 # Schema for updating an application's status
 class EnrollmentApplicationUpdate(BaseModel):
