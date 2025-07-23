@@ -24,7 +24,10 @@ class EnrollmentApplication(SQLModel, table=True):
     ultrasound_experience: Optional[str] = None
     contact_number: str
     
-    status: ApplicationStatus = Field(default=ApplicationStatus.PENDING)
+    status: ApplicationStatus = Field(
+        sa_column=SQLAlchemyEnum(ApplicationStatus, name="application_status_enum"),
+        default=ApplicationStatus.PENDING
+    )
 
     user_id: uuid.UUID = Field(foreign_key="user.id")
     course_id: uuid.UUID = Field(foreign_key="course.id")

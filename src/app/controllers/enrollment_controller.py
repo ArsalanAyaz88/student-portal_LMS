@@ -41,23 +41,21 @@ def get_application_status(
     Check the enrollment application status for a specific course for the current user.
     """
     logger.info(f"Checking application status for course_id: {course_id} and user_id: {current_user.id}")
-    try:
-        application = db.exec(
-            select(EnrollmentApplication).where(
-                EnrollmentApplication.course_id == course_id,
-                EnrollmentApplication.user_id == current_user.id
-            )
-        ).first()
+    application = db.exec(
+        select(EnrollmentApplication).where(
+            EnrollmentApplication.course_id == course_id,
+            EnrollmentApplication.user_id == current_user.id
+        )
+    ).first()
 
-        if not application:
-            logger.warning(f"No application found for course_id: {course_id} and user_id: {current_user.id}. Raising 404.")
-            raise HTTPException(status_code=404, detail="Application not found")
-        
-        logger.info(f"Application found with status: {application.status.value}. Returning status.")
-        return {"status": application.status.value}
-    except Exception as e:
-        logger.error(f"An unexpected error occurred in get_application_status: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="An internal server error occurred.")
+    if not application:
+        logger.warning(f"No application found for course_id: {course_id} and user_id: {current_user.id}. Raising 404.")
+        # Return a dictionary with a 'status' of 'not_found' or similar
+        # to be handled gracefully by the frontend.
+        return {"status": "not_applied"}
+    
+    logger.info(f"Application found with status: {application.status.value}. Returning status.")
+    return {"status": application.status.value}
 
 @router.get("/courses/{course_id}/purchase-info")
 def get_purchase_info(course_id: uuid.UUID, session: Session = Depends(get_db)):
