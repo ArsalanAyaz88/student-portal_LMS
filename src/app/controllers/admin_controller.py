@@ -1353,7 +1353,7 @@ class ApplicationStatusUpdate(BaseModel):
     rejection_reason: Optional[str] = None
 
 @router.get("/admin/applications", response_model=List[EnrollmentApplicationRead])
-def get_all_applications(session: Session = Depends(get_db), current_user: User = Depends(get_current_active_admin_user)):
+def get_all_applications(session: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)):
     """Retrieve all enrollment applications with user and course details."""
     applications = session.query(EnrollmentApplication).options(joinedload(EnrollmentApplication.user), joinedload(EnrollmentApplication.course)).all()
     return applications
