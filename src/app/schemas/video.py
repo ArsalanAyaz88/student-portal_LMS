@@ -31,10 +31,10 @@ class VideoUpdate(BaseModel):
     public_id: Optional[str] = None
     duration: Optional[float] = None
     is_preview: Optional[bool] = None
-        order: Optional[int] = None
+    order: Optional[int] = None
 
     # Schema for reading video data (e.g., in API responses)
-    class VideoRead(VideoBase):
+class VideoRead(VideoBase):
         id: uuid.UUID
         course_id: uuid.UUID
         quiz: Optional["QuizRead"] = None
@@ -43,14 +43,14 @@ class VideoUpdate(BaseModel):
             from_attributes = True
 
     # Schema for reading video data for the admin panel
-    class VideoAdminRead(VideoBase):
+class VideoAdminRead(VideoBase):
         id: uuid.UUID
 
         class Config:
             from_attributes = True
 
     # Schema for video previews on the course explore page
-    class VideoPreview(BaseModel):
+class VideoPreview(BaseModel):
         title: str
         duration: Optional[float] = None
         is_preview: bool = False
@@ -58,17 +58,7 @@ class VideoUpdate(BaseModel):
         class Config:
             from_attributes = True
 
-    class Config:
-        from_attributes = True
 
-# Schema for video previews on the course explore page
-class VideoPreview(BaseModel):
-    title: str
-    duration: Optional[float] = None
-    is_preview: bool = False
-
-    class Config:
-        from_attributes = True
 
 
 class VideoWithProgress(VideoBase):
