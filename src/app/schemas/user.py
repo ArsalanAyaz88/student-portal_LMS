@@ -1,6 +1,7 @@
 # File location: src/app/schemas/user.py
 from pydantic import BaseModel, EmailStr
 import uuid
+from typing import Optional
 
 class UserCreate(BaseModel):
     email: EmailStr
