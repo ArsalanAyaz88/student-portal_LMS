@@ -67,11 +67,7 @@ class CourseDetail(BaseModel):
     thumbnail_url: Optional[str] = None
     videos: List["video.VideoRead"] = []
 
-# Update forward references to resolve circular dependencies
-from . import video
 
-CourseExploreDetail.model_rebuild()
-CourseDetail.model_rebuild()
 
 class CourseBasicDetail(BaseModel):
     id: uuid.UUID

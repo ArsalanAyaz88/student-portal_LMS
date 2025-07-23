@@ -28,15 +28,12 @@ class EnrollmentApplicationUpdate(BaseModel):
 # Schema for reading a full application record
 class EnrollmentApplicationRead(EnrollmentApplicationBase):
     id: uuid.UUID
-    user: "UserRead"
-    course: "CourseRead"
+    user: "user.UserRead"
+    course: "course.CourseRead"
     status: ApplicationStatus
     qualification_certificate_url: str
 
-# Update forward references
-from . import user, course
 
-EnrollmentApplicationRead.model_rebuild()
 
     class Config:
         from_attributes = True
