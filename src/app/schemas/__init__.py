@@ -1,24 +1,21 @@
 # src/app/schemas/__init__.py
 
-# Import all schema modules to ensure all models are loaded.
-from . import video, quiz, course, user, submission, enrollment
+# Import all the necessary models directly into this namespace.
+# This creates a shared namespace where all models can find each other.
+from .video import VideoRead, VideoWithProgress
+from .quiz import QuizRead, QuizReadWithDetails
+from .course import CourseRead, CourseReadWithSections
+from .user import UserRead
 
-# Now that all modules are loaded, rebuild the models that contain
-# forward string references to resolve them.
-# This is the standard Pydantic v2 approach.
+# Now, rebuild each model that has a forward reference.
+# We pass `_types_namespace=globals()` to tell Pydantic to use the
+# current (shared) namespace to find the string references like 'QuizRead'.
 
-# Rebuild models from video.py
-video.VideoRead.model_rebuild()
-video.VideoWithProgress.model_rebuild()
+VideoRead.model_rebuild(_types_namespace=globals())
+VideoWithProgress.model_rebuild(_types_namespace=globals())
+QuizRead.model_rebuild(_types_namespace=globals())
+QuizReadWithDetails.model_rebuild(_types_namespace=globals())
+CourseRead.model_rebuild(_types_namespace=globals())
+CourseReadWithSections.model_rebuild(_types_namespace=globals())
+UserRead.model_rebuild(_types_namespace=globals())
 
-# Rebuild models from quiz.py
-# (Even if they don't have forward refs to other files, it's safe to rebuild)
-quiz.QuizRead.model_rebuild()
-quiz.QuizReadWithDetails.model_rebuild()
-
-# Rebuild models from course.py
-course.CourseRead.model_rebuild()
-course.CourseReadWithSections.model_rebuild()
-
-# Rebuild models from user.py
-user.UserRead.model_rebuild()

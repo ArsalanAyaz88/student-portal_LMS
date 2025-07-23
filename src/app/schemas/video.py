@@ -37,7 +37,7 @@ class VideoUpdate(BaseModel):
 class VideoRead(VideoBase):
         id: uuid.UUID
         course_id: uuid.UUID
-        quiz: Optional['quiz.QuizRead'] = None
+        quiz: Optional['QuizRead'] = None
 
         class Config:
             from_attributes = True
@@ -69,7 +69,7 @@ class VideoWithProgress(VideoBase):
     quiz_status: Optional[str] = None  # 'passed', 'failed', or 'not_taken'
     is_accessible: bool = True
     is_next_available: bool = False
-    quiz: Optional['quiz.QuizRead'] = None
+    quiz: Optional['QuizRead'] = None
 
     class Config:
         from_attributes = True
