@@ -98,7 +98,7 @@ async def upload_certificate(
 
 
 @router.post("/apply", response_model=EnrollmentApplicationRead)
-def apply_for_enrollment(
+async def apply_for_enrollment(
     application_data: EnrollmentApplicationCreate,
     request: Request, # Add request to access headers
     db: Session = Depends(get_db),
