@@ -11,7 +11,10 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+from sqlalchemy.orm import selectinload
+
 from ..db.session import get_db
+from ..utils.email import send_application_approved_email, send_enrollment_rejected_email
 from ..models.user import User
 from ..models.course import Course
 from ..models.enrollment_application import EnrollmentApplication, ApplicationStatus
@@ -20,6 +23,9 @@ from ..models.bank_account import BankAccount
 from ..schemas.enrollment_application_schema import EnrollmentApplicationCreate, EnrollmentApplicationRead
 from ..utils.dependencies import get_current_user
 from ..utils.file import upload_file_to_cloudinary
+from ..utils.dependencies import get_current_admin_user
+from ..schemas.enrollment_application_schema import EnrollmentApplicationUpdate
+from ..models.enrollment import Enrollment
 
 router = APIRouter(
     tags=["Enrollments"]
@@ -128,5 +134,81 @@ async def submit_payment_proof(
     return {"message": "Payment proof submitted successfully."}
 
 
+@router.get("/admin/applications", response_model=list[EnrollmentApplicationRead])
+def get_all_applications(
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    """
+    Retrieve all enrollment applications. Admin access required.
+    """
+    applications = db.exec(select(EnrollmentApplication)).all()
+    return applications
 
 
+@router.patch("/admin/applications/{application_id}", response_model=EnrollmentApplicationRead)
+def update_application_status(
+    application_id: uuid.UUID,
+    application_update: EnrollmentApplicationUpdate,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    """
+    Update the status of an enrollment application (approve or reject). Admin access required.
+    """
+    # Eagerly load user and course relationships to get email and title
+    query = (
+        select(EnrollmentApplication)
+        .options(
+            selectinload(EnrollmentApplication.user),
+            selectinload(EnrollmentApplication.course)
+        )
+        .where(EnrollmentApplication.id == application_id)
+    )
+    application = db.exec(query).first()
+
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    original_status = application.status
+    application.status = application_update.status
+    db.add(application)
+
+    # If approved for the first time, create a corresponding enrollment record
+    if application.status == ApplicationStatus.APPROVED and original_status != ApplicationStatus.APPROVED:
+        existing_enrollment = db.exec(
+            select(Enrollment).where(
+                Enrollment.user_id == application.user_id,
+                Enrollment.course_id == application.course_id
+            )
+        ).first()
+
+        if not existing_enrollment:
+            new_enrollment = Enrollment(
+                user_id=application.user_id,
+                course_id=application.course_id,
+                status="pending"  # User still needs to pay
+            )
+            db.add(new_enrollment)
+
+    db.commit()
+
+    # Send email notification
+    try:
+        if application.status == ApplicationStatus.APPROVED:
+            send_application_approved_email(
+                to_email=application.user.email,
+                course_title=application.course.title
+            )
+        elif application.status == ApplicationStatus.REJECTED:
+            send_enrollment_rejected_email(
+                to_email=application.user.email,
+                course_title=application.course.title,
+                rejection_reason=application_update.rejection_reason or "No reason provided."
+            )
+    except Exception as e:
+        logger.error(f"Failed to send email notification for application {application.id}: {e}")
+        # Do not fail the request if email fails, but log it.
+
+    db.refresh(application)
+    return application
