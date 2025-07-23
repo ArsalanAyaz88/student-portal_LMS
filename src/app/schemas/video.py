@@ -61,23 +61,20 @@ class VideoPreview(BaseModel):
 
 
 
-class VideoWithProgress(VideoBase):
-    id: uuid.UUID
-    course_id: uuid.UUID
-    quiz_id: Optional[uuid.UUID] = None
-    watched: bool = False
-    quiz_status: Optional[str] = None  # 'passed', 'failed', or 'not_taken'
-    is_accessible: bool = True
-    is_next_available: bool = False
-    quiz: Optional["quiz.QuizRead"] = None
+from pydantic import create_model
 
-    class Config:
-        from_attributes = True
-
-# The following import and model_rebuild calls are at the end of the file
-# to resolve circular dependencies after all models in this file are defined.
-# This is the standard Pydantic approach.
-from . import quiz
-
-VideoRead.model_rebuild()
-VideoWithProgress.model_rebuild()
+# Defer the creation of this model to prevent circular import errors at startup.
+# It will be finalized in main.py after all modules are loaded.
+VideoWithProgress = create_model(
+    'VideoWithProgress',
+    __base__=VideoBase,
+    id=(uuid.UUID, ...),
+    course_id=(uuid.UUID, ...),
+    quiz_id=(Optional[uuid.UUID], None),
+    watched=(bool, False),
+    quiz_status=(Optional[str], None), # 'passed', 'failed', or 'not_taken'
+    is_accessible=(bool, True),
+    is_next_available=(bool, False),
+    quiz=(Optional['quiz.QuizRead'], None),
+    __config__=dict(from_attributes=True)
+)
