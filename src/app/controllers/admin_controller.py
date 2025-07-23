@@ -48,6 +48,7 @@ from src.app.utils.file import save_upload_and_get_url
 from src.app.schemas.assignment import AssignmentCreate, AssignmentUpdate, AssignmentRead, AssignmentList, SubmissionRead, SubmissionGrade, SubmissionStudent, SubmissionStudentsResponse
 
 import logging
+from src.app.utils.email import send_email
 
 router = APIRouter()
 
@@ -1319,77 +1320,25 @@ def create_quiz(
     admin: User = Depends(get_current_admin_user)
 ):
     # Check if course exists
-    course = db.get(Course, quiz_data.course_id)
-    if not course:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+class ApplicationStatusUpdate(BaseModel):
+    status: ApplicationStatus
+    rejection_reason: Optional[str] = None
 
-    # Create Quiz instance
-    new_quiz = Quiz(
-        course_id=quiz_data.course_id,
-        title=quiz_data.title,
-        description=quiz_data.description,
-        due_date=quiz_data.due_date
-    )
-    db.add(new_quiz)
-    db.commit()
-    db.refresh(new_quiz)
-
-    # Create Questions and Options
-    for q_data in quiz_data.questions:
-        new_question = Question(
-            quiz_id=new_quiz.id,
-            text=q_data.text,
-            is_multiple_choice=True # You can adjust this based on your needs
-        )
-        db.add(new_question)
-        db.commit()
-        db.refresh(new_question)
-
-        for o_data in q_data.options:
-            new_option = Option(
-                question_id=new_question.id,
-                text=o_data.text,
-                is_correct=o_data.is_correct
-            )
-            db.add(new_option)
-    
-    db.commit()
-    db.refresh(new_quiz) # Refresh to get all nested objects
-
-    return new_quiz
-def get_admin_user(current_user: User = Depends(get_current_admin_user)) -> User:
-    """Dependency to ensure the user is an admin."""
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="You do not have permission to access this resource.")
-    return current_user
-
-@router.get("/applications", response_model=List[EnrollmentApplicationAdminRead], dependencies=[Depends(get_admin_user)])
-def get_all_applications(
-    session: Session = Depends(get_db)
-) -> List[EnrollmentApplicationAdminRead]:
-    # This query joins the application with the user and course to get their details
-    statement = select(EnrollmentApplication, User.email, Course.title).join(User).join(Course)
-    results = session.exec(statement).all()
-    
-    # Format the results into the Pydantic schema
-    applications = [
-        EnrollmentApplicationAdminRead(
-            id=app.id,
-            student_email=email,
-            course_title=title,
-            status=app.status
-        )
-        for app, email, title in results
-    ]
+@router.get("/admin/applications", response_model=List[EnrollmentApplicationRead])
+def get_all_applications(session: Session = Depends(get_db), current_user: User = Depends(get_current_active_admin_user)):
+    """Retrieve all enrollment applications with user and course details."""
+    applications = session.query(EnrollmentApplication).options(joinedload(EnrollmentApplication.user), joinedload(EnrollmentApplication.course)).all()
     return applications
 
-@router.patch("/applications/{application_id}/status", response_model=EnrollmentApplicationRead, dependencies=[Depends(get_admin_user)])
+@router.patch("/admin/applications/{application_id}/status", response_model=EnrollmentApplicationRead)
 def update_application_status(
     application_id: uuid.UUID,
     status_update: ApplicationStatusUpdate,
-    session: Session = Depends(get_db)
-) -> EnrollmentApplication:
-    application = session.get(EnrollmentApplication, application_id)
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_admin_user)
+):
+    """Update the status of an enrollment application and notify the user."""
+    application = session.query(EnrollmentApplication).options(joinedload(EnrollmentApplication.user), joinedload(EnrollmentApplication.course)).filter(EnrollmentApplication.id == application_id).first()
     if not application:
         raise HTTPException(status_code=404, detail="Application not found")
 
@@ -1398,24 +1347,17 @@ def update_application_status(
     session.commit()
     session.refresh(application)
 
-    if status_update.status == ApplicationStatus.APPROVED:
-        user = session.get(User, application.user_id)
-        course = session.get(Course, application.course_id)
-        if user and course:
-            send_application_approved_email(
-                to_email=user.email, 
-                course_title=course.title
-            )
+    # Send email notification
+    user = application.user
+    course = application.course
 
+    if status_update.status == ApplicationStatus.APPROVED:
+        send_application_approved_email(to_email=user.email, course_title=course.title)
     elif status_update.status == ApplicationStatus.REJECTED:
-        user = session.get(User, application.user_id)
-        course = session.get(Course, application.course_id)
-        if user and course:
-            rejection_reason = status_update.message or "No reason provided."
-            send_enrollment_rejected_email(
-                to_email=user.email, 
-                course_title=course.title, 
-                rejection_reason=rejection_reason
-            )
+        send_enrollment_rejected_email(
+            to_email=user.email, 
+            course_title=course.title, 
+            rejection_reason=status_update.rejection_reason or "No reason provided."
+        )
 
     return application    

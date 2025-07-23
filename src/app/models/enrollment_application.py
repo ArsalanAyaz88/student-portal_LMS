@@ -2,6 +2,7 @@ import uuid
 from typing import TYPE_CHECKING, Optional
 from sqlmodel import SQLModel, Field, Relationship
 import enum
+from sqlalchemy import Enum as SQLAlchemyEnum
 
 if TYPE_CHECKING:
     from .user import User

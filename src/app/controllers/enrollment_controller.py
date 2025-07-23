@@ -20,6 +20,9 @@ import os
 from uuid import uuid4
 from ..schemas.enrollment import EnrollmentStatus
 from ..utils.file import save_upload_and_get_url
+from ..utils.security import get_current_active_user
+from ..models.enrollment_application import EnrollmentApplication, ApplicationStatus
+from ..schemas.enrollment_application_schema import EnrollmentApplicationRead
 
 router = APIRouter(
     prefix="/api/enrollments",
