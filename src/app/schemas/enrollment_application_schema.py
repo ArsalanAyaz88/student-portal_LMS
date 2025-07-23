@@ -33,6 +33,9 @@ class EnrollmentApplicationRead(EnrollmentApplicationBase):
     status: ApplicationStatus
     qualification_certificate_url: str
 
+# Update forward references
+from . import user, course
+
 EnrollmentApplicationRead.model_rebuild()
 
     class Config:

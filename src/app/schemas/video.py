@@ -43,6 +43,8 @@ class VideoRead(VideoBase):
     class Config:
         from_attributes = True
 
+from . import quiz
+
 VideoRead.model_rebuild()
 
 # Schema for reading video data for the admin panel
@@ -74,5 +76,7 @@ class VideoWithProgress(VideoBase):
 
     class Config:
         from_attributes = True
+
+from . import quiz
 
 VideoWithProgress.model_rebuild()

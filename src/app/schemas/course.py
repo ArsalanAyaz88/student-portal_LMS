@@ -68,6 +68,8 @@ class CourseDetail(BaseModel):
     videos: List["video.VideoRead"] = []
 
 # Update forward references to resolve circular dependencies
+from . import video
+
 CourseExploreDetail.model_rebuild()
 CourseDetail.model_rebuild()
 
