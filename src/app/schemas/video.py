@@ -3,33 +3,34 @@ from pydantic import BaseModel, Field
 from typing import Optional, List, TYPE_CHECKING
 import uuid
 
+# Base schema with common fields
+class VideoBase(BaseModel):
+    title: str = Field(..., example="Introduction to FastAPI")
+    description: Optional[str] = Field(default=None, example="A quick overview of the FastAPI framework.")
+    cloudinary_url: str = Field(..., example="https://res.cloudinary.com/demo/video/upload/dog.mp4")
+    duration: Optional[float] = Field(default=None, example=360.5)
+    order: int = Field(default=0, example=1)
+    is_preview: bool = Field(default=False)
+
 if TYPE_CHECKING:
-    # Base schema with common fields
-    class VideoBase(BaseModel):
-        title: str = Field(..., example="Introduction to FastAPI")
-        description: Optional[str] = Field(default=None, example="A quick overview of the FastAPI framework.")
-        cloudinary_url: str = Field(..., example="https://res.cloudinary.com/demo/video/upload/dog.mp4")
-        duration: Optional[float] = Field(default=None, example=360.5)
-        order: int = Field(default=0, example=1)
-        is_preview: bool = Field(default=False)
 
-    # Schema for creating a new video
-    class VideoCreate(BaseModel):
+# Schema for creating a new video
+class VideoCreate(BaseModel):
 
-        title: str
-        description: Optional[str] = None
-        cloudinary_url: str
-        course_id: uuid.UUID
-        order: Optional[int] = 0
+    title: str
+    description: Optional[str] = None
+    cloudinary_url: str
+    course_id: uuid.UUID
+    order: Optional[int] = 0
 
-    # Schema for updating an existing video
-    class VideoUpdate(BaseModel):
-        title: Optional[str] = None
-        description: Optional[str] = None
-        cloudinary_url: Optional[str] = None
-        public_id: Optional[str] = None
-        duration: Optional[float] = None
-        is_preview: Optional[bool] = None
+# Schema for updating an existing video
+class VideoUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    cloudinary_url: Optional[str] = None
+    public_id: Optional[str] = None
+    duration: Optional[float] = None
+    is_preview: Optional[bool] = None
         order: Optional[int] = None
 
     # Schema for reading video data (e.g., in API responses)
