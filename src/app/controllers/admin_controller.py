@@ -1,55 +1,57 @@
+# Standard Library Imports
 import os
+import re
 import time
+import logging
+from uuid import UUID
+from datetime import datetime, timedelta
+from typing import List, Optional
+
+# Third-party Imports
 import cloudinary
 import cloudinary.uploader
 import cloudinary.utils
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, Query, status, UploadFile, File, Form
 from pydantic import BaseModel
-from sqlmodel import Session, select
 from sqlalchemy import func
-import uuid
-from typing import List
-from fastapi import File, UploadFile, status
+from sqlalchemy.orm import selectinload
+from sqlmodel import Session, select
+
+# Application-specific Imports
 from src.app.db.session import get_db
-from src.app.models.enrollment_application import EnrollmentApplication, ApplicationStatus
-from src.app.models.user import User
+from src.app.utils.dependencies import get_current_admin_user, get_current_active_admin_user
+from src.app.utils.email import send_application_approved_email, send_enrollment_rejected_email
+from src.app.utils.file import save_upload_and_get_url
+from src.app.utils.time import get_pakistan_time
+
+# Models
+from src.app.models.assignment import Assignment, AssignmentSubmission
 from src.app.models.course import Course
-from src.app.schemas.enrollment_application_schema import EnrollmentApplicationAdminRead, ApplicationStatusUpdate, EnrollmentApplicationRead
-from src.app.utils.dependencies import get_current_admin_user
-from typing import List, Optional
-from src.app.models.video import Video
-from src.app.models.enrollment import Enrollment
-from src.app.models.notification import Notification
-from src.app.models.video_progress import VideoProgress
 from src.app.models.course_progress import CourseProgress
-from src.app.db.session import get_db 
-from uuid import UUID
-from sqlalchemy.orm import selectinload 
-from src.app.schemas.user import UserRead
+from src.app.models.enrollment import Enrollment
+from src.app.models.enrollment_application import EnrollmentApplication, ApplicationStatus
+from src.app.models.notification import Notification
+from src.app.models.quiz import Quiz, Question, Option
+from src.app.models.user import User
+from src.app.models.video import Video
+from src.app.models.video_progress import VideoProgress
+
+# Schemas
+from src.app.schemas.assignment import (
+    AssignmentCreate, AssignmentUpdate, AssignmentRead, AssignmentList,
+    SubmissionRead, SubmissionGrade, SubmissionStudent, SubmissionStudentsResponse
+)
 from src.app.schemas.course import (
     AdminCourseList, AdminCourseDetail, AdminCourseStats,
     CourseCreate, CourseUpdate, CourseRead, CourseCreateAdmin
 )
-from src.app.schemas.video import VideoAdminRead, VideoCreate, VideoRead, VideoUpdate
-from src.app.schemas.quiz import QuizCreate, QuizReadWithDetails, QuizRead, QuizCreateForVideo
-from src.app.models.quiz import Quiz, Question, Option
+from src.app.schemas.enrollment_application_schema import (
+    EnrollmentApplicationAdminRead, ApplicationStatusUpdate, EnrollmentApplicationRead
+)
 from src.app.schemas.notification import NotificationRead, AdminNotificationRead
-import uuid
-import re
-import time
-import cloudinary
-import cloudinary.utils
-from datetime import datetime, timedelta
-from src.app.utils.time import get_pakistan_time
-from src.app.models.assignment import Assignment, AssignmentSubmission
-
-from typing import List
-from fastapi import Form
-from src.app.utils.file import save_upload_and_get_url
-from src.app.schemas.assignment import AssignmentCreate, AssignmentUpdate, AssignmentRead, AssignmentList, SubmissionRead, SubmissionGrade, SubmissionStudent, SubmissionStudentsResponse
-
-import logging
-from src.app.utils.email import send_application_approved_email, send_enrollment_rejected_email
+from src.app.schemas.quiz import QuizCreate, QuizReadWithDetails, QuizRead, QuizCreateForVideo
+from src.app.schemas.user import UserRead
+from src.app.schemas.video import VideoAdminRead, VideoCreate, VideoRead, VideoUpdate
 
 router = APIRouter()
 
