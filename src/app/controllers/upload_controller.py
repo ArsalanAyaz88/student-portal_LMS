@@ -17,7 +17,7 @@ router = APIRouter(
 # If not, you might need to call cloudinary.config() here using environment variables.
 
 @router.post("/signature")
-def get_upload_signature(current_user: User = Depends(get_current_user)):
+async def get_upload_signature(current_user: User = Depends(get_current_user)):
     """
     Generate a signature for a direct, signed upload to Cloudinary.
     """
