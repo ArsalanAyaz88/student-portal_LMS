@@ -3,7 +3,9 @@
 # First, import all the schema modules that have dependencies on each other.
 # This ensures that all Pydantic models are defined before we try to resolve
 # the forward references.
-from . import course, video, quiz, enrollment, submission, user
+# A safe import order is established here to prevent circular dependency errors during initialization.
+# Modules with fewer dependencies are imported first.
+from . import user, quiz, video, course, submission, enrollment
 
 # Now that all modules are loaded and all models are defined, we can safely
 # call model_rebuild() on the models that contain forward references ('str' type hints).
