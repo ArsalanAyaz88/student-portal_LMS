@@ -12,7 +12,7 @@ class VideoBase(BaseModel):
     order: int = Field(default=0, example=1)
     is_preview: bool = Field(default=False)
 
-if TYPE_CHECKING:
+
 
 # Schema for creating a new video
 class VideoCreate(BaseModel):
