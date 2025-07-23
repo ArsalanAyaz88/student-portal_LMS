@@ -69,10 +69,11 @@ class QuizRead(QuizBase):
     class Config:
         from_attributes = True
 
+
+
 class QuizReadWithDetails(QuizRead):
     questions: List[QuestionRead] = []
 
-QuizReadWithDetails.model_rebuild()
 
 # --- Submission and Grading Schemas ---
 
