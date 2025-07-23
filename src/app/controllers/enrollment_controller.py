@@ -116,9 +116,17 @@ async def apply_for_enrollment(
             detail="You have already applied for this course."
         )
 
-    new_application = EnrollmentApplication.from_orm(application_data)
-    new_application.user_id = current_user.id
-    new_application.status = ApplicationStatus.PENDING
+    new_application = EnrollmentApplication(
+        first_name=application_data.first_name,
+        last_name=application_data.last_name,
+        qualification=application_data.qualification,
+        ultrasound_experience=application_data.ultrasound_experience,
+        contact_number=application_data.contact_number,
+        qualification_certificate_url=application_data.qualification_certificate_url,
+        course_id=application_data.course_id,
+        user_id=current_user.id,
+        status=ApplicationStatus.PENDING
+    )
     
     db.add(new_application)
     db.commit()
