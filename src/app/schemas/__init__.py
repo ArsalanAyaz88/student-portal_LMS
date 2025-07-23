@@ -1,10 +1,15 @@
-# File: app/schemas/__init__.py
+# src/app/schemas/__init__.py
 
-from .video import VideoRead
-from .quiz import QuizRead
-from .course import CourseRead
+# First, import the modules that contain the Pydantic models.
+# This allows Python to be aware of all modules before we try to resolve the dependencies.
+from . import course
+from . import video
+from . import quiz
 
-# Resolve forward references to break circular dependencies
-VideoRead.model_rebuild()
-QuizRead.model_rebuild()
-CourseRead.model_rebuild()
+# Now that all modules are loaded, we can safely call model_rebuild()
+# on the models that have forward references ('str' type hints) to other models.
+# This resolves the circular dependencies.
+video.VideoRead.model_rebuild()
+video.VideoWithProgress.model_rebuild()
+quiz.QuizRead.model_rebuild()
+course.CourseRead.model_rebuild()
