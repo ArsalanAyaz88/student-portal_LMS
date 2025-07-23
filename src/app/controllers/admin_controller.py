@@ -1319,7 +1319,32 @@ def create_quiz(
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin_user)
 ):
-    # Check if course exists
+    """Create a new quiz, including its questions and options."""
+    # Check if the associated video exists
+    video = db.get(Video, quiz_data.video_id)
+    if not video:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found")
+
+    # Create the Quiz instance
+    db_quiz = Quiz(
+        title=quiz_data.title,
+        description=quiz_data.description,
+        video_id=quiz_data.video_id
+    )
+
+    # Create Question and Option instances from the nested data
+    for question_data in quiz_data.questions:
+        db_question = Question(text=question_data.text)
+        for option_data in question_data.options:
+            db_option = Option(text=option_data.text, is_correct=option_data.is_correct)
+            db_question.options.append(db_option)
+        db_quiz.questions.append(db_question)
+
+    db.add(db_quiz)
+    db.commit()
+    db.refresh(db_quiz)
+    return db_quiz
+
 class ApplicationStatusUpdate(BaseModel):
     status: ApplicationStatus
     rejection_reason: Optional[str] = None
