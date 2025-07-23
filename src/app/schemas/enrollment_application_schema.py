@@ -2,6 +2,8 @@ import uuid
 from pydantic import BaseModel
 from typing import Optional
 from src.app.models.enrollment_application import ApplicationStatus
+from .user import UserRead
+from .course import CourseRead
 
 # Base schema with common application fields
 class EnrollmentApplicationBase(BaseModel):
@@ -24,8 +26,8 @@ class EnrollmentApplicationUpdate(BaseModel):
 # Schema for reading a full application record
 class EnrollmentApplicationRead(EnrollmentApplicationBase):
     id: uuid.UUID
-    user_id: uuid.UUID
-    course_id: uuid.UUID
+    user: UserRead
+    course: CourseRead
     status: ApplicationStatus
     qualification_certificate_url: str
 

@@ -169,9 +169,16 @@ def get_all_applications(
     admin: User = Depends(get_current_admin_user)
 ):
     """
-    Retrieve all enrollment applications. Admin access required.
+    Retrieve all enrollment applications, including user and course details. Admin access required.
     """
-    applications = db.exec(select(EnrollmentApplication)).all()
+    query = (
+        select(EnrollmentApplication)
+        .options(
+            selectinload(EnrollmentApplication.user),
+            selectinload(EnrollmentApplication.course)
+        )
+    )
+    applications = db.exec(query).all()
     return applications
 
 
