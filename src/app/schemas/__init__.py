@@ -4,7 +4,7 @@
 # This creates a shared namespace where all models can find each other.
 from .video import VideoRead, VideoWithProgress
 from .quiz import QuizRead, QuizReadWithDetails
-from .course import CourseRead, CourseReadWithSections
+from .course import CourseRead
 from .user import UserRead
 
 # Now, rebuild each model that has a forward reference.
@@ -16,6 +16,5 @@ VideoWithProgress.model_rebuild(_types_namespace=globals())
 QuizRead.model_rebuild(_types_namespace=globals())
 QuizReadWithDetails.model_rebuild(_types_namespace=globals())
 CourseRead.model_rebuild(_types_namespace=globals())
-CourseReadWithSections.model_rebuild(_types_namespace=globals())
 UserRead.model_rebuild(_types_namespace=globals())
 
