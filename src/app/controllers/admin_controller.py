@@ -46,7 +46,7 @@ from src.app.schemas.course import (
     CourseCreate, CourseUpdate, CourseRead, CourseCreateAdmin
 )
 from src.app.schemas.enrollment_application_schema import (
-    EnrollmentApplicationAdminRead, ApplicationStatusUpdate, EnrollmentApplicationRead
+    ApplicationStatusUpdate, EnrollmentApplicationRead
 )
 from src.app.schemas.notification import NotificationRead, AdminNotificationRead
 from src.app.schemas.quiz import QuizCreate, QuizReadWithDetails, QuizRead, QuizCreateForVideo
@@ -1260,44 +1260,6 @@ def create_quiz(
     db.refresh(db_quiz)
     return db_quiz
 
-class ApplicationStatusUpdate(BaseModel):
-    status: ApplicationStatus
-    rejection_reason: Optional[str] = None
 
-@router.get("/admin/applications", response_model=List[EnrollmentApplicationRead])
-def get_all_applications(session: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)):
-    """Retrieve all enrollment applications with user and course details."""
-    applications = session.query(EnrollmentApplication).options(joinedload(EnrollmentApplication.user), joinedload(EnrollmentApplication.course)).all()
-    return applications
-
-@router.patch("/admin/applications/{application_id}/status", response_model=EnrollmentApplicationRead)
-def update_application_status(
-    application_id: uuid.UUID,
-    status_update: ApplicationStatusUpdate,
-    session: Session = Depends(get_db),
-    current_user: User = Depends(get_current_admin_user)
-):
-    """Update the status of an enrollment application and notify the user."""
-    application = session.query(EnrollmentApplication).options(joinedload(EnrollmentApplication.user), joinedload(EnrollmentApplication.course)).filter(EnrollmentApplication.id == application_id).first()
-    if not application:
-        raise HTTPException(status_code=404, detail="Application not found")
-
-    application.status = status_update.status
-    session.add(application)
-    session.commit()
-    session.refresh(application)
-
-    # Send email notification
-    user = application.user
-    course = application.course
-
-    if status_update.status == ApplicationStatus.APPROVED:
-        send_application_approved_email(to_email=user.email, course_title=course.title)
-    elif status_update.status == ApplicationStatus.REJECTED:
-        send_enrollment_rejected_email(
-            to_email=user.email, 
-            course_title=course.title, 
-            rejection_reason=status_update.rejection_reason or "No reason provided."
-        )
 
     return application    
