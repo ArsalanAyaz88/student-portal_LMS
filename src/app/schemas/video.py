@@ -1,8 +1,10 @@
 # File: app/schemas/video.py
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 import uuid
-from src.app.schemas.quiz import QuizRead
+
+if TYPE_CHECKING:
+    from . import quiz
 
 # Base schema with common fields
 class VideoBase(BaseModel):
@@ -36,10 +38,12 @@ class VideoUpdate(BaseModel):
 class VideoRead(VideoBase):
     id: uuid.UUID
     course_id: uuid.UUID
-    quiz_id: Optional[uuid.UUID] = None
+    quiz: Optional["quiz.QuizRead"] = None
 
     class Config:
         from_attributes = True
+
+VideoRead.model_rebuild()
 
 # Schema for reading video data for the admin panel
 class VideoAdminRead(VideoBase):
@@ -48,7 +52,6 @@ class VideoAdminRead(VideoBase):
     class Config:
         from_attributes = True
 
-# Schema for video with student's progress
 # Schema for video previews on the course explore page
 class VideoPreview(BaseModel):
     title: str
@@ -67,3 +70,9 @@ class VideoWithProgress(VideoBase):
     quiz_status: Optional[str] = None  # 'passed', 'failed', or 'not_taken'
     is_accessible: bool = True
     is_next_available: bool = False
+    quiz: Optional["quiz.QuizRead"] = None
+
+    class Config:
+        from_attributes = True
+
+VideoWithProgress.model_rebuild()

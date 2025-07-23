@@ -33,5 +33,7 @@ class EnrollmentApplicationRead(EnrollmentApplicationBase):
     status: ApplicationStatus
     qualification_certificate_url: str
 
+EnrollmentApplicationRead.model_rebuild()
+
     class Config:
         from_attributes = True

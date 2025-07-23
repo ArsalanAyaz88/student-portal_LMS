@@ -1,9 +1,11 @@
 # File: app/schemas/course.py
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
 from datetime import datetime
 import uuid
-from src.app.schemas.video import VideoRead, VideoPreview
+
+if TYPE_CHECKING:
+    from . import video
 
 class CourseBase(BaseModel):
     title: str = Field(..., example="The Complete Web Development Bootcamp")
@@ -52,15 +54,22 @@ class CourseExploreList(BaseModel):
     price: float
     thumbnail_url: Optional[str] = None
 
-class CourseExploreDetail(CourseBase):
+class CourseExploreDetail(BaseModel):
     id: uuid.UUID
-    videos: List[VideoPreview] = []
+    videos: List["video.VideoPreview"] = []
 
 class CourseCurriculumDetail(BaseModel):
     curriculum: str
 
-class CourseDetail(CourseRead):
-    videos: List[VideoRead] = []
+class CourseDetail(BaseModel):
+    id: uuid.UUID
+    title: str
+    thumbnail_url: Optional[str] = None
+    videos: List["video.VideoRead"] = []
+
+# Update forward references to resolve circular dependencies
+CourseExploreDetail.model_rebuild()
+CourseDetail.model_rebuild()
 
 class CourseBasicDetail(BaseModel):
     id: uuid.UUID
