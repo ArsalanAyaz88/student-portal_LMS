@@ -50,8 +50,8 @@ def get_application_status(
         ).first()
 
         if not application:
-            logger.warning(f"No application found for course_id: {course_id} and user_id: {current_user.id}. Returning 'not_found'.")
-            return {"status": "not_found"}
+            logger.warning(f"No application found for course_id: {course_id} and user_id: {current_user.id}. Raising 404.")
+            raise HTTPException(status_code=404, detail="Application not found")
         
         logger.info(f"Application found with status: {application.status.value}. Returning status.")
         return {"status": application.status.value}
