@@ -22,7 +22,6 @@ from ..utils.dependencies import get_current_user
 from ..utils.file import upload_file_to_cloudinary
 
 router = APIRouter(
-    prefix="/enrollments",
     tags=["Enrollments"]
 )
 
