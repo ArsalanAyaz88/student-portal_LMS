@@ -1,24 +1,23 @@
+
+
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlmodel import Session, select
 from typing import Optional
+from datetime import datetime
+import uuid
 import logging
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-from datetime import datetime, timedelta
-import uuid
 
 from ..db.session import get_db
 from ..models.user import User
 from ..models.course import Course
-from ..models.enrollment import Enrollment, get_pakistan_time
 from ..models.enrollment_application import EnrollmentApplication, ApplicationStatus
 from ..models.payment_proof import PaymentProof
-from ..models.notification import Notification
 from ..models.bank_account import BankAccount
 from ..schemas.enrollment_application_schema import EnrollmentApplicationCreate, EnrollmentApplicationRead
-from ..schemas.payment_proof import ProofCreate
 from ..utils.dependencies import get_current_user
 from ..utils.file import upload_file_to_cloudinary
 
@@ -36,21 +35,28 @@ def get_application_status(
     """
     Check the enrollment application status for a specific course for the current user.
     """
-    application = db.exec(
-        select(EnrollmentApplication).where(
-            EnrollmentApplication.course_id == course_id,
-            EnrollmentApplication.user_id == current_user.id
-        )
-    ).first()
+    logger.info(f"Checking application status for course_id: {course_id} and user_id: {current_user.id}")
+    try:
+        application = db.exec(
+            select(EnrollmentApplication).where(
+                EnrollmentApplication.course_id == course_id,
+                EnrollmentApplication.user_id == current_user.id
+            )
+        ).first()
 
-    if not application:
-        return {"status": "not_found"}
-    
-    return {"status": application.status.value}
+        if not application:
+            logger.warning(f"No application found for course_id: {course_id} and user_id: {current_user.id}. Returning 'not_found'.")
+            return {"status": "not_found"}
+        
+        logger.info(f"Application found with status: {application.status.value}. Returning status.")
+        return {"status": application.status.value}
+    except Exception as e:
+        logger.error(f"An unexpected error occurred in get_application_status: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="An internal server error occurred.")
 
 @router.get("/courses/{course_id}/purchase-info")
-def get_purchase_info(course_id: str, session: Session = Depends(get_db)):
-    course = session.exec(select(Course).where(Course.id == course_id)).first()
+def get_purchase_info(course_id: uuid.UUID, session: Session = Depends(get_db)):
+    course = session.get(Course, course_id)
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
     
@@ -84,11 +90,10 @@ def apply_for_enrollment(
             detail="You have already applied for this course."
         )
 
-    new_application = EnrollmentApplication(
-        user_id=current_user.id,
-        course_id=application_data.course_id,
-        status=ApplicationStatus.PENDING
-    )
+    new_application = EnrollmentApplication.from_orm(application_data)
+    new_application.user_id = current_user.id
+    new_application.status = ApplicationStatus.PENDING
+    
     db.add(new_application)
     db.commit()
     db.refresh(new_application)
@@ -124,18 +129,7 @@ async def submit_payment_proof(
     return {"message": "Payment proof submitted successfully."}
 
 
-from src.app.schemas.enrollment_application_schema import EnrollmentApplicationCreate, EnrollmentApplicationRead
-from src.app.utils.file import upload_file_to_cloudinary
-from src.app.utils.dependencies import get_current_user
-from ..models.enrollment import Enrollment, get_pakistan_time
-from src.app.models.course import Course
-from ..schemas.payment_proof import ProofCreate
-from ..db.session import get_db
-from ..models.payment_proof import PaymentProof
-from ..models.notification import Notification
-from datetime import datetime, timedelta
-import os
-from uuid import uuid4
+
 
 
 router = APIRouter(
