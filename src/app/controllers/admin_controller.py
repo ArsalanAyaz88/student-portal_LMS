@@ -81,7 +81,7 @@ def create_upload_signature(folder: str = Form("videos")):
 
 # 1. Enrollment Management
 @router.get("/users", response_model=List[UserRead])
-def list_students(session: Session = Depends(get_db), admin=Depends(get_current_admin_user)):
+def list_students(session: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
     query = select(User).where(User.role == "student")
     return session.exec(query).all()
 
@@ -112,30 +112,7 @@ async def upload_image(
             detail=f"An error occurred while uploading the image: {str(e)}"
         )
 
-@router.get("/courses", response_model=list[AdminCourseList])
-def admin_list_courses(db: Session = Depends(get_db), admin=Depends(get_current_admin_user)):
-    courses = db.exec(select(Course)).all()
-    
-    course_list = []
-    for c in courses:
-        total_enrollments = db.exec(
-            select(func.count(Enrollment.id)).where(Enrollment.course_id == c.id)
-        ).one()
 
-        course_list.append(
-            AdminCourseList(
-                id=c.id,
-                title=c.title,
-                price=c.price,
-                total_enrollments=total_enrollments,
-                active_enrollments=0, # Placeholder
-                average_progress=0.0, # Placeholder
-                status=c.status,
-                created_at=c.created_at,
-                updated_at=c.updated_at
-            )
-        )
-    return course_list
 
 @router.post("/courses", status_code=status.HTTP_201_CREATED, response_model=AdminCourseDetail)
 async def create_course(
@@ -174,8 +151,8 @@ async def create_course(
             prerequisites=prerequisites,
             curriculum=curriculum,
             status=status,
-            created_by=session_admin.id,
-            updated_by=session_admin.id
+            created_by=admin.id,
+            updated_by=admin.id
         )
 
         db.add(course)
@@ -217,12 +194,9 @@ async def generate_video_upload_signature(admin: User = Depends(get_current_admi
             detail="Could not generate upload signature."
         )
 
-
-
-
 @router.post("/courses/{course_id}/videos", response_model=VideoRead)
 async def upload_video_for_course(
-    course_id: UUID,
+    course_id: uuid.UUID,
     title: str = Form(...),
     description: str = Form(None),
     is_preview: bool = Form(False),
@@ -265,28 +239,7 @@ async def upload_video_for_course(
         )
 
 
-@router.get("/courses/{course_id}", response_model=AdminCourseDetail)
-def get_course_detail(
-    course_id: UUID,
-    db: Session = Depends(get_db),
-    admin: User = Depends(get_current_admin_user),
-):
-    """
-    Get detailed information about a specific course.
-    """
-    course = db.exec(
-        select(Course)
-        .where(Course.id == course_id)
-        .options(
-            selectinload(Course.videos),
-            selectinload(Course.preview_video)
-        )
-    ).first()
 
-    if not course:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
-
-    return course
 
 
 @router.post("/videos", response_model=VideoAdminRead, status_code=status.HTTP_201_CREATED)
@@ -326,7 +279,7 @@ def create_video(video: VideoCreate, db: Session = Depends(get_db), admin: User 
 
 @router.get("/videos", response_model=List[VideoAdminRead])
 def get_admin_videos_for_course(
-    course_id: UUID = Query(..., description="The ID of the course to fetch videos for"),
+    course_id: uuid.UUID = Query(..., description="The ID of the course to fetch videos for"),
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin_user)
 ):
@@ -347,7 +300,7 @@ def get_admin_videos_for_course(
 
 @router.put("/videos/{video_id}", response_model=VideoRead)
 def update_video(
-    video_id: UUID,
+    video_id: uuid.UUID,
     video_update: VideoUpdate,
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin_user)
@@ -377,7 +330,7 @@ def update_video(
 
 @router.delete("/videos/{video_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_video(
-    video_id: UUID,
+    video_id: uuid.UUID,
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin_user)
 ):
@@ -408,7 +361,7 @@ def delete_video(
 
 # 2. Notifications
 @router.get("/notifications", response_model=List[AdminNotificationRead])
-def get_notifications(session: Session = Depends(get_db), admin=Depends(get_current_admin_user)):
+def get_notifications(session: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
     """
     Get notifications for the admin, extracting course_id from the details string
     for easier processing on the frontend.
@@ -437,7 +390,7 @@ def get_notifications(session: Session = Depends(get_db), admin=Depends(get_curr
 @router.put("/courses/{course_id}", response_model=CourseRead)
 async def update_course(
     request: Request,
-    course_id: str,
+    course_id: uuid.UUID,
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin_user)
 ):
@@ -446,17 +399,10 @@ async def update_course(
     logger.info(f"--- Admin Course Update: START for course_id: {course_id} ---")
 
     try:
-        # 1. Validate UUID format
-        try:
-            course_uuid = UUID(course_id)
-        except ValueError:
-            logger.error(f"Invalid UUID format for course_id: '{course_id}'")
-            raise HTTPException(status_code=400, detail="Invalid course ID format.")
-
         # 2. Fetch existing course
-        db_course = db.get(Course, course_uuid)
+        db_course = db.get(Course, course_id)
         if not db_course:
-            logger.warning(f"Course with ID {course_uuid} not found.")
+            logger.warning(f"Course with ID {course_id} not found.")
             raise HTTPException(status_code=404, detail="Course not found")
         logger.info(f"Found course '{db_course.title}' for update.")
 
@@ -508,7 +454,7 @@ async def update_course(
 # Delete a course (hard delete)
 @router.delete("/courses/{course_id}", status_code=status.HTTP_200_OK)
 def delete_course(
-    course_id: str,
+    course_id: uuid.UUID,
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin_user)
 ):
@@ -517,17 +463,10 @@ def delete_course(
     logger.info(f"--- Admin Course Deletion: START for course_id: {course_id} ---")
 
     try:
-        # 1. Validate UUID
-        try:
-            course_uuid = UUID(course_id)
-        except ValueError:
-            logger.error(f"Invalid UUID format for course_id: '{course_id}'")
-            raise HTTPException(status_code=400, detail="Invalid course ID format.")
-
         # 2. Fetch the course
-        course = db.get(Course, course_uuid)
+        course = db.get(Course, course_id)
         if not course:
-            logger.warning(f"Course with ID {course_uuid} not found for deletion.")
+            logger.warning(f"Course with ID {course_id} not found for deletion.")
             raise HTTPException(status_code=404, detail="Course not found")
         logger.info(f"Found course '{course.title}' for deletion.")
 
@@ -709,7 +648,7 @@ async def list_courses(
 
 @router.get("/courses/{course_id}", response_model=AdminCourseDetail)
 async def get_course_detail(
-    course_id: str,
+    course_id: uuid.UUID,
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin_user)
 ):
@@ -772,8 +711,7 @@ async def get_course_detail(
             last_updated=datetime.utcnow()
         )
         
-        # Import VideoRead from course schema which matches our needs
-        from app.schemas.course import VideoRead
+
         
         # Prepare video data according to the VideoRead schema in course.py
         video_data = []
@@ -809,15 +747,14 @@ async def get_course_detail(
             detail=f"Error fetching course details: {str(e)}"
         )
 
-from src.app.utils.email import send_application_approved_email, send_enrollment_rejected_email
 
 @router.put("/enrollments/approve")
 def approve_enrollment_by_user(
-    user_id: str,
-    course_id: str,
+    user_id: uuid.UUID,
+    course_id: uuid.UUID,
     duration_months: int = Query(..., description="Duration of access in months"),
     session: Session = Depends(get_db),
-    admin=Depends(get_current_admin_user)
+    admin: User = Depends(get_current_admin_user)
 ):
     enrollment = session.exec(select(Enrollment).where(Enrollment.user_id == user_id, Enrollment.course_id == course_id)).first()
     if not enrollment:
@@ -880,16 +817,16 @@ def approve_enrollment_by_user(
 
 @router.put("/enrollments/test-expiration")
 def test_enrollment_expiration(
-    user_id: str,
-    course_id: str,
+    user_id: uuid.UUID,
+    course_id: uuid.UUID,
     session: Session = Depends(get_db),
-    admin=Depends(get_current_admin_user)
+    admin: User = Depends(get_current_admin_user)
 ):
     """Test endpoint to set an enrollments expiration date to today.
 
     Args:
-        user_id (str): ID of the user whose enrollment will be updated
-        course_id (str): ID of the course for the enrollment
+        user_id (uuid.UUID): ID of the user whose enrollment will be updated
+        course_id (uuid.UUID): ID of the course for the enrollment
         session (Session): Database session
         admin (User): Authenticated admin user
 
@@ -929,10 +866,10 @@ def test_enrollment_expiration(
     summary="Create a new assignment for a course",
 )
 def admin_create_assignment(
-    course_id: UUID,
+    course_id: uuid.UUID,
     payload: AssignmentCreate,
     db: Session = Depends(get_db),
-    admin=Depends(get_current_admin_user),
+    admin: User = Depends(get_current_admin_user),
 ):
     """Create a new assignment for a course."""
     # 1) Ensure course exists
@@ -966,9 +903,9 @@ def admin_create_assignment(
 
 @router.get("/courses/{course_id}/assignments", response_model=List[AssignmentRead])
 def admin_list_assignments(
-    course_id: UUID,
+    course_id: uuid.UUID,
     db: Session = Depends(get_db),
-    admin=Depends(get_current_admin_user),
+    admin: User = Depends(get_current_admin_user),
 ):
     """List all assignments under a given course for the admin panel."""
     query = (
@@ -998,32 +935,33 @@ def admin_list_assignments(
     summary="Remove an assignment",
 )
 def admin_delete_assignment(
-    course_id: str,
-    assignment_id: str,
+    course_id: uuid.UUID,
+    assignment_id: uuid.UUID,
     db: Session = Depends(get_db),
-    admin=Depends(get_current_admin_user),
+    admin: User = Depends(get_current_admin_user),
 ):
     """Remove an assignment."""
-    assign = db.get(Assignment, uuid.UUID(assignment_id))
-    if not assign or str(assign.course_id) != course_id:
+    assign = db.get(Assignment, assignment_id)
+    if not assign or assign.course_id != course_id:
         raise HTTPException(404, "Assignment not found")
     db.delete(assign)
     db.commit()
     return
+
 @router.get(
     "/courses/{course_id}/assignments/{assignment_id}/submissions/students",
     response_model=SubmissionStudentsResponse,
 )
 def admin_list_on_time_submissions(
-    course_id: UUID,
-    assignment_id: UUID,
+    course_id: uuid.UUID,
+    assignment_id: uuid.UUID,
     db: Session = Depends(get_db),
-    admin = Depends(get_current_admin_user),
+    admin: User = Depends(get_current_admin_user),
 ):
     # 1) load assignment and its course
     stmt = select(Assignment).where(Assignment.id == assignment_id).options(selectinload(Assignment.course))
     assignment = db.exec(stmt).first()
-    if not assignment or str(assignment.course_id) != str(course_id):
+    if not assignment or assignment.course_id != course_id:
         raise HTTPException(status_code=404, detail="Assignment not found in this course")
 
     # 2) load submissions + students
@@ -1073,12 +1011,12 @@ def admin_list_on_time_submissions(
     summary="Grade a student's assignment submission",
 )
 def admin_grade_submission(
-    course_id: UUID,
-    assignment_id: UUID,
-    submission_id: UUID,
+    course_id: uuid.UUID,
+    assignment_id: uuid.UUID,
+    submission_id: uuid.UUID,
     payload: SubmissionGrade,
     db: Session = Depends(get_db),
-    admin = Depends(get_current_admin_user),
+    admin: User = Depends(get_current_admin_user),
 ):
     # 1) Ensure assignment exists under this course
     assignment = db.get(Assignment, assignment_id)
@@ -1109,15 +1047,15 @@ def admin_grade_submission(
 
 @router.put("/courses/{course_id}/assignments/{assignment_id}", response_model=AssignmentRead)
 def admin_update_assignment(
-    course_id: str,
-    assignment_id: str,
-    payload: AssignmentUpdate,  # Changed from AssignmentCreate
+    course_id: uuid.UUID,
+    assignment_id: uuid.UUID,
+    payload: AssignmentUpdate,
     db: Session = Depends(get_db),
-    admin=Depends(get_current_admin_user),
+    admin: User = Depends(get_current_admin_user),
 ):
     """Update an assignment's title, description, and due date."""
     assignment = db.get(Assignment, assignment_id)
-    if not assignment or str(assignment.course_id) != course_id:
+    if not assignment or assignment.course_id != course_id:
         raise HTTPException(status_code=404, detail="Assignment not found")
 
     # Get the update data, excluding unset fields
@@ -1164,7 +1102,7 @@ def get_cloudinary_signature(admin: User = Depends(get_current_admin_user)):
         raise HTTPException(status_code=500, detail="Could not generate upload signature.")
 
 @router.get("/videos/{video_id}/quiz", response_model=QuizReadWithDetails, name="get_quiz_for_video")
-def get_quiz_for_video(video_id: UUID, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
+def get_quiz_for_video(video_id: uuid.UUID, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
     logging.info(f"Attempting to fetch quiz for video_id: {video_id}")
     try:
         quiz = db.exec(
@@ -1190,7 +1128,7 @@ def get_quiz_for_video(video_id: UUID, db: Session = Depends(get_db), admin: Use
 
 @router.post("/videos/{video_id}/quiz", response_model=QuizReadWithDetails)
 def upsert_quiz_for_video(
-    video_id: UUID,
+    video_id: uuid.UUID,
     quiz_data: QuizCreateForVideo,
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin_user)
@@ -1255,12 +1193,7 @@ def upsert_quiz_for_video(
         logging.info(f"Database transaction rolled back for video {video_id}.")
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred while saving the quiz.")
 
-@router.get("/videos/{video_id}/quiz", response_model=QuizReadWithDetails)
-def get_quiz_for_video(
-    video_id: UUID,
-    db: Session = Depends(get_db),
-    admin: User = Depends(get_current_admin_user)
-):
+
     logging.info(f"Fetching quiz for video {video_id}")
     video = db.get(Video, video_id)
     if not video:
@@ -1293,27 +1226,6 @@ def get_quiz_for_video(
     ).one()
 
     return updated_quiz
-
-
-@router.get("/videos/{video_id}/quiz", response_model=QuizReadWithDetails)
-def get_quiz_by_video(
-    video_id: UUID,
-    db: Session = Depends(get_db),
-    admin: User = Depends(get_current_admin_user)
-):
-    """
-    Get the quiz associated with a specific video.
-    """
-    quiz = db.exec(
-        select(Quiz)
-        .where(Quiz.video_id == video_id)
-        .options(selectinload(Quiz.questions).selectinload(Question.options))
-    ).first()
-
-    if not quiz:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found for this video.")
-    
-    return quiz
 
 
 @router.post("/admin/quizzes", response_model=QuizRead, status_code=status.HTTP_201_CREATED)
