@@ -18,7 +18,8 @@ from src.app.models.video import Video
 from src.app.controllers import (
     auth_controller,
     admin_controller,
-    enrollment_controller
+    enrollment_controller,
+    upload_controller
 )
 from src.app.routers import (
     auth_router,
@@ -88,6 +89,7 @@ app.include_router(
 app.include_router(admin_quiz_router.quiz_router, prefix="/api/admin/quizzes")
 app.include_router(admin_quiz_router.question_router, prefix="/api/admin/questions")
 app.include_router(admin_quiz_router.submission_router, prefix="/api/admin/submissions")
+app.include_router(upload_controller.router, prefix="/api")
 
 # Include video router
 

@@ -1,6 +1,6 @@
 
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request
 from sqlmodel import Session, select
 from typing import Optional
 from datetime import datetime
@@ -79,9 +79,11 @@ def get_purchase_info(course_id: uuid.UUID, session: Session = Depends(get_db)):
 @router.post("/apply", response_model=EnrollmentApplicationRead)
 def apply_for_enrollment(
     application_data: EnrollmentApplicationCreate,
+    request: Request, # Add request to access headers
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    logger.info(f"Apply for enrollment request received. Headers: {request.headers}")
     existing_application = db.exec(
         select(EnrollmentApplication).where(
             EnrollmentApplication.user_id == current_user.id,
