@@ -49,6 +49,16 @@ class VideoAdminRead(VideoBase):
         from_attributes = True
 
 # Schema for video with student's progress
+# Schema for video previews on the course explore page
+class VideoPreview(BaseModel):
+    title: str
+    duration: Optional[float] = None
+    is_preview: bool = False
+
+    class Config:
+        from_attributes = True
+
+
 class VideoWithProgress(VideoBase):
     id: uuid.UUID
     course_id: uuid.UUID

@@ -81,9 +81,16 @@ def explore_course_detail(course_id: str, session: Session = Depends(get_db)):
         course_uuid = uuid.UUID(course_id)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid course ID format")
-    course = session.get(Course, course_uuid)
+
+    # Use selectinload to efficiently fetch the related videos
+    course = session.exec(
+        select(Course).options(selectinload(Course.videos)).where(Course.id == course_uuid)
+    ).first()
+
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
+
+    # The videos are already loaded in course.videos
     return CourseExploreDetail(
         id=course.id,
         title=course.title,
@@ -92,7 +99,8 @@ def explore_course_detail(course_id: str, session: Session = Depends(get_db)):
         description=course.description,
         outcomes=course.outcomes or "",
         prerequisites=course.prerequisites or "",
-        curriculum=course.curriculum or ""
+        curriculum=course.curriculum or "",
+        videos=course.videos  # Pass the loaded videos
     )
 
 

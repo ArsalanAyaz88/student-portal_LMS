@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime
 import uuid
-from src.app.schemas.video import VideoRead
+from src.app.schemas.video import VideoRead, VideoPreview
 
 class CourseBase(BaseModel):
     title: str = Field(..., example="The Complete Web Development Bootcamp")
@@ -54,6 +54,7 @@ class CourseExploreList(BaseModel):
 
 class CourseExploreDetail(CourseBase):
     id: uuid.UUID
+    videos: List[VideoPreview] = []
 
 class CourseCurriculumDetail(BaseModel):
     curriculum: str
