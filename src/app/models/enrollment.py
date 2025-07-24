@@ -50,8 +50,7 @@ class EnrollmentApplication(SQLModel, table=True):
 
 
     
-    # Relationship to payment proofs
-    payment_proofs: List["PaymentProof"] = Relationship(back_populates="application", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+
 
 
 class Enrollment(SQLModel, table=True):

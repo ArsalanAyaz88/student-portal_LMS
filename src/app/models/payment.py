@@ -34,5 +34,5 @@ class PaymentProof(SQLModel, table=True):
     application_id: uuid.UUID = Field(foreign_key="enrollment_applications.id")
     
     # Relationship to the application
-    application: "EnrollmentApplication" = Relationship(back_populates="payment_proofs")
+
 
