@@ -4,7 +4,7 @@ from sqlmodel import select
 import uuid
 import logging
 
-from src.app.database import get_db
+from src.app.db.session import get_db
 from src.app.models.user import User
 from src.app.models.course import Course
 from src.app.models.enrollment import ApplicationStatus, PaymentProof, EnrollmentApplication
