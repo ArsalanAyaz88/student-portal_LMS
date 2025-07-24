@@ -6,16 +6,13 @@ from datetime import datetime
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, SQLModel, create_engine, select
-from datetime import datetime
 from sqlalchemy import inspect
 from dotenv import load_dotenv
 import logging
 
 # ─── Local imports ─────────────────────────────────────────────
 from src.app.db.session import create_db_and_tables
-from src.app.models.course import Course
-from src.app.models.enrollment import Enrollment # FIX: Import Enrollment to ensure table creation
-from src.app.models.video import Video
+from src.app import models  # FIX: Import all models to ensure they are registered with SQLAlchemy metadata
 
 # Import all necessary schemas for model_rebuild
 from src.app.schemas.user import UserRead
@@ -92,8 +89,8 @@ async def startup_tasks():
         raise
 
     # Step 3: Log relationships (optional)
-    logging.info("Course relationships: %s", inspect(Course).relationships)
-    logging.info("Video relationships: %s", inspect(Video).relationships)
+    logging.info("Course relationships: %s", inspect(models.Course).relationships)
+    logging.info("Video relationships: %s", inspect(models.Video).relationships)
 
 # ─── Routers ───────────────────────────────────────────────────
 app.include_router(auth_router.router, prefix="/api/auth", tags=["Authentication"])
