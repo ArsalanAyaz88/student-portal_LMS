@@ -30,4 +30,4 @@ class User(SQLModel, table=True):
     quiz_submissions: List["QuizSubmission"] = Relationship(back_populates="student")
     enrollment_applications: List["EnrollmentApplication"] = Relationship(back_populates="user")
     enrollments: List["Enrollment"] = Relationship(back_populates="user")
-    progress: List["VideoProgress"] = Relationship(back_populates="user")
+
