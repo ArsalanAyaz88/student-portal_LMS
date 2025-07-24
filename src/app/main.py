@@ -79,6 +79,11 @@ async def startup_tasks():
     
     # 2. Rebuild Pydantic models to resolve forward references
     print("INFO:     Rebuilding Pydantic models...")
+    # Base models first to resolve dependencies
+    UserRead.model_rebuild()
+    CourseRead.model_rebuild()
+
+    # Dependent models
     EnrollmentApplicationRead.model_rebuild()
     video.VideoWithProgress.model_rebuild()
     course.CourseExploreDetail.model_rebuild()
