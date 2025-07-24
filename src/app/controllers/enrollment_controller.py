@@ -81,7 +81,7 @@ def get_purchase_info(course_id: uuid.UUID, session: Session = Depends(get_db)):
         formatted_accounts = [
             {
                 "bank_name": acc.bank_name,
-                "account_name": acc.account_title, # Matching frontend's 'account_name'
+                "account_name": acc.account_name, # Matching frontend's 'account_name'
                 "account_number": acc.account_number
             } for acc in bank_accounts
         ]
