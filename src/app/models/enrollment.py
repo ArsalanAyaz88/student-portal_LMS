@@ -1,4 +1,5 @@
 # File: app/models/enrollment.py
+from __future__ import annotations
 import uuid
 import enum
 from datetime import datetime
@@ -8,9 +9,9 @@ from sqlalchemy import Enum as SQLAlchemyEnum
 from sqlmodel import SQLModel, Field, Relationship
 
 if TYPE_CHECKING:
-    from .user import User
-    from .course import Course
-    from .bank_account import BankAccount
+    from src.app.models.user import User
+    from src.app.models.course import Course
+    from src.app.models.bank_account import BankAccount
 
 # --- Enums ---
 
