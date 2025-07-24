@@ -129,27 +129,51 @@ def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     session: Session = Depends(get_db)
 ):
-    print("--- STUDENT LOGIN FUNCTION STARTED ---")
-    user = session.exec(
-        select(User).where(User.email == form_data.username)
-    ).first()
-    if not user or not verify_password(form_data.password, user.hashed_password):
+    logging.info(f"--- LOGIN ATTEMPT FOR USER: {form_data.username} ---")
+    try:
+        user = session.exec(
+            select(User).where(User.email == form_data.username)
+        ).first()
+
+        if not user:
+            logging.warning(f"Login failed: User '{form_data.username}' not found.")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect email or password",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        logging.info(f"User '{form_data.username}' found. Verifying password...")
+        if not verify_password(form_data.password, user.hashed_password):
+            logging.warning(f"Login failed: Incorrect password for user '{form_data.username}'.")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect email or password",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        logging.info(f"Password verified for '{form_data.username}'. Creating access token...")
+        token = create_access_token({"user_id": str(user.id), "role": user.role})
+
+        content = {
+            "access_token": token,
+            "token_type": "bearer",
+            "role": user.role,
+            "message": "Login successful."
+        }
+        
+        logging.info(f"Login successful for user '{form_data.username}'.")
+        return JSONResponse(content=content)
+
+    except HTTPException as e:
+        # Re-raise HTTP exceptions to be handled by FastAPI
+        raise e
+    except Exception as e:
+        logging.error(f"An unexpected error occurred during login for {form_data.username}: {e}", exc_info=True)
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An internal server error occurred.",
         )
-    token = create_access_token({"user_id": str(user.id), "role": user.role})
-
-    # Create the response content
-    content = {
-        "access_token": token,
-        "token_type": "bearer",
-        "role": user.role,
-        "message": "Login successful."
-    }
-
-    return JSONResponse(content=content)
 
 @router.post(
     "/forgot-password",
