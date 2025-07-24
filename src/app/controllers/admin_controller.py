@@ -29,7 +29,7 @@ from src.app.models.assignment import Assignment, AssignmentSubmission
 from src.app.models.course import Course
 from src.app.models.course_progress import CourseProgress
 from src.app.models.enrollment import Enrollment
-from src.app.models.enrollment_application import EnrollmentApplication, ApplicationStatus
+from src.app.models.enrollment import EnrollmentApplication, ApplicationStatus
 from src.app.models.notification import Notification
 from src.app.models.quiz import Quiz, Question, Option
 from src.app.models.user import User

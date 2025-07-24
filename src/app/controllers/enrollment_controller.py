@@ -7,12 +7,19 @@ import logging
 from src.app.db.session import get_db
 from src.app.models.user import User
 from src.app.models.course import Course
-from src.app.models.enrollment_application import ApplicationStatus, EnrollmentApplication
+from src.app.models.enrollment import Enrollment, EnrollmentApplication, ApplicationStatus
 from src.app.models.payment_proof import PaymentProof
 from src.app.models.bank_account import BankAccount
-from src.app.schemas.enrollment_application_schema import EnrollmentApplicationCreate, EnrollmentApplicationRead
-from src.app.utils.dependencies import get_current_user
 from src.app.models.notification import Notification
+from src.app.schemas.enrollment import (
+    EnrollmentApplicationCreate,
+    EnrollmentApplicationRead,
+    EnrollmentApplicationUpdate,
+    PaymentProofCreate,
+    PaymentProofRead,
+    EnrollmentStatusResponse
+)
+from src.app.utils.dependencies import get_current_user
 
 
 logging.basicConfig(level=logging.INFO)
@@ -122,7 +129,7 @@ async def submit_payment_proof(
 
 
 @router.get("/{course_id}/status", response_model=EnrollmentStatusResponse, summary="Check enrollment status for a course")
-def get_application_status(
+def get_enrollment_status(
     course_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)

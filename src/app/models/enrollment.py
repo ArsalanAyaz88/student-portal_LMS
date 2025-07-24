@@ -1,17 +1,53 @@
 # File: app/models/enrollment.py
-from sqlmodel import SQLModel, Field, Relationship, JSON
 import uuid
+import enum
 from datetime import datetime, timedelta
 from typing import Optional, TYPE_CHECKING, List
+
+import pytz
 from pydantic import validator
+from sqlalchemy import Enum as SQLAlchemyEnum
+from sqlmodel import SQLModel, Field, Relationship, JSON
+
 from src.app.utils.time import get_pakistan_time, convert_to_pakistan_time
 
 if TYPE_CHECKING:
-    from src.app.models.user import User
-    from src.app.models.course import Course
-    from src.app.models.payment_proof import PaymentProof
+    from .user import User
+    from .course import Course
+    from .payment_proof import PaymentProof
 
-import uuid
+# --- Enrollment Application Model ---
+
+class ApplicationStatus(str, enum.Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+class EnrollmentApplication(SQLModel, table=True):
+    __tablename__ = "enrollment_applications"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    first_name: str
+    last_name: str
+    qualification: str
+    qualification_certificate_url: str
+    ultrasound_experience: Optional[str] = None
+    contact_number: str
+    
+    status: ApplicationStatus = Field(
+        sa_column=SQLAlchemyEnum(ApplicationStatus, name="application_status_enum"),
+        default=ApplicationStatus.PENDING
+    )
+
+    user_id: uuid.UUID = Field(foreign_key="user.id")
+    course_id: uuid.UUID = Field(foreign_key="course.id")
+
+    user: "User" = Relationship(back_populates="enrollment_applications")
+    course: "Course" = Relationship(back_populates="enrollment_applications")
+    payment_proofs: List["PaymentProof"] = Relationship(back_populates="application", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+
+
+# --- Enrollment Model ---
 
 class Enrollment(SQLModel, table=True):
     __table_args__ = {"extend_existing": True}
@@ -32,12 +68,12 @@ class Enrollment(SQLModel, table=True):
         if v is None:
             return v
         if v.tzinfo is None:
+            # Assuming naive datetimes are UTC, then localizing to Pakistan time
             v = pytz.UTC.localize(v)
         return convert_to_pakistan_time(v)
 
-    user: "src.app.models.user.User" = Relationship(back_populates="enrollments")
-    course: "src.app.models.course.Course" = Relationship(back_populates="enrollments")
-    payment_proofs: List["src.app.models.payment_proof.PaymentProof"] = Relationship(back_populates="enrollment", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+    user: "User" = Relationship(back_populates="enrollments")
+    course: "Course" = Relationship(back_populates="enrollments")
 
     def update_expiration_status(self):
         """Update the expiration status and days remaining"""
@@ -56,5 +92,5 @@ class Enrollment(SQLModel, table=True):
             self.is_accessible = time_diff.total_seconds() > 0
         else:
             self.days_remaining = None
-            self.is_accessible = True
+            self.is_accessible = True # Or False, depending on desired logic for no expiration
         self.last_access_date = current_time

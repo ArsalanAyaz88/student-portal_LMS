@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from src.app.models.course_progress import CourseProgress
     from src.app.models.assignment import Assignment
     from src.app.models.quiz import Quiz
-    from src.app.models.enrollment_application import EnrollmentApplication
+    from src.app.models.enrollment import EnrollmentApplication
 
 class Course(SQLModel, table=True):
     __tablename__ = 'course'
