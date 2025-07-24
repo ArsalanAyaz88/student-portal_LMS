@@ -25,7 +25,7 @@ from src.app.schemas import video, course, enrollment, user
 video.VideoWithProgress.model_rebuild()
 course.CourseExploreDetail.model_rebuild()
 course.CourseDetail.model_rebuild()
-enrollment.EnrollmentApplicationRead.model_rebuild()
+
 video.VideoRead.model_rebuild()
 video.VideoWithProgress.model_rebuild()
 
