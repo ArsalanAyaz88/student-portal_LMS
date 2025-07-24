@@ -9,7 +9,8 @@ namespace and to ensure they are registered with SQLModel's metadata.
 from .user import User
 from .oauth import OAuthAccount
 from .course import Course
-from .video import Video, VideoProgress
+from .video import Video
+from .video_progress import VideoProgress
 from .enrollment import Enrollment, EnrollmentApplication
 from .payment import PaymentProof
 from .bank_account import BankAccount
