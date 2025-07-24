@@ -20,14 +20,17 @@ from src.app.controllers import (
     admin_controller,
     enrollment_controller
 )
-from src.app.schemas import video, course, enrollment, user
+from src.app.schemas import video, course, user
+from src.app.schemas.enrollment import EnrollmentApplicationRead
+from src.app.schemas.user import UserRead
+from src.app.schemas.course import CourseRead
 
+# Rebuild models to resolve forward references
 video.VideoWithProgress.model_rebuild()
 course.CourseExploreDetail.model_rebuild()
 course.CourseDetail.model_rebuild()
-
 video.VideoRead.model_rebuild()
-video.VideoWithProgress.model_rebuild()
+EnrollmentApplicationRead.model_rebuild()
 
 from src.app.routers import (
     auth_router,
