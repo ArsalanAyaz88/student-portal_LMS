@@ -25,12 +25,7 @@ from src.app.schemas.enrollment import EnrollmentApplicationRead
 from src.app.schemas.user import UserRead
 from src.app.schemas.course import CourseRead
 
-# Rebuild models to resolve forward references
-video.VideoWithProgress.model_rebuild()
-course.CourseExploreDetail.model_rebuild()
-course.CourseDetail.model_rebuild()
-video.VideoRead.model_rebuild()
-EnrollmentApplicationRead.model_rebuild()
+
 
 from src.app.routers import (
     auth_router,
@@ -70,30 +65,31 @@ app.add_middleware(
     allow_headers=["*"],  # Allows all headers
 )
 
-# ─── DB tables on startup ──────────────────────────────────────
+# ─── Consolidated Startup Events ────────────────────────────────
 @app.on_event("startup")
-def on_startup() -> None:
+async def startup_tasks():
+    """
+    Run all startup tasks in the correct order.
+    """
+    print("INFO:     Running startup tasks...")
+    
+    # 1. Create database and tables
+    print("INFO:     Creating database and tables...")
     create_db_and_tables()
-
-# ─── Pydantic model rebuild on startup ─────────────────────────
-@app.on_event("startup")
-def resolve_forward_refs() -> None:
-    from src.app.schemas import course, enrollment_application_schema, video
-
-    # Resolve forward references for Pydantic models
+    
+    # 2. Rebuild Pydantic models to resolve forward references
+    print("INFO:     Rebuilding Pydantic models...")
+    EnrollmentApplicationRead.model_rebuild()
+    video.VideoWithProgress.model_rebuild()
     course.CourseExploreDetail.model_rebuild()
     course.CourseDetail.model_rebuild()
-    enrollment_application_schema.EnrollmentApplicationRead.model_rebuild()
     video.VideoRead.model_rebuild()
-    video.VideoWithProgress.model_rebuild()
 
-
-# Log model relationships (optional)
-@app.on_event("startup")
-async def startup_event() -> None:
+    # 3. Log model relationships (optional, for debugging)
     logging.basicConfig(level=logging.INFO)
     logging.info("Course relationships: %s", inspect(Course).relationships)
     logging.info("Video relationships: %s", inspect(Video).relationships)
+    print("INFO:     Startup tasks completed.")
 
 # ─── Routers ───────────────────────────────────────────────────
 app.include_router(auth_router.router, prefix="/api/auth", tags=["Authentication"])
