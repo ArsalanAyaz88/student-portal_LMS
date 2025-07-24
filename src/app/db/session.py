@@ -38,6 +38,10 @@ def get_db():
     finally:
         db.close()
 
+# Import all models here before creating tables.
+# This ensures that SQLModel's metadata is populated with all table definitions.
+from src.app import models
+
 # A function to create all tables. This is useful for initial setup.
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
