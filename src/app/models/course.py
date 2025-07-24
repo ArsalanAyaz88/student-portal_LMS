@@ -36,8 +36,6 @@ class Course(SQLModel, table=True):
     # Relationships
     preview_video: Optional["Video"] = Relationship(sa_relationship_kwargs={"primaryjoin": "Course.preview_video_id == Video.id", "foreign_keys": "[Course.preview_video_id]", "uselist": False, "post_update": True})
     videos: List["Video"] = Relationship(back_populates="course", sa_relationship_kwargs={"foreign_keys": "[Video.course_id]", "cascade": "all, delete-orphan"})
-    enrollments: List["Enrollment"] = Relationship(back_populates="course", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
     progress: List["CourseProgress"] = Relationship(back_populates="course", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
     assignments: List["Assignment"] = Relationship(back_populates="course", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
     quizzes: List["Quiz"] = Relationship(back_populates="course", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
-    enrollment_applications: List["EnrollmentApplication"] = Relationship(back_populates="course")
