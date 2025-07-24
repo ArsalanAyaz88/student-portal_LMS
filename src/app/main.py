@@ -78,17 +78,19 @@ async def startup_tasks():
     create_db_and_tables()
     
     # 2. Rebuild Pydantic models to resolve forward references
-    print("INFO:     Rebuilding Pydantic models...")
-    # Base models first to resolve dependencies
+    print("INFO:     Rebuilding Pydantic models in correct order...")
+    
+    # --- Stage 1: Base models with no dependencies ---
     UserRead.model_rebuild()
     CourseRead.model_rebuild()
+    video.VideoRead.model_rebuild()
 
-    # Dependent models
+    # --- Stage 2: Dependent models ---
+    # These models depend on the base models rebuilt above.
     EnrollmentApplicationRead.model_rebuild()
     video.VideoWithProgress.model_rebuild()
     course.CourseExploreDetail.model_rebuild()
     course.CourseDetail.model_rebuild()
-    video.VideoRead.model_rebuild()
 
     # 3. Log model relationships (optional, for debugging)
     logging.basicConfig(level=logging.INFO)
