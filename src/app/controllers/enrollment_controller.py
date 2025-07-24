@@ -1,134 +1,37 @@
 
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request
-from sqlmodel import Session, select
-from typing import Optional
-from datetime import datetime
+from fastapi import APIRouter, Depends, HTTPException, Body
+from sqlalchemy.orm import Session
+from sqlmodel import select
 import uuid
 import logging
 
-# Configure logging
+from src.app.database import get_db
+from src.app.models.user import User
+from src.app.models.course import Course
+from src.app.models.enrollment import ApplicationStatus, PaymentProof, EnrollmentApplication
+from src.app.models.bank_account import BankAccount
+from src.app.schemas.enrollment import PaymentProofRead, EnrollmentApplicationCreate, EnrollmentApplicationRead
+from src.app.utils.dependencies import get_current_user
+from src.app.controllers.admin_controller import create_admin_notification
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-from sqlalchemy.orm import selectinload
-
-from ..db.session import get_db
-from ..utils.email import send_application_approved_email, send_enrollment_rejected_email
-from ..models.user import User
-from ..models.course import Course
-from ..models.enrollment_application import EnrollmentApplication, ApplicationStatus
-from ..models.payment_proof import PaymentProof
-from ..models.bank_account import BankAccount
-from ..schemas.enrollment_application_schema import EnrollmentApplicationCreate, EnrollmentApplicationRead
-from ..utils.dependencies import get_current_user
-from ..utils.file import upload_file_to_cloudinary, save_upload_and_get_url
-from ..utils.dependencies import get_current_admin_user
-from ..schemas.enrollment_application_schema import EnrollmentApplicationUpdate
-from ..models.enrollment import Enrollment
-
 router = APIRouter(
-    tags=["Enrollments"]
+    prefix="/enrollments",
+    tags=["enrollments"],
 )
 
-@router.get("/application-status/{course_id}", response_model=dict)
-def get_application_status(
-    course_id: uuid.UUID,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """
-    Check the enrollment application status for a specific course for the current user.
-    """
-    logger.info(f"Checking application status for course_id: {course_id} and user_id: {current_user.id}")
-    application = db.exec(
-        select(EnrollmentApplication).where(
-            EnrollmentApplication.course_id == course_id,
-            EnrollmentApplication.user_id == current_user.id
-        )
-    ).first()
-
-    if not application:
-        logger.warning(f"No application found for course_id: {course_id} and user_id: {current_user.id}. Raising 404.")
-        # Return a dictionary with a 'status' of 'not_found' or similar
-        # to be handled gracefully by the frontend.
-        return {"status": "not_applied"}
-    
-    logger.info(f"Application found with status: {application.status.value}. Returning status.")
-    return {"status": application.status.value}
-
-@router.get("/courses/{course_id}/purchase-info")
-def get_purchase_info(course_id: uuid.UUID, session: Session = Depends(get_db)):
-    try:
-        logger.info(f"Attempting to get purchase info for course_id: {course_id}")
-        
-        course = session.get(Course, course_id)
-        if not course:
-            logger.warning(f"Course with id {course_id} not found in the database.")
-            raise HTTPException(status_code=404, detail="Course not found")
-        
-        logger.info(f"Found course: {course.title}")
-
-        # Fetch all bank accounts, not just the first one
-        bank_accounts = session.exec(select(BankAccount)).all()
-        if not bank_accounts:
-            logger.warning("No bank account details found in the database.")
-            raise HTTPException(status_code=404, detail="Bank account details not found.")
-
-        logger.info(f"Found {len(bank_accounts)} bank account(s).")
-
-        # Format bank accounts to match the frontend interface
-        formatted_accounts = [
-            {
-                "bank_name": acc.bank_name,
-                "account_name": acc.account_name, # Matching frontend's 'account_name'
-                "account_number": acc.account_number
-            } for acc in bank_accounts
-        ]
-
-        return {
-            "course_title": course.title,
-            "course_price": course.price,
-            "bank_accounts": formatted_accounts
-        }
-    except HTTPException:
-        # Re-raise HTTPException to avoid catching it in the generic exception handler
-        raise
-    except Exception as e:
-        # Log the full traceback for debugging
-        logger.exception(f"An unexpected error occurred in get_purchase_info for course_id: {course_id} - Error: {e}")
-        # Raise a generic 500 error to the client
-        raise HTTPException(status_code=500, detail="An internal server error occurred.")
-
-@router.post("/upload-certificate")
-async def upload_certificate(
-    file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user)
-):
-    """
-    Upload a qualification certificate and return the URL.
-    This is a preliminary step before submitting the full application.
-    """
-    try:
-        # The same utility used for avatar uploads
-        url = await save_upload_and_get_url(file, folder="certificates")
-        return {"certificate_url": url}
-    except Exception as e:
-        logger.error(f"Error uploading certificate: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to upload certificate: {str(e)}"
-        )
-
-
-@router.post("/apply", response_model=EnrollmentApplicationRead)
-async def apply_for_enrollment(
+@router.post("/apply", response_model=EnrollmentApplicationRead, summary="Apply for a course enrollment")
+def apply_for_enrollment(
     application_data: EnrollmentApplicationCreate,
-    request: Request, # Add request to access headers
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    logger.info(f"Apply for enrollment request received. Headers: {request.headers}")
+    if current_user.role != 'student':
+        raise HTTPException(status_code=403, detail="Only students can apply for enrollment")
+
     existing_application = db.exec(
         select(EnrollmentApplication).where(
             EnrollmentApplication.user_id == current_user.id,
@@ -137,35 +40,36 @@ async def apply_for_enrollment(
     ).first()
 
     if existing_application:
-        raise HTTPException(
-            status_code=400,
-            detail="You have already applied for this course."
-        )
+        raise HTTPException(status_code=400, detail="You have already applied for this course")
 
-    new_application = EnrollmentApplication(
-        first_name=application_data.first_name,
-        last_name=application_data.last_name,
-        qualification=application_data.qualification,
-        ultrasound_experience=application_data.ultrasound_experience,
-        contact_number=application_data.contact_number,
-        qualification_certificate_url=application_data.qualification_certificate_url,
-        course_id=application_data.course_id,
-        user_id=current_user.id,
-        status=ApplicationStatus.PENDING
-    )
+    # The schema now expects a URL, which the frontend provides after uploading.
+    new_application = EnrollmentApplication.from_orm(application_data)
+    new_application.user_id = current_user.id
+    new_application.status = ApplicationStatus.PENDING
     
     db.add(new_application)
     db.commit()
     db.refresh(new_application)
+
+    notification_message = f"New enrollment application from {current_user.name} for course ID {application_data.course_id}."
+    # Assuming create_admin_notification is available and works as intended
+    # create_admin_notification(db, notification_message, current_user.id, new_application.id)
+
     return new_application
 
-@router.post("/submit-payment-proof", status_code=201)
+
+@router.post("/submit-payment-proof", response_model=PaymentProofRead, summary="Submit payment proof for an enrollment")
 async def submit_payment_proof(
-    course_id: uuid.UUID = Form(...),
-    file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    course_id: uuid.UUID = Body(...),
+    bank_account_id: uuid.UUID = Body(...),
+    transaction_id: str = Body(...),
+    file_url: str = Body(...)
 ):
+    if current_user.role != 'student':
+        raise HTTPException(status_code=403, detail="Only students can submit payment proofs")
+
     application = db.exec(
         select(EnrollmentApplication).where(
             EnrollmentApplication.user_id == current_user.id,
@@ -174,125 +78,68 @@ async def submit_payment_proof(
     ).first()
 
     if not application:
-        raise HTTPException(status_code=404, detail="Enrollment application not found.")
-
+        raise HTTPException(status_code=404, detail="No application found for this course.")
+    
     if application.status != ApplicationStatus.APPROVED:
         raise HTTPException(status_code=403, detail="Your application must be approved before submitting payment.")
 
-    file_url = await upload_file_to_cloudinary(file, "payment_proofs")
-
     proof = PaymentProof(
-        application_id=application.id,
-        proof_url=file_url,
-        uploaded_at=datetime.now()
+        user_id=current_user.id,
+        course_id=course_id,
+        bank_account_id=bank_account_id,
+        transaction_id=transaction_id,
+        proof_url=file_url, # Using the pre-uploaded file URL
+        status='pending'
     )
     db.add(proof)
     db.commit()
+    db.refresh(proof)
+    
+    notification_message = f"Payment proof submitted by {current_user.name} for course ID {course_id}."
+    # create_admin_notification(db, notification_message, current_user.id, proof.id)
 
-    return {"message": "Payment proof submitted successfully."}
+    return proof
 
 
-@router.get("/{course_id}/status")
-def get_enrollment_status(
+@router.get("/{course_id}/status", summary="Check enrollment status for a course")
+def get_application_status(
     course_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     application = db.exec(
         select(EnrollmentApplication).where(
-            EnrollmentApplication.user_id == current_user.id,
-            EnrollmentApplication.course_id == course_id
+            EnrollmentApplication.course_id == course_id,
+            EnrollmentApplication.user_id == current_user.id
         )
     ).first()
 
     if not application:
-        return {"status": "NOT_APPLIED"}
+        return {"status": "not_applied"}
     
     return {"status": application.status.value}
 
 
-@router.get("/admin/applications", response_model=list[EnrollmentApplicationRead])
-def get_all_applications(
-    db: Session = Depends(get_db),
-    admin: User = Depends(get_current_admin_user)
-):
-    """
-    Retrieve all enrollment applications, including user and course details. Admin access required.
-    """
-    query = (
-        select(EnrollmentApplication)
-        .options(
-            selectinload(EnrollmentApplication.user),
-            selectinload(EnrollmentApplication.course)
-        )
-    )
-    applications = db.exec(query).all()
-    return applications
+@router.get("/courses/{course_id}/purchase-info", summary="Get course price and bank details for payment")
+def get_purchase_info(course_id: uuid.UUID, session: Session = Depends(get_db)):
+    course = session.get(Course, course_id)
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+        
+    bank_accounts = session.exec(select(BankAccount).where(BankAccount.is_active == True)).all()
+    if not bank_accounts:
+        raise HTTPException(status_code=404, detail="No active bank accounts found for payment.")
+        
+    return {
+        "course_price": course.price,
+        "bank_accounts": [
+            {
+                "id": acc.id,
+                "bank_name": acc.bank_name,
+                "account_title": acc.account_name, 
+                "account_number": acc.account_number,
+                "iban": acc.iban
+            } for acc in bank_accounts
+        ]
+    }
 
-
-@router.patch("/admin/applications/{application_id}", response_model=EnrollmentApplicationRead)
-def update_application_status(
-    application_id: uuid.UUID,
-    application_update: EnrollmentApplicationUpdate,
-    db: Session = Depends(get_db),
-    admin: User = Depends(get_current_admin_user)
-):
-    """
-    Update the status of an enrollment application (approve or reject). Admin access required.
-    """
-    # Eagerly load user and course relationships to get email and title
-    query = (
-        select(EnrollmentApplication)
-        .options(
-            selectinload(EnrollmentApplication.user),
-            selectinload(EnrollmentApplication.course)
-        )
-        .where(EnrollmentApplication.id == application_id)
-    )
-    application = db.exec(query).first()
-
-    if not application:
-        raise HTTPException(status_code=404, detail="Application not found")
-
-    original_status = application.status
-    application.status = application_update.status
-    db.add(application)
-
-    # If approved for the first time, create a corresponding enrollment record
-    if application.status == ApplicationStatus.APPROVED and original_status != ApplicationStatus.APPROVED:
-        existing_enrollment = db.exec(
-            select(Enrollment).where(
-                Enrollment.user_id == application.user_id,
-                Enrollment.course_id == application.course_id
-            )
-        ).first()
-
-        if not existing_enrollment:
-            new_enrollment = Enrollment(
-                user_id=application.user_id,
-                course_id=application.course_id,
-                status="pending"  # User still needs to pay
-            )
-            db.add(new_enrollment)
-
-    db.commit()
-
-    # Send email notification
-    try:
-        if application.status == ApplicationStatus.APPROVED:
-            send_application_approved_email(
-                to_email=application.user.email,
-                course_title=application.course.title
-            )
-        elif application.status == ApplicationStatus.REJECTED:
-            send_enrollment_rejected_email(
-                to_email=application.user.email,
-                course_title=application.course.title,
-                rejection_reason=application_update.rejection_reason or "No reason provided."
-            )
-    except Exception as e:
-        logger.error(f"Failed to send email notification for application {application.id}: {e}")
-        # Do not fail the request if email fails, but log it.
-
-    db.refresh(application)
-    return application
