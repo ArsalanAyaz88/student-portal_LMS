@@ -7,7 +7,8 @@ import logging
 from src.app.db.session import get_db
 from src.app.models.user import User
 from src.app.models.course import Course
-from src.app.models.enrollment import ApplicationStatus, PaymentProof, EnrollmentApplication
+from src.app.models.enrollment_application import ApplicationStatus, EnrollmentApplication
+from src.app.models.payment_proof import PaymentProof
 from src.app.models.bank_account import BankAccount
 from src.app.schemas.enrollment import PaymentProofRead, EnrollmentApplicationCreate, EnrollmentApplicationRead
 from src.app.utils.dependencies import get_current_user
