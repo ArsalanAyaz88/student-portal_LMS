@@ -189,6 +189,25 @@ async def submit_payment_proof(
     return {"message": "Payment proof submitted successfully."}
 
 
+@router.get("/{course_id}/status")
+def get_enrollment_status(
+    course_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    application = db.exec(
+        select(EnrollmentApplication).where(
+            EnrollmentApplication.user_id == current_user.id,
+            EnrollmentApplication.course_id == course_id
+        )
+    ).first()
+
+    if not application:
+        return {"status": "NOT_APPLIED"}
+    
+    return {"status": application.status.value}
+
+
 @router.get("/admin/applications", response_model=list[EnrollmentApplicationRead])
 def get_all_applications(
     db: Session = Depends(get_db),

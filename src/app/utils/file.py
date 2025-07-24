@@ -85,8 +85,8 @@ async def save_upload_and_get_url(file: UploadFile, folder: str = "") -> str:
         public_id = f"{file_id}"
         
         # Upload the file
-        file.file.seek(0)
-        return await upload_file_to_cloudinary(file.file, public_id, folder)
+        file_content = await file.read()
+        return await upload_file_to_cloudinary(file_content, public_id, folder)
         
     except Exception as e:
         logger.error(f"Error processing file upload: {str(e)}")
