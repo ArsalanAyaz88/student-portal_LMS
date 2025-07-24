@@ -8,7 +8,7 @@
 from .user import User
 from .profile import Profile
 from .oauth import OAuthAccount
-from .password_reset import PasswordResetToken
+from .password_reset import PasswordReset
 from .bank_account import BankAccount
 
 # --- Course-related Models ---
@@ -35,7 +35,7 @@ __all__ = [
     "User",
     "Profile",
     "OAuthAccount",
-    "PasswordResetToken",
+    "PasswordReset",
     "BankAccount",
     "Course",
     "Video",
