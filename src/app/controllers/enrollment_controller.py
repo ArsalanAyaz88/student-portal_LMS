@@ -121,7 +121,7 @@ async def submit_payment_proof(
     return proof
 
 
-@router.get("/{course_id}/status", summary="Check enrollment status for a course")
+@router.get("/{course_id}/status", response_model=EnrollmentStatusResponse, summary="Check enrollment status for a course")
 def get_application_status(
     course_id: uuid.UUID,
     db: Session = Depends(get_db),
