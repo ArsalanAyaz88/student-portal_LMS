@@ -77,4 +77,7 @@ class PaymentProofRead(BaseModel):
         from_attributes = True
 
 # Manually update forward references to resolve circular dependencies
+from .user import UserRead
+from .course import CourseRead
+
 EnrollmentApplicationRead.model_rebuild()
