@@ -13,13 +13,15 @@ import logging
 
 # ─── Local imports ─────────────────────────────────────────────
 from src.app.db.session import create_db_and_tables
-from src.app import models  # FIX: Import all models to ensure they are registered with SQLAlchemy metadata
 
-# Import all necessary schemas for model_rebuild
-from src.app.schemas.user import UserRead
-from src.app.schemas.course import CourseRead, CourseExploreDetail, CourseDetail
-from src.app.schemas.enrollment import EnrollmentApplicationRead
-from src.app.schemas.video import VideoRead, VideoWithProgress, VideoPreview
+# FIX: Explicitly import all models to ensure they are available for mapper configuration
+from src.app.models.user import User
+from src.app.models.enrollment import Enrollment, EnrollmentApplication
+from src.app.models.course import Course
+from src.app.models.payment import PaymentProof
+from src.app.models.profile import Profile
+from src.app.models.video import Video
+# ... import other models as needed
 
 # Import routers
 from src.app.routers import (
@@ -56,35 +58,22 @@ app.add_middleware(
 # ─── Consolidated Startup Events ────────────────────────────────
 @app.on_event("startup")
 async def on_startup():
-    # FIX: Step 1 - Explicitly configure SQLAlchemy mappers before anything else.
-    # This is the definitive fix for the "failed to locate a name" mapper error.
+    # Step 1: Configure SQLAlchemy mappers
     logging.info("Configuring SQLAlchemy mappers...")
-    configure_mappers()
-    logging.info("Mappers configured successfully.")
+    try:
+        configure_mappers()
+        logging.info("Mappers configured successfully.")
+    except Exception as e:
+        logging.error(f"Mapper configuration failed: {e}", exc_info=True)
+        raise
 
-    # FIX: Step 2 - Explicitly rebuild models before any DB operations
-    # This resolves all forward references for Pydantic/SQLModel.
-    logging.info("Rebuilding Pydantic models to resolve forward references...")
-    UserRead.model_rebuild()
-    CourseRead.model_rebuild()
-    CourseDetail.model_rebuild()
-    CourseExploreDetail.model_rebuild()
-    EnrollmentApplicationRead.model_rebuild()
-    VideoRead.model_rebuild()
-    VideoWithProgress.model_rebuild()
-    VideoPreview.model_rebuild()
-    logging.info("Pydantic models rebuilt successfully.")
-
+    # Step 2: Create database and tables
     logging.info("Creating database and tables...")
     try:
         create_db_and_tables()
     except Exception as e:
         logging.error(f"Failed to create database and tables: {e}", exc_info=True)
         raise
-
-    # Step 3: Log relationships (optional)
-    logging.info("Course relationships: %s", inspect(models.Course).relationships)
-    logging.info("Video relationships: %s", inspect(models.Video).relationships)
 
 # ─── Routers ───────────────────────────────────────────────────
 app.include_router(auth_router.router, prefix="/api/auth", tags=["Authentication"])
