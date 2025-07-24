@@ -7,9 +7,8 @@ from typing import Optional, TYPE_CHECKING
 # Import ApplicationStatus from the correct model file
 from src.app.models.enrollment import ApplicationStatus
 
-if TYPE_CHECKING:
-    from .user import UserRead
-    from .course import CourseRead
+from .user import UserRead
+from .course import CourseRead
 
 # --- Enrollment Schemas ---
 
