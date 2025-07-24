@@ -62,16 +62,18 @@ async def startup_tasks():
 
     # Step 2: Rebuild all Pydantic models in correct order
     try:
-        # Base models first
+        # --- Tier 1: Base models with no or minimal dependencies ---
         UserRead.model_rebuild()
         CourseRead.model_rebuild()
-        CourseExploreDetail.model_rebuild()
-        CourseDetail.model_rebuild()
         VideoRead.model_rebuild()
-        VideoWithProgress.model_rebuild()
 
-        # Dependent models next
-        EnrollmentApplicationRead.model_rebuild()
+        # --- Tier 2: Models that depend on Tier 1 ---
+        CourseExploreDetail.model_rebuild() # Depends on CourseRead
+        CourseDetail.model_rebuild()      # Depends on VideoRead
+        VideoWithProgress.model_rebuild() # Depends on VideoRead
+
+        # --- Tier 3: Models that depend on Tier 1 and/or Tier 2 ---
+        EnrollmentApplicationRead.model_rebuild() # Depends on UserRead, CourseRead
 
         # Log success
         logging.info("All Pydantic models rebuilt successfully")
