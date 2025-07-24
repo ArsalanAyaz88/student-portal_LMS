@@ -54,38 +54,25 @@ app.add_middleware(
 
 # ─── Consolidated Startup Events ────────────────────────────────
 @app.on_event("startup")
-async def startup_tasks():
-    # Step 1: Create database tables
-    create_db_and_tables()
+async def on_startup():
+    # FIX: Explicitly rebuild models before any DB operations
+    # This resolves all forward references and is the key to fixing the mapper error.
+    logging.info("Rebuilding Pydantic models to resolve forward references...")
+    UserRead.model_rebuild()
+    CourseRead.model_rebuild()
+    CourseDetail.model_rebuild()
+    CourseExploreDetail.model_rebuild()
+    EnrollmentApplicationRead.model_rebuild()
+    VideoRead.model_rebuild()
+    VideoWithProgress.model_rebuild()
+    VideoPreview.model_rebuild()
+    logging.info("Pydantic models rebuilt successfully.")
 
-    # Step 2: Rebuild all Pydantic models in correct order
-    logging.basicConfig(level=logging.INFO) # Basic config for logging
+    logging.info("Creating database and tables...")
     try:
-        # --- Tier 1: Base models with no or minimal dependencies ---
-        logging.info("Rebuilding UserRead...")
-        UserRead.model_rebuild()
-        logging.info("Rebuilding CourseRead...")
-        CourseRead.model_rebuild()
-        logging.info("Rebuilding VideoRead...")
-        VideoRead.model_rebuild()
-        logging.info("Rebuilding VideoPreview...")
-        VideoPreview.model_rebuild()
-
-        # --- Tier 2: Models that depend on Tier 1 ---
-        logging.info("Rebuilding CourseExploreDetail...")
-        CourseExploreDetail.model_rebuild()
-        logging.info("Rebuilding CourseDetail...")
-        CourseDetail.model_rebuild()
-        logging.info("Rebuilding VideoWithProgress...")
-        VideoWithProgress.model_rebuild()
-
-        # --- Tier 3: Models that depend on Tier 1 and/or Tier 2 ---
-        logging.info("Rebuilding EnrollmentApplicationRead...")
-        EnrollmentApplicationRead.model_rebuild()
-
-        logging.info("All Pydantic models rebuilt successfully")
+        create_db_and_tables()
     except Exception as e:
-        logging.error(f"Failed to rebuild Pydantic models: {e}", exc_info=True)
+        logging.error(f"Failed to create database and tables: {e}", exc_info=True)
         raise
 
     # Step 3: Log relationships (optional)
