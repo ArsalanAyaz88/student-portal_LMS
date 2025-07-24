@@ -1,27 +1,39 @@
 # File: app/models/enrollment.py
 import uuid
 import enum
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional, TYPE_CHECKING, List
 
-import pytz
-from pydantic import validator
 from sqlalchemy import Enum as SQLAlchemyEnum
-from sqlmodel import SQLModel, Field, Relationship, JSON
-
-from src.app.utils.time import get_pakistan_time, convert_to_pakistan_time
+from sqlmodel import SQLModel, Field, Relationship
 
 if TYPE_CHECKING:
     from .user import User
     from .course import Course
-    from .payment_proof import PaymentProof
 
-# --- Enrollment Application Model ---
+# --- Enums ---
 
 class ApplicationStatus(str, enum.Enum):
     PENDING = "pending"
     APPROVED = "approved"
     REJECTED = "rejected"
+
+# --- Models ---
+
+class PaymentProof(SQLModel, table=True):
+    __tablename__ = "paymentproof"
+    
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    proof_url: str
+    uploaded_at: datetime = Field(default_factory=datetime.utcnow)
+    is_verified: bool = False
+
+    # FIX: Added the foreign key to link back to the application
+    application_id: uuid.UUID = Field(foreign_key="enrollment_applications.id")
+    
+    # FIX: Defined the other side of the relationship
+    application: "EnrollmentApplication" = Relationship(back_populates="payment_proofs")
+
 
 class EnrollmentApplication(SQLModel, table=True):
     __tablename__ = "enrollment_applications"
@@ -44,53 +56,24 @@ class EnrollmentApplication(SQLModel, table=True):
 
     user: "User" = Relationship(back_populates="enrollment_applications")
     course: "Course" = Relationship(back_populates="enrollment_applications")
-    payment_proofs: List["PaymentProof"] = Relationship(back_populates="application", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+    
+    # FIX: Completed the bi-directional relationship
+    payment_proofs: List["PaymentProof"] = Relationship(
+        back_populates="application", 
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
 
-
-# --- Enrollment Model ---
 
 class Enrollment(SQLModel, table=True):
-    __table_args__ = {"extend_existing": True}
+    __tablename__ = "enrollments"
+    
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     user_id: uuid.UUID = Field(foreign_key="user.id")
     course_id: uuid.UUID = Field(foreign_key="course.id")
-    status: str = Field(default="pending")  # pending, approved, rejected
-    enroll_date: datetime = Field(default_factory=get_pakistan_time)
+    status: str = Field(default="pending")
+    enroll_date: datetime = Field(default_factory=datetime.utcnow)
     expiration_date: Optional[datetime] = None
     is_accessible: bool = Field(default=False)
-    days_remaining: Optional[int] = None
-    audit_log: list = Field(sa_type=JSON, default_factory=list)
-    last_access_date: Optional[datetime] = None
-
-    @validator('enroll_date', 'expiration_date', 'last_access_date', pre=True)
-    def validate_timezone(cls, v):
-        """Ensure all datetime fields are timezone-aware and in Pakistan time"""
-        if v is None:
-            return v
-        if v.tzinfo is None:
-            # Assuming naive datetimes are UTC, then localizing to Pakistan time
-            v = pytz.UTC.localize(v)
-        return convert_to_pakistan_time(v)
 
     user: "User" = Relationship(back_populates="enrollments")
     course: "Course" = Relationship(back_populates="enrollments")
-
-    def update_expiration_status(self):
-        """Update the expiration status and days remaining"""
-        current_time = get_pakistan_time()
-        
-        if self.expiration_date:
-            # Ensure both datetimes are timezone-aware
-            if self.expiration_date.tzinfo is None:
-                self.expiration_date = convert_to_pakistan_time(self.expiration_date)
-            
-            # Calculate days remaining using timezone-aware datetimes
-            time_diff = self.expiration_date - current_time
-            self.days_remaining = time_diff.days
-            
-            # Update is_accessible based on expiration
-            self.is_accessible = time_diff.total_seconds() > 0
-        else:
-            self.days_remaining = None
-            self.is_accessible = True # Or False, depending on desired logic for no expiration
-        self.last_access_date = current_time

@@ -1,9 +1,10 @@
 # File: app/schemas/enrollment.py
 import uuid
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import Optional, TYPE_CHECKING
 
+# Import ApplicationStatus from the correct model file
 from src.app.models.enrollment import ApplicationStatus
 
 if TYPE_CHECKING:
@@ -21,10 +22,7 @@ class EnrollmentRead(BaseModel):
     status: str
     enroll_date: Optional[datetime]
     expiration_date: Optional[datetime]
-    days_remaining: Optional[int]
-    is_expired: bool
     is_accessible: bool
-    last_access_date: Optional[datetime]
 
     class Config:
         from_attributes = True
@@ -45,14 +43,8 @@ class EnrollmentApplicationCreate(EnrollmentApplicationBase):
     course_id: uuid.UUID
     qualification_certificate_url: str
 
-class EnrollmentApplicationUpdate(BaseModel):
-    status: ApplicationStatus
-    rejection_reason: Optional[str] = None
-
 class EnrollmentApplicationRead(EnrollmentApplicationBase):
     id: uuid.UUID
-    user_id: uuid.UUID # Keep this for direct access
-    course_id: uuid.UUID # Keep this for direct access
     user: "UserRead"
     course: "CourseRead"
     status: ApplicationStatus
@@ -65,6 +57,7 @@ class EnrollmentApplicationRead(EnrollmentApplicationBase):
 
 class PaymentProofCreate(BaseModel):
     application_id: uuid.UUID
+    proof_url: str
 
 class PaymentProofRead(BaseModel):
     id: uuid.UUID
@@ -76,8 +69,5 @@ class PaymentProofRead(BaseModel):
     class Config:
         from_attributes = True
 
-# Manually update forward references to resolve circular dependencies
-from .user import UserRead
-from .course import CourseRead
-
+# Manually update forward references
 EnrollmentApplicationRead.model_rebuild()
