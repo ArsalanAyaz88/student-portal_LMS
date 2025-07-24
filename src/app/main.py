@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, SQLModel, create_engine, select
 from sqlalchemy import inspect
+from sqlalchemy.orm import configure_mappers
 from dotenv import load_dotenv
 import logging
 
@@ -55,8 +56,14 @@ app.add_middleware(
 # ─── Consolidated Startup Events ────────────────────────────────
 @app.on_event("startup")
 async def on_startup():
-    # FIX: Explicitly rebuild models before any DB operations
-    # This resolves all forward references and is the key to fixing the mapper error.
+    # FIX: Step 1 - Explicitly configure SQLAlchemy mappers before anything else.
+    # This is the definitive fix for the "failed to locate a name" mapper error.
+    logging.info("Configuring SQLAlchemy mappers...")
+    configure_mappers()
+    logging.info("Mappers configured successfully.")
+
+    # FIX: Step 2 - Explicitly rebuild models before any DB operations
+    # This resolves all forward references for Pydantic/SQLModel.
     logging.info("Rebuilding Pydantic models to resolve forward references...")
     UserRead.model_rebuild()
     CourseRead.model_rebuild()
