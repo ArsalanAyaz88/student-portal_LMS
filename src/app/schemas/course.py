@@ -4,8 +4,8 @@ from typing import List, Optional, TYPE_CHECKING
 from datetime import datetime
 import uuid
 
-if TYPE_CHECKING:
-    from . import video
+# Import the video schema module to resolve forward references at runtime
+from . import video
 
 class CourseBase(BaseModel):
     title: str = Field(..., example="The Complete Web Development Bootcamp")
