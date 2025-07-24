@@ -8,9 +8,12 @@ from typing import Optional, TYPE_CHECKING, List
 from sqlalchemy import Enum as SQLAlchemyEnum
 from sqlmodel import SQLModel, Field, Relationship
 
+# FIX: Import models directly at the top level for SQLAlchemy to resolve relationships at runtime.
+from src.app.models.user import User
+from src.app.models.course import Course
+from src.app.models.payment import PaymentProof # Assuming PaymentProof is in payment.py
+
 if TYPE_CHECKING:
-    from src.app.models.user import User
-    from src.app.models.course import Course
     from src.app.models.bank_account import BankAccount
 
 # --- Enums ---

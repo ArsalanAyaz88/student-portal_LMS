@@ -3,14 +3,16 @@ from sqlmodel import SQLModel, Field, Relationship
 import uuid
 from typing import Optional, List, TYPE_CHECKING
 
+# FIX: Import all related models directly for SQLAlchemy to resolve relationships at runtime.
+from src.app.models.assignment import AssignmentSubmission
+from src.app.models.enrollment import Enrollment, EnrollmentApplication
+from src.app.models.oauth import OAuthAccount
+from src.app.models.profile import Profile
+from src.app.models.video_progress import VideoProgress
+from src.app.models.quiz import QuizSubmission
+
 if TYPE_CHECKING:
-    from src.app.models.assignment import AssignmentSubmission
-    from src.app.models.enrollment import Enrollment
-    from src.app.models.oauth import OAuthAccount
-    from src.app.models.profile import Profile
-    from src.app.models.video_progress import VideoProgress
-    from src.app.models.quiz import QuizSubmission
-    from src.app.models.enrollment import EnrollmentApplication
+    pass  # Keep block for any future non-runtime type hints
 
 class User(SQLModel, table=True):
     __table_args__ = {"extend_existing": True}
