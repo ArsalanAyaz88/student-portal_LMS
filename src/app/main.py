@@ -14,6 +14,7 @@ import logging
 # ─── Local imports ─────────────────────────────────────────────
 from src.app.db.session import create_db_and_tables
 from src.app.models.course import Course
+from src.app.models.enrollment import Enrollment # FIX: Import Enrollment to ensure table creation
 from src.app.models.video import Video
 
 # Import all necessary schemas for model_rebuild
