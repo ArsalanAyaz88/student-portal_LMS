@@ -59,37 +59,46 @@ def get_application_status(
 
 @router.get("/courses/{course_id}/purchase-info")
 def get_purchase_info(course_id: uuid.UUID, session: Session = Depends(get_db)):
-    logger.info(f"Attempting to get purchase info for course_id: {course_id}")
-    
-    course = session.get(Course, course_id)
-    if not course:
-        logger.warning(f"Course with id {course_id} not found in the database.")
-        raise HTTPException(status_code=404, detail="Course not found")
-    
-    logger.info(f"Found course: {course.title}")
+    try:
+        logger.info(f"Attempting to get purchase info for course_id: {course_id}")
+        
+        course = session.get(Course, course_id)
+        if not course:
+            logger.warning(f"Course with id {course_id} not found in the database.")
+            raise HTTPException(status_code=404, detail="Course not found")
+        
+        logger.info(f"Found course: {course.title}")
 
-    # Fetch all bank accounts, not just the first one
-    bank_accounts = session.exec(select(BankAccount)).all()
-    if not bank_accounts:
-        logger.warning("No bank account details found in the database.")
-        raise HTTPException(status_code=404, detail="Bank account details not found.")
+        # Fetch all bank accounts, not just the first one
+        bank_accounts = session.exec(select(BankAccount)).all()
+        if not bank_accounts:
+            logger.warning("No bank account details found in the database.")
+            raise HTTPException(status_code=404, detail="Bank account details not found.")
 
-    logger.info(f"Found {len(bank_accounts)} bank account(s).")
+        logger.info(f"Found {len(bank_accounts)} bank account(s).")
 
-    # Format bank accounts to match the frontend interface
-    formatted_accounts = [
-        {
-            "bank_name": acc.bank_name,
-            "account_name": acc.account_title, # Matching frontend's 'account_name'
-            "account_number": acc.account_number
-        } for acc in bank_accounts
-    ]
+        # Format bank accounts to match the frontend interface
+        formatted_accounts = [
+            {
+                "bank_name": acc.bank_name,
+                "account_name": acc.account_title, # Matching frontend's 'account_name'
+                "account_number": acc.account_number
+            } for acc in bank_accounts
+        ]
 
-    return {
-        "course_title": course.title,
-        "course_price": course.price,
-        "bank_accounts": formatted_accounts
-    }
+        return {
+            "course_title": course.title,
+            "course_price": course.price,
+            "bank_accounts": formatted_accounts
+        }
+    except HTTPException:
+        # Re-raise HTTPException to avoid catching it in the generic exception handler
+        raise
+    except Exception as e:
+        # Log the full traceback for debugging
+        logger.exception(f"An unexpected error occurred in get_purchase_info for course_id: {course_id} - Error: {e}")
+        # Raise a generic 500 error to the client
+        raise HTTPException(status_code=500, detail="An internal server error occurred.")
 
 @router.post("/upload-certificate")
 async def upload_certificate(
