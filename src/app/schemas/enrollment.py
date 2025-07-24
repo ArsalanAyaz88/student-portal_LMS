@@ -76,3 +76,7 @@ class PaymentProofRead(BaseModel):
 
     class Config:
         from_attributes = True
+
+# FIX: Rebuild the model to resolve forward references like 'User' and 'Course'
+# This is the key to fixing the SQLAlchemy mapper error without causing circular imports.
+EnrollmentApplicationRead.model_rebuild()
