@@ -3,16 +3,18 @@ from __future__ import annotations
 import uuid
 import enum
 from datetime import datetime
-from typing import Optional, TYPE_CHECKING, List
+from typing import Optional, List
 
 from sqlalchemy import Enum as SQLAlchemyEnum
 from sqlmodel import SQLModel, Field, Relationship
 
-if TYPE_CHECKING:
-    from src.app.models.user import User
-    from src.app.models.course import Course
-    from src.app.models.bank_account import BankAccount
-    from src.app.models.payment import PaymentProof
+# --- Direct Imports to Resolve Circular Dependency ---
+# In this complex scenario, the standard TYPE_CHECKING approach is failing.
+# We are importing directly to ensure the names 'User' and 'Course' are in the
+# global scope when SQLAlchemy's mappers are configured.
+from src.app.models.user import User
+from src.app.models.course import Course
+from src.app.models.payment import PaymentProof
 
 # --- Enums ---
 
@@ -45,8 +47,8 @@ class EnrollmentApplication(SQLModel, table=True):
     user_id: uuid.UUID = Field(foreign_key="user.id")
     course_id: uuid.UUID = Field(foreign_key="course.id")
 
-    user: "User" = Relationship(back_populates="enrollment_applications")
-    course: "Course" = Relationship(back_populates="enrollment_applications")
+    user: "User" = Relationship(back_populates="enrollment_applications", sa_relationship_kwargs={"foreign_keys": "[EnrollmentApplication.user_id]"})
+    course: "Course" = Relationship(back_populates="enrollment_applications", sa_relationship_kwargs={"foreign_keys": "[EnrollmentApplication.course_id]"})
     
     # Relationship to payment proofs
     payment_proofs: List["PaymentProof"] = Relationship(back_populates="application", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
@@ -63,5 +65,5 @@ class Enrollment(SQLModel, table=True):
     expiration_date: Optional[datetime] = None
     is_accessible: bool = Field(default=False)
 
-    user: "User" = Relationship(back_populates="enrollments")
-    course: "Course" = Relationship(back_populates="enrollments")
+    user: "User" = Relationship(back_populates="enrollments", sa_relationship_kwargs={"foreign_keys": "[Enrollment.user_id]"})
+    course: "Course" = Relationship(back_populates="enrollments", sa_relationship_kwargs={"foreign_keys": "[Enrollment.course_id]"})

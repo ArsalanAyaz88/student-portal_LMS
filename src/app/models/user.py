@@ -28,6 +28,6 @@ class User(SQLModel, table=True):
     assignment_submissions: List["AssignmentSubmission"] = Relationship(back_populates="student")
     video_progress: List["VideoProgress"] = Relationship(back_populates="user")
     quiz_submissions: List["QuizSubmission"] = Relationship(back_populates="student")
-    enrollment_applications: List["EnrollmentApplication"] = Relationship(back_populates="user")
-    enrollments: List["Enrollment"] = Relationship(back_populates="user")
+    enrollment_applications: List["EnrollmentApplication"] = Relationship(back_populates="user", sa_relationship_kwargs={"foreign_keys": "[EnrollmentApplication.user_id]"})
+    enrollments: List["Enrollment"] = Relationship(back_populates="user", sa_relationship_kwargs={"foreign_keys": "[Enrollment.user_id]"})
 
