@@ -6,11 +6,10 @@ from datetime import datetime
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, SQLModel, create_engine, select
-import logging
+from datetime import datetime
 from sqlalchemy import inspect
 from dotenv import load_dotenv
-import cloudinary
-from datetime import datetime
+import logging
 
 # ─── Local imports ─────────────────────────────────────────────
 from src.app.db.session import create_db_and_tables
@@ -58,40 +57,32 @@ app.add_middleware(
 # ─── Consolidated Startup Events ────────────────────────────────
 @app.on_event("startup")
 async def startup_tasks():
-    """
-    Run all startup tasks in the correct order to prevent errors.
-    """
-    print("INFO:     Running startup tasks...")
-
-    # Step 1: Create database and tables
-    print("INFO:     Creating database and tables...")
+    # Step 1: Create database tables
     create_db_and_tables()
 
-    # Step 2: Rebuild all Pydantic models in the correct dependency order
-    print("INFO:     Rebuilding Pydantic models...")
+    # Step 2: Rebuild all Pydantic models in correct order
     try:
         # Base models first
         UserRead.model_rebuild()
         CourseRead.model_rebuild()
-        VideoRead.model_rebuild()
-
-        # Dependent models next
         CourseExploreDetail.model_rebuild()
         CourseDetail.model_rebuild()
+        VideoRead.model_rebuild()
         VideoWithProgress.model_rebuild()
+
+        # Dependent models next
         EnrollmentApplicationRead.model_rebuild()
-        print("INFO:     Pydantic models rebuilt successfully.")
+
+        # Log success
+        logging.info("All Pydantic models rebuilt successfully")
     except Exception as e:
-        logging.error(f"Failed to rebuild Pydantic models: {e}", exc_info=True)
-        # Depending on the desired behavior, you might want to raise the exception
-        # to prevent the app from starting in a broken state.
+        logging.error(f"Failed to rebuild models: {e}")
         raise
 
-    # Step 3: Log relationships (optional for debugging)
+    # Step 3: Log relationships (optional)
     logging.basicConfig(level=logging.INFO)
     logging.info("Course relationships: %s", inspect(Course).relationships)
     logging.info("Video relationships: %s", inspect(Video).relationships)
-    print("INFO:     Startup tasks completed.")
 
 # ─── Routers ───────────────────────────────────────────────────
 app.include_router(auth_router.router, prefix="/api/auth", tags=["Authentication"])
