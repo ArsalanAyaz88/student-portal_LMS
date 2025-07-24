@@ -13,7 +13,8 @@ from src.app.models.bank_account import BankAccount
 from src.app.schemas.payment_proof import ProofCreate
 from src.app.schemas.enrollment_application_schema import EnrollmentApplicationCreate, EnrollmentApplicationRead
 from src.app.utils.dependencies import get_current_user
-from src.app.controllers.admin_controller import create_admin_notification
+from src.app.models.notification import Notification
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -48,6 +49,16 @@ def apply_for_enrollment(
     new_application.status = ApplicationStatus.PENDING
     
     db.add(new_application)
+
+    # Create a notification for the admin
+    notification = Notification(
+        user_id=current_user.id, # The user who performed the action
+        course_id=application_data.course_id,
+        event_type="new_enrollment_application",
+        details=f"New enrollment application from {current_user.name} for course: {application_data.course_id}."
+    )
+    db.add(notification)
+    
     db.commit()
     db.refresh(new_application)
 
@@ -92,6 +103,16 @@ async def submit_payment_proof(
         status='pending'
     )
     db.add(proof)
+
+    # Create a notification for the admin
+    notification = Notification(
+        user_id=current_user.id,
+        course_id=course_id,
+        event_type="payment_proof_submitted",
+        details=f"Payment proof submitted by {current_user.name} for course: {course_id}."
+    )
+    db.add(notification)
+
     db.commit()
     db.refresh(proof)
     
