@@ -59,19 +59,36 @@ def get_application_status(
 
 @router.get("/courses/{course_id}/purchase-info")
 def get_purchase_info(course_id: uuid.UUID, session: Session = Depends(get_db)):
+    logger.info(f"Attempting to get purchase info for course_id: {course_id}")
+    
     course = session.get(Course, course_id)
     if not course:
+        logger.warning(f"Course with id {course_id} not found in the database.")
         raise HTTPException(status_code=404, detail="Course not found")
     
-    bank_account = session.exec(select(BankAccount)).first()
-    if not bank_account:
+    logger.info(f"Found course: {course.title}")
+
+    # Fetch all bank accounts, not just the first one
+    bank_accounts = session.exec(select(BankAccount)).all()
+    if not bank_accounts:
+        logger.warning("No bank account details found in the database.")
         raise HTTPException(status_code=404, detail="Bank account details not found.")
 
+    logger.info(f"Found {len(bank_accounts)} bank account(s).")
+
+    # Format bank accounts to match the frontend interface
+    formatted_accounts = [
+        {
+            "bank_name": acc.bank_name,
+            "account_name": acc.account_title, # Matching frontend's 'account_name'
+            "account_number": acc.account_number
+        } for acc in bank_accounts
+    ]
+
     return {
+        "course_title": course.title,
         "course_price": course.price,
-        "account_title": bank_account.account_title,
-        "account_number": bank_account.account_number,
-        "bank_name": bank_account.bank_name
+        "bank_accounts": formatted_accounts
     }
 
 @router.post("/upload-certificate")
