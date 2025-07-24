@@ -20,7 +20,7 @@ from src.app.models.video import Video
 from src.app.schemas.user import UserRead
 from src.app.schemas.course import CourseRead, CourseExploreDetail, CourseDetail
 from src.app.schemas.enrollment import EnrollmentApplicationRead
-from src.app.schemas.video import VideoRead, VideoWithProgress
+from src.app.schemas.video import VideoRead, VideoWithProgress, VideoPreview
 
 # Import routers
 from src.app.routers import (
@@ -70,6 +70,8 @@ async def startup_tasks():
         CourseRead.model_rebuild()
         logging.info("Rebuilding VideoRead...")
         VideoRead.model_rebuild()
+        logging.info("Rebuilding VideoPreview...")
+        VideoPreview.model_rebuild()
 
         # --- Tier 2: Models that depend on Tier 1 ---
         logging.info("Rebuilding CourseExploreDetail...")
