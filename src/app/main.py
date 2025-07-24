@@ -61,28 +61,34 @@ async def startup_tasks():
     create_db_and_tables()
 
     # Step 2: Rebuild all Pydantic models in correct order
+    logging.basicConfig(level=logging.INFO) # Basic config for logging
     try:
         # --- Tier 1: Base models with no or minimal dependencies ---
+        logging.info("Rebuilding UserRead...")
         UserRead.model_rebuild()
+        logging.info("Rebuilding CourseRead...")
         CourseRead.model_rebuild()
+        logging.info("Rebuilding VideoRead...")
         VideoRead.model_rebuild()
 
         # --- Tier 2: Models that depend on Tier 1 ---
-        CourseExploreDetail.model_rebuild() # Depends on CourseRead
-        CourseDetail.model_rebuild()      # Depends on VideoRead
-        VideoWithProgress.model_rebuild() # Depends on VideoRead
+        logging.info("Rebuilding CourseExploreDetail...")
+        CourseExploreDetail.model_rebuild()
+        logging.info("Rebuilding CourseDetail...")
+        CourseDetail.model_rebuild()
+        logging.info("Rebuilding VideoWithProgress...")
+        VideoWithProgress.model_rebuild()
 
         # --- Tier 3: Models that depend on Tier 1 and/or Tier 2 ---
-        EnrollmentApplicationRead.model_rebuild() # Depends on UserRead, CourseRead
+        logging.info("Rebuilding EnrollmentApplicationRead...")
+        EnrollmentApplicationRead.model_rebuild()
 
-        # Log success
         logging.info("All Pydantic models rebuilt successfully")
     except Exception as e:
-        logging.error(f"Failed to rebuild models: {e}")
+        logging.error(f"Failed to rebuild Pydantic models: {e}", exc_info=True)
         raise
 
     # Step 3: Log relationships (optional)
-    logging.basicConfig(level=logging.INFO)
     logging.info("Course relationships: %s", inspect(Course).relationships)
     logging.info("Video relationships: %s", inspect(Video).relationships)
 
