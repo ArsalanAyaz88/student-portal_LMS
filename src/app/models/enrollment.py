@@ -45,8 +45,8 @@ class EnrollmentApplication(SQLModel, table=True):
     user_id: uuid.UUID = Field(foreign_key="user.id")
     course_id: uuid.UUID = Field(foreign_key="course.id")
 
-    user: "User" = Relationship()
-    course: "Course" = Relationship()  # back_populates removed as it was incorrect
+    user: "User" = Relationship(back_populates="enrollment_applications")
+    course: "Course" = Relationship(back_populates="enrollment_applications")
     
     # Relationship to payment proofs
     payment_proofs: List["PaymentProof"] = Relationship(back_populates="application", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
