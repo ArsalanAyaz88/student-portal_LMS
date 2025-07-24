@@ -12,16 +12,20 @@ from dotenv import load_dotenv
 import logging
 
 # ─── Local imports ─────────────────────────────────────────────
+from sqlalchemy.orm import configure_mappers
 from src.app.db.session import create_db_and_tables
 
-# FIX: Explicitly import all models to ensure they are available for mapper configuration
-from src.app.models.user import User
-from src.app.models.enrollment import Enrollment, EnrollmentApplication
-from src.app.models.course import Course
-from src.app.models.payment import PaymentProof
-from src.app.models.profile import Profile
-from src.app.models.video import Video
-# ... import other models as needed
+# --- Explicitly Import All Models ---
+# This is the definitive fix to ensure all models are loaded into SQLAlchemy's
+# metadata before any mapper configuration or table creation is attempted.
+# It resolves circular dependency issues that can occur during startup.
+from src.app.models import (
+    User, Profile, OAuthAccount, PasswordReset, BankAccount,
+    Course, Video, Assignment, Quiz, Question, Option,
+    Enrollment, EnrollmentApplication, CourseProgress, VideoProgress,
+    QuizAuditLog, CourseFeedback, PaymentProof, Notification, Certificate
+)
+# --- End of Explicit Imports ---
 
 # Import routers
 from src.app.routers import (
@@ -58,9 +62,9 @@ app.add_middleware(
 # ─── Consolidated Startup Events ────────────────────────────────
 @app.on_event("startup")
 async def on_startup():
-    # Step 1: Configure SQLAlchemy mappers
     logging.info("Configuring SQLAlchemy mappers...")
     try:
+        # This resolves all relationships between models before any other action.
         configure_mappers()
         logging.info("Mappers configured successfully.")
     except Exception as e:
