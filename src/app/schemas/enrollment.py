@@ -2,14 +2,10 @@
 import uuid
 from datetime import datetime
 from pydantic import BaseModel
-from typing import Optional, TYPE_CHECKING
+from typing import Optional
 
 # Import ApplicationStatus from the correct model file
 from src.app.models.enrollment import ApplicationStatus
-
-if TYPE_CHECKING:
-    from .user import UserRead
-    from .course import CourseRead
 
 # --- Enrollment Schemas ---
 
@@ -77,3 +73,10 @@ class PaymentProofRead(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# Update forward references to resolve circular imports
+from src.app.schemas.user import UserRead
+from src.app.schemas.course import CourseRead
+
+EnrollmentApplicationRead.model_rebuild()

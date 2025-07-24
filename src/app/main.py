@@ -28,7 +28,6 @@ course.CourseDetail.model_rebuild()
 
 video.VideoRead.model_rebuild()
 video.VideoWithProgress.model_rebuild()
-enrollment.EnrollmentApplicationRead.model_rebuild()
 
 from src.app.routers import (
     auth_router,
