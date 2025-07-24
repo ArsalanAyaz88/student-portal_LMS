@@ -47,4 +47,3 @@ async def upload_payment_proof(file: UploadFile = File(...)):
     except Exception as e:
         logger.error(f"Payment proof upload failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Could not upload payment proof: {str(e)}")
-

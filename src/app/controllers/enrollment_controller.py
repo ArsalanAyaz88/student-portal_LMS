@@ -1,5 +1,3 @@
-
-
 from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.orm import Session
 from sqlmodel import select
@@ -142,4 +140,3 @@ def get_purchase_info(course_id: uuid.UUID, session: Session = Depends(get_db)):
             } for acc in bank_accounts
         ]
     }
-
