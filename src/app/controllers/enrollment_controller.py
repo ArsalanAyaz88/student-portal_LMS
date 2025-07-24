@@ -176,6 +176,9 @@ async def submit_payment_proof(
     if not application:
         raise HTTPException(status_code=404, detail="Enrollment application not found.")
 
+    if application.status != ApplicationStatus.APPROVED:
+        raise HTTPException(status_code=403, detail="Your application must be approved before submitting payment.")
+
     file_url = await upload_file_to_cloudinary(file, "payment_proofs")
 
     proof = PaymentProof(
