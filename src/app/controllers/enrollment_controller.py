@@ -10,7 +10,7 @@ from src.app.models.course import Course
 from src.app.models.enrollment_application import ApplicationStatus, EnrollmentApplication
 from src.app.models.payment_proof import PaymentProof
 from src.app.models.bank_account import BankAccount
-from src.app.schemas.payment_proof import PaymentProofCreate
+from src.app.schemas.payment_proof import ProofCreate
 from src.app.schemas.enrollment_application_schema import EnrollmentApplicationCreate, EnrollmentApplicationRead
 from src.app.utils.dependencies import get_current_user
 from src.app.controllers.admin_controller import create_admin_notification
