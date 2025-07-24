@@ -8,7 +8,7 @@ from src.app.db.session import get_db
 from src.app.models.user import User
 from src.app.models.course import Course
 from src.app.models.enrollment import Enrollment, EnrollmentApplication, ApplicationStatus
-from src.app.models.payment_proof import PaymentProof
+
 from src.app.models.bank_account import BankAccount
 from src.app.models.notification import Notification
 from src.app.schemas.enrollment import (
@@ -75,24 +75,20 @@ def apply_for_enrollment(
     return new_application
 
 
-@router.post("/submit-payment-proof", response_model=PaymentProof, summary="Submit payment proof for an enrollment")
+@router.post("/submit-payment-proof", response_model=PaymentProofRead, summary="Submit payment proof for an enrollment")
 async def submit_payment_proof(
+    payment_data: PaymentProofCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-    course_id: uuid.UUID = Body(...),
-    bank_account_id: uuid.UUID = Body(...),
-    transaction_id: str = Body(...),
-    file_url: str = Body(...)
+    current_user: User = Depends(get_current_user)
 ):
     if current_user.role != 'student':
         raise HTTPException(status_code=403, detail="Only students can submit payment proofs")
 
-    application = db.exec(
-        select(EnrollmentApplication).where(
-            EnrollmentApplication.user_id == current_user.id,
-            EnrollmentApplication.course_id == course_id
-        )
-    ).first()
+    application = db.get(EnrollmentApplication, payment_data.application_id)
+
+    # Verify the application belongs to the current user
+    if not application or application.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Application not found or access denied.")
 
     if not application:
         raise HTTPException(status_code=404, detail="No application found for this course.")
@@ -100,30 +96,31 @@ async def submit_payment_proof(
     if application.status != ApplicationStatus.APPROVED:
         raise HTTPException(status_code=403, detail="Your application must be approved before submitting payment.")
 
+    # Create the payment proof record with all details
     proof = PaymentProof(
-        user_id=current_user.id,
-        course_id=course_id,
-        bank_account_id=bank_account_id,
-        transaction_id=transaction_id,
-        proof_url=file_url, # Using the pre-uploaded file URL
-        status='pending'
+        application_id=application.id,
+        transaction_id=payment_data.transaction_id,
+        bank_account_id=payment_data.bank_account_id,
+        proof_url=payment_data.proof_url
     )
     db.add(proof)
+
+    # Set the application status back to PENDING for admin to verify the payment
+    application.status = ApplicationStatus.PENDING
+    db.add(application)
 
     # Create a notification for the admin
     notification = Notification(
         user_id=current_user.id,
-        course_id=course_id,
+        course_id=application.course_id, # Get course_id from the application
         event_type="payment_proof_submitted",
-        details=f"Payment proof submitted by {current_user.name} for course: {course_id}."
+        details=f"Payment proof submitted by {current_user.name} for course: {application.course.title}. Please verify."
     )
     db.add(notification)
 
     db.commit()
     db.refresh(proof)
-    
-    notification_message = f"Payment proof submitted by {current_user.name} for course ID {course_id}."
-    # create_admin_notification(db, notification_message, current_user.id, proof.id)
+    db.refresh(application)
 
     return proof
 
@@ -142,9 +139,9 @@ def get_enrollment_status(
     ).first()
 
     if not application:
-        return {"status": "not_applied"}
+        return {"status": "not_applied", "application_id": None}
     
-    return {"status": application.status.value}
+    return {"status": application.status.value, "application_id": application.id}
 
 
 @router.get("/courses/{course_id}/purchase-info", summary="Get course price and bank details for payment")

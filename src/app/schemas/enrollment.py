@@ -29,6 +29,7 @@ class EnrollmentRead(BaseModel):
 
 class EnrollmentStatusResponse(BaseModel):
     status: str
+    application_id: Optional[uuid.UUID] = None
 
 # --- Enrollment Application Schemas ---
 
@@ -42,6 +43,10 @@ class EnrollmentApplicationBase(BaseModel):
 class EnrollmentApplicationCreate(EnrollmentApplicationBase):
     course_id: uuid.UUID
     qualification_certificate_url: str
+
+class EnrollmentApplicationUpdate(BaseModel):
+    status: ApplicationStatus
+    rejection_reason: Optional[str] = None
 
 class EnrollmentApplicationRead(EnrollmentApplicationBase):
     id: uuid.UUID
@@ -57,11 +62,15 @@ class EnrollmentApplicationRead(EnrollmentApplicationBase):
 
 class PaymentProofCreate(BaseModel):
     application_id: uuid.UUID
+    transaction_id: str
+    bank_account_id: uuid.UUID
     proof_url: str
 
 class PaymentProofRead(BaseModel):
     id: uuid.UUID
     application_id: uuid.UUID
+    transaction_id: str
+    bank_account_id: uuid.UUID
     proof_url: str
     uploaded_at: datetime
     is_verified: bool

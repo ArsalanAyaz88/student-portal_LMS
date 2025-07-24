@@ -45,7 +45,7 @@ from src.app.schemas.course import (
     AdminCourseList, AdminCourseDetail, AdminCourseStats,
     CourseCreate, CourseUpdate, CourseRead, CourseCreateAdmin
 )
-from src.app.schemas.enrollment import EnrollmentApplicationRead
+from src.app.schemas.enrollment import EnrollmentApplicationRead, EnrollmentApplicationUpdate
 from src.app.schemas.notification import NotificationRead, AdminNotificationRead
 from src.app.schemas.quiz import QuizCreate, QuizReadWithDetails, QuizRead, QuizCreateForVideo
 from src.app.schemas.user import UserRead
@@ -385,6 +385,73 @@ def get_notifications(session: Session = Depends(get_db), admin: User = Depends(
             )
         )
     return response_data
+
+
+@router.get("/enrollment-applications", response_model=List[EnrollmentApplicationRead])
+def get_enrollment_applications(
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    """
+    Get all enrollment applications, with user and course details.
+    """
+    applications = db.exec(
+        select(EnrollmentApplication).options(
+            selectinload(EnrollmentApplication.user),
+            selectinload(EnrollmentApplication.course)
+        ).order_by(EnrollmentApplication.id.desc())
+    ).all()
+    return applications
+
+
+@router.put("/enrollment-applications/{application_id}/status", response_model=EnrollmentApplicationRead)
+def update_enrollment_application_status(
+    application_id: uuid.UUID,
+    update_data: EnrollmentApplicationUpdate,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    """
+    Update the status of an enrollment application (approve or reject).
+    If approved, create an enrollment record to grant course access.
+    """
+    application = db.get(EnrollmentApplication, application_id)
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    # Keep track of the old status to see if it's the final approval
+    old_status = application.status
+    application.status = update_data.status
+
+    # If the application is being approved for the first time OR after payment verification
+    if update_data.status == ApplicationStatus.APPROVED and old_status != ApplicationStatus.APPROVED:
+        # Check if an enrollment already exists to avoid duplicates
+        existing_enrollment = db.exec(
+            select(Enrollment).where(
+                Enrollment.user_id == application.user_id,
+                Enrollment.course_id == application.course_id
+            )
+        ).first()
+
+        if not existing_enrollment:
+            # Create the final enrollment record, giving the student access
+            new_enrollment = Enrollment(
+                user_id=application.user_id,
+                course_id=application.course_id,
+                status="active",
+                is_accessible=True,
+                enroll_date=datetime.utcnow(),
+                # Set an expiration date, e.g., 1 year from now
+                expiration_date=datetime.utcnow() + timedelta(days=365)
+            )
+            db.add(new_enrollment)
+
+    db.add(application)
+    db.commit()
+    db.refresh(application)
+    return application
+
+
 @router.put("/courses/{course_id}", response_model=CourseRead)
 async def update_course(
     request: Request,
