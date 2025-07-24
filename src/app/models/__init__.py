@@ -13,7 +13,7 @@ from .notification import Notification
 from .oauth import OAuthAccount
 from .password_reset import PasswordReset
 from .payment import Payment
-from .payment_proof import PaymentProof
+from .payment import PaymentProof
 from .profile import Profile
 from .quiz import Answer, Option, Question, Quiz, QuizSubmission
 from .quiz_audit_log import QuizAuditLog

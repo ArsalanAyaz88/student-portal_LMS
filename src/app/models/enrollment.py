@@ -21,23 +21,7 @@ class ApplicationStatus(str, enum.Enum):
 
 # --- Models ---
 
-class PaymentProof(SQLModel, table=True):
-    __tablename__ = "paymentproof"
-    
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    transaction_id: str
-    proof_url: str
-    uploaded_at: datetime = Field(default_factory=datetime.utcnow)
-    is_verified: bool = Field(default=False)
 
-    # Foreign key for the bank account paid to
-    bank_account_id: uuid.UUID = Field(foreign_key="bank_accounts.id")
-
-    # FIX: Added the foreign key to link back to the application
-    application_id: uuid.UUID = Field(foreign_key="enrollment_applications.id")
-    
-    # FIX: Defined the other side of the relationship
-    application: "EnrollmentApplication" = Relationship(back_populates="payment_proofs")
 
 
 class EnrollmentApplication(SQLModel, table=True):
@@ -62,11 +46,8 @@ class EnrollmentApplication(SQLModel, table=True):
     user: "User" = Relationship(back_populates="enrollment_applications")
     course: "Course" = Relationship(back_populates="enrollment_applications")
     
-    # FIX: Completed the bi-directional relationship
-    payment_proofs: List["PaymentProof"] = Relationship(
-        back_populates="application", 
-        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
-    )
+    # Relationship to payment proofs
+    payment_proofs: List["PaymentProof"] = Relationship(back_populates="application", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
 
 
 class Enrollment(SQLModel, table=True):
