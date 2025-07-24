@@ -47,8 +47,8 @@ class EnrollmentApplication(SQLModel, table=True):
     user_id: uuid.UUID = Field(foreign_key="user.id")
     course_id: uuid.UUID = Field(foreign_key="course.id")
 
-    user: "User" = Relationship(back_populates="enrollment_applications", sa_relationship_kwargs={"foreign_keys": "[EnrollmentApplication.user_id]"})
-    course: "Course" = Relationship(back_populates="enrollment_applications", sa_relationship_kwargs={"foreign_keys": "[EnrollmentApplication.course_id]"})
+
+
     
     # Relationship to payment proofs
     payment_proofs: List["PaymentProof"] = Relationship(back_populates="application", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
@@ -65,5 +65,3 @@ class Enrollment(SQLModel, table=True):
     expiration_date: Optional[datetime] = None
     is_accessible: bool = Field(default=False)
 
-    user: "User" = Relationship(back_populates="enrollments", sa_relationship_kwargs={"foreign_keys": "[Enrollment.user_id]"})
-    course: "Course" = Relationship(back_populates="enrollments", sa_relationship_kwargs={"foreign_keys": "[Enrollment.course_id]"})
