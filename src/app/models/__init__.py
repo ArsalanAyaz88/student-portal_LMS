@@ -6,7 +6,8 @@ namespace and to ensure they are registered with SQLModel's metadata.
 # By importing them here, we can avoid circular import errors in other parts of the app
 # and ensure that `create_db_and_tables` knows about all our tables.
 
-from .user import User, OAuthAccount
+from .user import User
+from .oauth import OAuthAccount
 from .course import Course
 from .video import Video, VideoProgress
 from .enrollment import Enrollment, EnrollmentApplication
