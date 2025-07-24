@@ -69,7 +69,7 @@ def apply_for_enrollment(
     return new_application
 
 
-@router.post("/submit-payment-proof", response_model=PaymentProofRead, summary="Submit payment proof for an enrollment")
+@router.post("/submit-payment-proof", response_model=PaymentProof, summary="Submit payment proof for an enrollment")
 async def submit_payment_proof(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
