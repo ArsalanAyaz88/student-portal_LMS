@@ -68,3 +68,7 @@ class Enrollment(SQLModel, table=True):
     expiration_date: Optional[datetime] = None
     is_accessible: bool = Field(default=False)
 
+    # --- Relationships ---
+    user: "User" = Relationship(back_populates="enrollments")
+    course: "Course" = Relationship(back_populates="enrollments")
+
