@@ -45,8 +45,8 @@ class EnrollmentApplication(SQLModel, table=True):
     course_id: uuid.UUID = Field(foreign_key="course.id")
 
     # --- Relationships (configured after import in __init__.py) ---
-    user: Optional[User] = Relationship(back_populates="enrollment_applications")
-    course: Optional[Course] = Relationship(back_populates="enrollment_applications")
+    user: "User" = Relationship(back_populates="enrollment_applications")
+    course: "Course" = Relationship(back_populates="enrollment_applications")
 
 
 
@@ -66,5 +66,5 @@ class Enrollment(SQLModel, table=True):
     is_accessible: bool = Field(default=False)
 
     # --- Relationships (configured after import in __init__.py) ---
-    user: Optional[User] = Relationship(back_populates="enrollments")
-    course: Optional[Course] = Relationship(back_populates="enrollments")
+    user: "User" = Relationship(back_populates="enrollments")
+    course: "Course" = Relationship(back_populates="enrollments")
