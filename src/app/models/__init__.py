@@ -53,16 +53,3 @@ __all__ = [
     "Notification",
     "Certificate",
 ]
-
-# --- Configure Model Relationships After Import ---
-# This eliminates circular dependency issues by configuring relationships
-# with direct class references instead of string-based forward references.
-from sqlmodel import Relationship
-
-# Configure EnrollmentApplication relationships
-EnrollmentApplication.user = Relationship(back_populates="enrollment_applications")
-EnrollmentApplication.course = Relationship(back_populates="enrollment_applications")
-
-# Configure Enrollment relationships  
-Enrollment.user = Relationship(back_populates="enrollments")
-Enrollment.course = Relationship(back_populates="enrollments")
