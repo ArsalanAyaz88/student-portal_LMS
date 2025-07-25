@@ -8,14 +8,7 @@ from typing import Optional, List, TYPE_CHECKING
 from sqlalchemy import Enum as SQLAlchemyEnum
 from sqlmodel import SQLModel, Field, Relationship
 
-# --- Direct Imports to Resolve Circular Dependency ---
-# In this complex scenario, the standard TYPE_CHECKING approach is failing.
-# We are importing directly to ensure the names 'User' and 'Course' are in the
-# global scope when SQLAlchemy's mappers are configured.
-if TYPE_CHECKING:
-    from src.app.models.user import User
-    from src.app.models.course import Course
-from src.app.models.payment import PaymentProof
+
 
 # --- Enums ---
 
@@ -72,4 +65,15 @@ class Enrollment(SQLModel, table=True):
     # --- Relationships ---
     user: "User" = Relationship(back_populates="enrollments")
     course: "Course" = Relationship(back_populates="enrollments")
+
+
+# --- Resolve Forward References ---
+# Import dependent models here to break circular dependencies
+from src.app.models.user import User
+from src.app.models.course import Course
+from src.app.models.payment import PaymentProof
+
+# Rebuild models to update forward references
+EnrollmentApplication.model_rebuild()
+Enrollment.model_rebuild()
 
