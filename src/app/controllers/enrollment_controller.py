@@ -7,18 +7,43 @@ import logging
 from src.app.db.session import get_db
 from src.app.models.user import User
 from src.app.models.course import Course
-from src.app.models.enrollment import Enrollment, EnrollmentApplication, ApplicationStatus
-
+from src.app.models.enrollment import Enrollment
+from src.app.models.enrollment_application import EnrollmentApplication, ApplicationStatus
 from src.app.models.bank_account import BankAccount
 from src.app.models.notification import Notification
-from src.app.schemas.enrollment import (
+from src.app.models.payment_proof import PaymentProof
+
+from src.app.schemas.enrollment_application_schema import (
     EnrollmentApplicationCreate,
     EnrollmentApplicationRead,
-    EnrollmentApplicationUpdate,
-    PaymentProofCreate,
-    PaymentProofRead,
-    EnrollmentStatusResponse
+    EnrollmentApplicationUpdate
 )
+
+from pydantic import BaseModel
+from datetime import datetime
+
+class PaymentProofCreate(BaseModel):
+    application_id: uuid.UUID
+    transaction_id: str
+    bank_account_id: uuid.UUID
+    proof_url: str
+
+class PaymentProofRead(BaseModel):
+    id: uuid.UUID
+    application_id: uuid.UUID
+    transaction_id: str
+    bank_account_id: uuid.UUID
+    proof_url: str
+    uploaded_at: datetime
+    is_verified: bool
+
+    class Config:
+        from_attributes = True
+
+class EnrollmentStatusResponse(BaseModel):
+    status: str
+    application_id: uuid.UUID | None
+
 from src.app.utils.dependencies import get_current_user
 
 
