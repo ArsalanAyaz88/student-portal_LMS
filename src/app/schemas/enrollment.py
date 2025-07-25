@@ -47,10 +47,13 @@ class EnrollmentApplicationUpdate(BaseModel):
     status: ApplicationStatus
     rejection_reason: Optional[str] = None
 
+from src.app.schemas.user import UserRead
+from src.app.schemas.course import CourseRead
+
 class EnrollmentApplicationRead(EnrollmentApplicationBase):
     id: uuid.UUID
-    user: "UserRead"
-    course: "CourseRead"
+    user: UserRead
+    course: CourseRead
     status: ApplicationStatus
     qualification_certificate_url: str
 
