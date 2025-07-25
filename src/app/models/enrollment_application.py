@@ -32,5 +32,5 @@ class EnrollmentApplication(SQLModel, table=True):
     user_id: uuid.UUID = Field(foreign_key="user.id")
     course_id: uuid.UUID = Field(foreign_key="course.id")
 
-    user: "User" = Relationship(back_populates="enrollment_applications")
-    course: "Course" = Relationship(back_populates="enrollment_applications")
+    user: "src.app.models.user.User" = Relationship(back_populates="enrollment_applications")
+    course: "src.app.models.course.Course" = Relationship(back_populates="enrollment_applications")
