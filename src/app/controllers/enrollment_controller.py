@@ -169,6 +169,40 @@ def get_enrollment_status(
     return {"status": application.status.value, "application_id": application.id}
 
 
+@router.get("/enrollments/{enrollment_id}/status", response_model=EnrollmentStatusResponse, summary="Check enrollment status by enrollment ID")
+def get_enrollment_status_by_id(
+    enrollment_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get enrollment status by enrollment ID - this is what the frontend expects"""
+    # First check if this is an enrollment record
+    enrollment = db.exec(
+        select(Enrollment).where(
+            Enrollment.id == enrollment_id,
+            Enrollment.user_id == current_user.id
+        )
+    ).first()
+    
+    if enrollment:
+        # This is an actual enrollment, return its status
+        return {"status": enrollment.status, "application_id": None}
+    
+    # If not found as enrollment, check if it's an application ID
+    application = db.exec(
+        select(EnrollmentApplication).where(
+            EnrollmentApplication.id == enrollment_id,
+            EnrollmentApplication.user_id == current_user.id
+        )
+    ).first()
+    
+    if application:
+        return {"status": application.status.value, "application_id": application.id}
+    
+    # Not found in either table
+    raise HTTPException(status_code=404, detail="Enrollment or application not found")
+
+
 @router.get("/courses/{course_id}/purchase-info", summary="Get course price and bank details for payment")
 def get_purchase_info(course_id: uuid.UUID, session: Session = Depends(get_db)):
     course = session.get(Course, course_id)
