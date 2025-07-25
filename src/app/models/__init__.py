@@ -53,3 +53,11 @@ __all__ = [
     "Notification",
     "Certificate",
 ]
+
+# --- Manually Rebuild Models to Resolve Circular Dependencies ---
+# This ensures that all forward references in relationships (e.g., 'User')
+# are resolved after all models have been loaded into memory.
+Enrollment.model_rebuild()
+EnrollmentApplication.model_rebuild()
+User.model_rebuild()
+Course.model_rebuild()

@@ -65,15 +65,3 @@ class Enrollment(SQLModel, table=True):
     # --- Relationships ---
     user: "User" = Relationship(back_populates="enrollments")
     course: "Course" = Relationship(back_populates="enrollments")
-
-
-# --- Resolve Forward References ---
-# Import dependent models here to break circular dependencies
-from src.app.models.user import User
-from src.app.models.course import Course
-from src.app.models.payment import PaymentProof
-
-# Rebuild models to update forward references
-EnrollmentApplication.model_rebuild()
-Enrollment.model_rebuild()
-
