@@ -13,7 +13,6 @@ from dotenv import load_dotenv
 import logging
 
 # ─── Local imports ─────────────────────────────────────────────
-from sqlalchemy.orm import configure_mappers
 from src.app.db.session import create_db_and_tables
 
 # --- Explicitly Import All Models ---

@@ -7,7 +7,7 @@ from typing import List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from src.app.models.course import Course
-    from src.app.models.user import User
+    
 
 class Assignment(SQLModel, table=True):
     __table_args__ = {"extend_existing": True}

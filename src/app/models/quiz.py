@@ -8,7 +8,7 @@ from src.app.utils.time import get_pakistan_time
 if TYPE_CHECKING:
     from src.app.models.course import Course
     from src.app.models.quiz_audit_log import QuizAuditLog
-    from src.app.models.user import User
+    
     from src.app.models.video import Video
 
 class Quiz(SQLModel, table=True):
