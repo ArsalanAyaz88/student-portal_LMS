@@ -8,6 +8,9 @@ from typing import Optional, List, TYPE_CHECKING
 from sqlalchemy import Enum as SQLAlchemyEnum
 from sqlmodel import SQLModel, Field, Relationship
 
+if TYPE_CHECKING:
+    from src.app.models.user import User
+    from src.app.models.course import Course
 
 
 # --- Enums ---
@@ -42,8 +45,8 @@ class EnrollmentApplication(SQLModel, table=True):
     course_id: uuid.UUID = Field(foreign_key="course.id")
 
     # --- Relationships (configured after import in __init__.py) ---
-    user = None  # Will be set to Relationship(back_populates="enrollment_applications")
-    course = None  # Will be set to Relationship(back_populates="enrollment_applications")
+    user: Optional[User] = Relationship(back_populates="enrollment_applications")
+    course: Optional[Course] = Relationship(back_populates="enrollment_applications")
 
 
 
@@ -63,5 +66,5 @@ class Enrollment(SQLModel, table=True):
     is_accessible: bool = Field(default=False)
 
     # --- Relationships (configured after import in __init__.py) ---
-    user = None  # Will be set to Relationship(back_populates="enrollments")
-    course = None  # Will be set to Relationship(back_populates="enrollments")
+    user: Optional[User] = Relationship(back_populates="enrollments")
+    course: Optional[Course] = Relationship(back_populates="enrollments")
