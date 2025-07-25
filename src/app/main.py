@@ -39,6 +39,7 @@ from src.app.routers import (
     enrollment_router,
     admin_router
 )
+from src.app.diagnostic import router as diagnostic_router
 
 # ─── Env setup ─────────────────────────────────────────────
 load_dotenv()
@@ -92,6 +93,7 @@ try:
     app.include_router(admin_quiz_router.quiz_router, prefix="/api/admin/quizzes")
     app.include_router(admin_quiz_router.question_router, prefix="/api/admin/questions")
     app.include_router(admin_quiz_router.submission_router, prefix="/api/admin/submissions")
+    app.include_router(diagnostic_router, tags=["Diagnostic"])
 
     # ─── Simple endpoints ──────────────────────────────────────────
     @app.get("/")
