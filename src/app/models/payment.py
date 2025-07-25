@@ -18,20 +18,6 @@ class Payment(SQLModel, table=True):
     initiated_at: datetime = Field(default_factory=get_pakistan_time)
     verified_at: Optional[datetime] = None
 
-class PaymentProof(SQLModel, table=True):
-    __tablename__ = "paymentproof"
-    
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    transaction_id: str
-    proof_url: str
-    uploaded_at: datetime = Field(default_factory=datetime.utcnow)
-    is_verified: bool = Field(default=False)
-
-    # Foreign key for the bank account paid to
-    bank_account_id: uuid.UUID = Field(foreign_key="bank_accounts.id")
-
-    # Foreign key to link back to the application
-    application_id: uuid.UUID = Field(foreign_key="enrollment_applications.id")
     
     # Relationship to the application
 
