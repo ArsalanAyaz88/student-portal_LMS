@@ -21,7 +21,7 @@ class Quiz(SQLModel, table=True):
 
     questions: List["Question"] = Relationship(back_populates="quiz", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
     submissions: List["QuizSubmission"] = Relationship(back_populates="quiz", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
-    audit_logs: List["src.app.models.quiz_audit_log.QuizAuditLog"] = Relationship(back_populates="quiz", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+    audit_logs: List["QuizAuditLog"] = Relationship(back_populates="quiz", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
     video_id: uuid.UUID = Field(foreign_key="video.id", unique=True)
     video: "Video" = Relationship(back_populates="quiz")
 
@@ -36,7 +36,7 @@ class Question(SQLModel, table=True):
     text: str
     is_multiple_choice: bool = Field(default=False)
 
-    quiz: Quiz = Relationship(back_populates="questions")
+    quiz: "Quiz" = Relationship(back_populates="questions")
     options: List["Option"] = Relationship(back_populates="question", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
 
 class Option(SQLModel, table=True):
@@ -46,7 +46,7 @@ class Option(SQLModel, table=True):
     text: str
     is_correct: bool = Field(default=False)
 
-    question: Question = Relationship(back_populates="options")
+    question: "Question" = Relationship(back_populates="options")
 
 class QuizSubmission(SQLModel, table=True):
     __table_args__ = {"extend_existing": True}
@@ -58,7 +58,7 @@ class QuizSubmission(SQLModel, table=True):
     is_graded: bool = Field(default=False)
 
     quiz: "Quiz" = Relationship(back_populates="submissions")
-    student: "User" = Relationship(back_populates="quiz_submissions")
+    user: "User" = Relationship(back_populates="quiz_submissions")
     answers: List["Answer"] = Relationship(back_populates="submission", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
 
 class Answer(SQLModel, table=True):
@@ -69,5 +69,5 @@ class Answer(SQLModel, table=True):
     selected_option_id: Optional[uuid.UUID] = Field(default=None, foreign_key="option.id")
     text_answer: Optional[str] = None
 
-    submission: QuizSubmission = Relationship(back_populates="answers")
+    submission: "QuizSubmission" = Relationship(back_populates="answers")
     selected_option: Optional["Option"] = Relationship()

@@ -17,8 +17,8 @@ class Assignment(SQLModel, table=True):
     description: str
     due_date: datetime
 
-    submissions: List["src.app.models.assignment.AssignmentSubmission"] = Relationship(back_populates="assignment", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
-    course: "src.app.models.course.Course" = Relationship(back_populates="assignments")
+    submissions: List["AssignmentSubmission"] = Relationship(back_populates="assignment", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+    course: "Course" = Relationship(back_populates="assignments")
 
 class AssignmentSubmission(SQLModel, table=True):
     __table_args__ = {"extend_existing": True}
@@ -31,5 +31,5 @@ class AssignmentSubmission(SQLModel, table=True):
     # ← New fields:
     grade: Optional[float] = Field(default=None, nullable=True)
     feedback: Optional[str] = Field(default=None, nullable=True)
-    student: "src.app.models.user.User" = Relationship(back_populates="assignment_submissions")
-    assignment: "src.app.models.assignment.Assignment" = Relationship(back_populates="submissions")
+    user: "User" = Relationship(back_populates="assignment_submissions")
+    assignment: "Assignment" = Relationship(back_populates="submissions")

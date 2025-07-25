@@ -27,14 +27,14 @@ class Enrollment(SQLModel, table=True):
     audit_log: list = Field(sa_type=JSON, default_factory=list)
     last_access_date: Optional[datetime] = None
 
-    @validator('enroll_date', 'expiration_date', 'last_access_date', pre=True)
-    def validate_timezone(cls, v):
-        """Ensure all datetime fields are timezone-aware and in Pakistan time"""
-        if v is None:
-            return v
-        if v.tzinfo is None:
-            v = pytz.UTC.localize(v)
-        return convert_to_pakistan_time(v)
+    # @validator('enroll_date', 'expiration_date', 'last_access_date', pre=True)
+    # def validate_timezone(cls, v):
+    #     """Ensure all datetime fields are timezone-aware and in Pakistan time"""
+    #     if v is None:
+    #         return v
+    #     if v.tzinfo is None:
+    #         v = pytz.UTC.localize(v)
+    #     return convert_to_pakistan_time(v)
 
     user: "User" = Relationship(back_populates="enrollments")
     course: "Course" = Relationship(back_populates="enrollments")
