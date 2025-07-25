@@ -1,8 +1,16 @@
 {
   "version": 2,
-  "functions": {
-    "api/**/*.py": {
-      "runtime": "python3.9"
+  "buildCommand": "pip install -r requirements.txt",
+  "builds": [
+    {
+      "src": "src/app/main.py",
+      "use": "@vercel/python"
     }
-  }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "src/app/main.py"
+    }
+  ]
 }
