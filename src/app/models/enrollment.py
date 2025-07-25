@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 import enum
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 
 from sqlalchemy import Enum as SQLAlchemyEnum
 from sqlmodel import SQLModel, Field, Relationship
