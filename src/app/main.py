@@ -1,7 +1,6 @@
 # ───────────────────────────────────────────────────────────────
 import os
 import logging
-import traceback
 from datetime import datetime
 
 from fastapi import FastAPI
@@ -45,8 +44,7 @@ from src.app.routers import (
 load_dotenv()
 
 # ─── FastAPI app ───────────────────────────────────────────────
-try:
-    app = FastAPI(
+app = FastAPI(
         title="Student Portal LMS",
         description="API for EduTech platform",
         version="1.0.0",
@@ -107,12 +105,3 @@ try:
     @app.get("/health")
     async def health_check():
         return {"status": "ok", "timestamp": datetime.utcnow().isoformat()}
-
-except Exception as e:
-    logging.error(" Failed to initialize FastAPI application ")
-    logging.error(traceback.format_exc())
-    # Create a dummy app to allow deployment to succeed while still showing the error
-    app = FastAPI()
-    @app.get("/")
-    async def error_app():
-        return {"error": "Application failed to start. Check Vercel logs for details."}
