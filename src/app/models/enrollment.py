@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Optional, TYPE_CHECKING, List
 from pydantic import validator
+import pytz
 from src.app.utils.time import get_pakistan_time, convert_to_pakistan_time
 
 if TYPE_CHECKING:
@@ -35,9 +36,9 @@ class Enrollment(SQLModel, table=True):
             v = pytz.UTC.localize(v)
         return convert_to_pakistan_time(v)
 
-    user: "src.app.models.user.User" = Relationship(back_populates="enrollments")
-    course: "src.app.models.course.Course" = Relationship(back_populates="enrollments")
-    payment_proofs: List["src.app.models.payment_proof.PaymentProof"] = Relationship(back_populates="enrollment", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+    user: "User" = Relationship(back_populates="enrollments")
+    course: "Course" = Relationship(back_populates="enrollments")
+    payment_proofs: List["PaymentProof"] = Relationship(back_populates="enrollment", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
 
     def update_expiration_status(self):
         """Update the expiration status and days remaining"""
