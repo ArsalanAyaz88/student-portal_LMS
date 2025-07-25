@@ -41,9 +41,9 @@ class EnrollmentApplication(SQLModel, table=True):
     user_id: uuid.UUID = Field(foreign_key="user.id")
     course_id: uuid.UUID = Field(foreign_key="course.id")
 
-    # --- Relationships ---
-    user: "User" = Relationship(back_populates="enrollment_applications")
-    course: "Course" = Relationship(back_populates="enrollment_applications")
+    # --- Relationships (configured after import in __init__.py) ---
+    user = None  # Will be set to Relationship(back_populates="enrollment_applications")
+    course = None  # Will be set to Relationship(back_populates="enrollment_applications")
 
 
 
@@ -62,6 +62,6 @@ class Enrollment(SQLModel, table=True):
     expiration_date: Optional[datetime] = None
     is_accessible: bool = Field(default=False)
 
-    # --- Relationships ---
-    user: "User" = Relationship(back_populates="enrollments")
-    course: "Course" = Relationship(back_populates="enrollments")
+    # --- Relationships (configured after import in __init__.py) ---
+    user = None  # Will be set to Relationship(back_populates="enrollments")
+    course = None  # Will be set to Relationship(back_populates="enrollments")

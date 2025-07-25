@@ -54,11 +54,15 @@ __all__ = [
     "Certificate",
 ]
 
-# --- Manually Rebuild Models to Resolve Circular Dependencies ---
-# This ensures that all forward references in relationships (e.g., 'User')
-# are resolved after all models have been loaded into memory.
-# The order is critical: base models must be rebuilt before dependent models.
-User.model_rebuild()
-Course.model_rebuild()
-Enrollment.model_rebuild()
-EnrollmentApplication.model_rebuild()
+# --- Configure Model Relationships After Import ---
+# This eliminates circular dependency issues by configuring relationships
+# with direct class references instead of string-based forward references.
+from sqlmodel import Relationship
+
+# Configure EnrollmentApplication relationships
+EnrollmentApplication.user = Relationship(back_populates="enrollment_applications")
+EnrollmentApplication.course = Relationship(back_populates="enrollment_applications")
+
+# Configure Enrollment relationships  
+Enrollment.user = Relationship(back_populates="enrollments")
+Enrollment.course = Relationship(back_populates="enrollments")
