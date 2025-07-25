@@ -1,6 +1,7 @@
 # ───────────────────────────────────────────────────────────────
 import os
 import logging
+import traceback
 from datetime import datetime
 
 from fastapi import FastAPI
@@ -44,63 +45,73 @@ from src.app.routers import (
 load_dotenv()
 
 # ─── FastAPI app ───────────────────────────────────────────────
-app = FastAPI(
-    title="Student Portal LMS",
-    description="API for EduTech platform",
-    version="1.0.0",
-)
+try:
+    app = FastAPI(
+        title="Student Portal LMS",
+        description="API for EduTech platform",
+        version="1.0.0",
+    )
 
-# ─── Middlewares ───────────────────────────────────────────────
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+    # ─── Middlewares ───────────────────────────────────────────────
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
-# ─── Consolidated Startup Events ────────────────────────────────
-@app.on_event("startup")
-async def on_startup():
-    logging.info("Configuring SQLAlchemy mappers...")
-    try:
-        # This resolves all relationships between models before any other action.
-        configure_mappers()
-        logging.info("Mappers configured successfully.")
-    except Exception as e:
-        logging.error(f"Mapper configuration failed: {e}", exc_info=True)
-        raise
+    # ─── Consolidated Startup Events ────────────────────────────────
+    @app.on_event("startup")
+    async def on_startup():
+        logging.info("Configuring SQLAlchemy mappers...")
+        try:
+            # This resolves all relationships between models before any other action.
+            configure_mappers()
+            logging.info("Mappers configured successfully.")
+        except Exception as e:
+            logging.error(f"Mapper configuration failed: {e}", exc_info=True)
+            raise
 
-    # Step 2: Create database and tables
-    logging.info("Creating database and tables...")
-    try:
-        create_db_and_tables()
-    except Exception as e:
-        logging.error(f"Failed to create database and tables: {e}", exc_info=True)
-        raise
+        # Step 2: Create database and tables
+        logging.info("Creating database and tables...")
+        try:
+            create_db_and_tables()
+        except Exception as e:
+            logging.error(f"Failed to create database and tables: {e}", exc_info=True)
+            raise
 
-# ─── Routers ───────────────────────────────────────────────────
-app.include_router(auth_router.router, prefix="/api/auth", tags=["Authentication"])
-app.include_router(profile_router.router, prefix="/api/profile", tags=["Profile"])
-app.include_router(course_router.router, prefix="/api/courses", tags=["Courses"])
-app.include_router(enrollment_router.router, prefix="/api/enrollments", tags=["Enrollments"])
-app.include_router(admin_router.router, prefix="/api/admin", tags=["Admin"])
-app.include_router(sa_router.router, prefix="/api/student/assignments")
-app.include_router(sq_router.router, prefix="/api/student")
-app.include_router(student_dashboard_router.router, prefix="/api/student/dashboard", tags=["Student Dashboard"])
-app.include_router(admin_quiz_router.quiz_router, prefix="/api/admin/quizzes")
-app.include_router(admin_quiz_router.question_router, prefix="/api/admin/questions")
-app.include_router(admin_quiz_router.submission_router, prefix="/api/admin/submissions")
+    # ─── Routers ───────────────────────────────────────────────────
+    app.include_router(auth_router.router, prefix="/api/auth", tags=["Authentication"])
+    app.include_router(profile_router.router, prefix="/api/profile", tags=["Profile"])
+    app.include_router(course_router.router, prefix="/api/courses", tags=["Courses"])
+    app.include_router(enrollment_router.router, prefix="/api/enrollments", tags=["Enrollments"])
+    app.include_router(admin_router.router, prefix="/api/admin", tags=["Admin"])
+    app.include_router(sa_router.router, prefix="/api/student/assignments")
+    app.include_router(sq_router.router, prefix="/api/student")
+    app.include_router(student_dashboard_router.router, prefix="/api/student/dashboard", tags=["Student Dashboard"])
+    app.include_router(admin_quiz_router.quiz_router, prefix="/api/admin/quizzes")
+    app.include_router(admin_quiz_router.question_router, prefix="/api/admin/questions")
+    app.include_router(admin_quiz_router.submission_router, prefix="/api/admin/submissions")
 
-# ─── Simple endpoints ──────────────────────────────────────────
-@app.get("/")
-async def root():
-    return {
-        "message": "Welcome to EduTech API",
-        "docs_url": "/docs",
-        "redoc_url": "/redoc",
-    }
+    # ─── Simple endpoints ──────────────────────────────────────────
+    @app.get("/")
+    async def root():
+        return {
+            "message": "Welcome to EduTech API",
+            "docs_url": "/docs",
+            "redoc_url": "/redoc",
+        }
 
-@app.get("/health")
-async def health_check():
-    return {"status": "ok", "timestamp": datetime.utcnow().isoformat()}
+    @app.get("/health")
+    async def health_check():
+        return {"status": "ok", "timestamp": datetime.utcnow().isoformat()}
+
+except Exception as e:
+    logging.error(" Failed to initialize FastAPI application ")
+    logging.error(traceback.format_exc())
+    # Create a dummy app to allow deployment to succeed while still showing the error
+    app = FastAPI()
+    @app.get("/")
+    async def error_app():
+        return {"error": "Application failed to start. Check Vercel logs for details."}
