@@ -12,8 +12,9 @@ from sqlmodel import SQLModel, Field, Relationship
 # In this complex scenario, the standard TYPE_CHECKING approach is failing.
 # We are importing directly to ensure the names 'User' and 'Course' are in the
 # global scope when SQLAlchemy's mappers are configured.
-from src.app.models.user import User
-from src.app.models.course import Course
+if TYPE_CHECKING:
+    from src.app.models.user import User
+    from src.app.models.course import Course
 from src.app.models.payment import PaymentProof
 
 # --- Enums ---
