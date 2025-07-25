@@ -9,6 +9,7 @@ from .course import Course
 from .course_feedback import CourseFeedback
 from .course_progress import CourseProgress
 from .enrollment import Enrollment
+from .enrollment_application import EnrollmentApplication
 from .notification import Notification
 from .oauth import OAuthAccount
 from .password_reset import PasswordReset
