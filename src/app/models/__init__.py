@@ -57,7 +57,8 @@ __all__ = [
 # --- Manually Rebuild Models to Resolve Circular Dependencies ---
 # This ensures that all forward references in relationships (e.g., 'User')
 # are resolved after all models have been loaded into memory.
-Enrollment.model_rebuild()
-EnrollmentApplication.model_rebuild()
+# The order is critical: base models must be rebuilt before dependent models.
 User.model_rebuild()
 Course.model_rebuild()
+Enrollment.model_rebuild()
+EnrollmentApplication.model_rebuild()
