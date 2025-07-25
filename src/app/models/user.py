@@ -25,7 +25,8 @@ class User(SQLModel, table=True):
 
     # Relationships
     oauth_accounts: List["OAuthAccount"] = Relationship(back_populates="user")
+    enrollments: List["Enrollment"] = Relationship(back_populates="user")
+    enrollment_applications: List["EnrollmentApplication"] = Relationship(back_populates="user")
     assignment_submissions: List["AssignmentSubmission"] = Relationship(back_populates="student")
     video_progress: List["VideoProgress"] = Relationship(back_populates="user")
     quiz_submissions: List["QuizSubmission"] = Relationship(back_populates="student")
-

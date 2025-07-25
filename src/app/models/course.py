@@ -38,4 +38,6 @@ class Course(SQLModel, table=True):
     videos: List["Video"] = Relationship(back_populates="course", sa_relationship_kwargs={"foreign_keys": "[Video.course_id]", "cascade": "all, delete-orphan"})
     progress: List["CourseProgress"] = Relationship(back_populates="course", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
     assignments: List["Assignment"] = Relationship(back_populates="course", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+    enrollments: List["Enrollment"] = Relationship(back_populates="course")
+    enrollment_applications: List["EnrollmentApplication"] = Relationship(back_populates="course", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
     quizzes: List["Quiz"] = Relationship(back_populates="course", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
