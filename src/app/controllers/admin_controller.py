@@ -395,12 +395,21 @@ def get_enrollment_applications(
     """
     Get all enrollment applications, with user and course details.
     """
-    applications = db.exec(
-        select(EnrollmentApplication).options(
-            selectinload(EnrollmentApplication.user),
-            selectinload(EnrollmentApplication.course)
-        ).order_by(EnrollmentApplication.id.desc())
-    ).all()
+    try:
+        logging.info("Attempting to fetch enrollment applications with user and course details.")
+        applications = db.exec(
+            select(EnrollmentApplication).options(
+                selectinload(EnrollmentApplication.user),
+                selectinload(EnrollmentApplication.course)
+            ).order_by(EnrollmentApplication.id.desc())
+        ).all()
+        logging.info(f"Successfully fetched {len(applications)} enrollment applications.")
+        return applications
+    except Exception as e:
+        logging.error(f"An unexpected error occurred while fetching enrollment applications: {e}")
+        import traceback
+        logging.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail="An internal error occurred. Please check the logs.")
     return applications
 
 
