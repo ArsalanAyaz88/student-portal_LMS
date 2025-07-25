@@ -6,6 +6,7 @@ import logging
 import uuid
 from datetime import datetime, timedelta
 from typing import List, Optional
+import traceback
 
 # Third-party Imports
 import cloudinary
@@ -406,9 +407,8 @@ def get_enrollment_applications(
         logging.info(f"Successfully fetched {len(applications)} enrollment applications.")
         return applications
     except Exception as e:
-        logging.error(f"An unexpected error occurred while fetching enrollment applications: {e}")
-        import traceback
-        logging.error(traceback.format_exc())
+        tb_str = traceback.format_exc()
+        logging.error(f"An unexpected error occurred while fetching enrollment applications: {e}\nTraceback:\n{tb_str}")
         raise HTTPException(status_code=500, detail="An internal error occurred. Please check the logs.")
     return applications
 
