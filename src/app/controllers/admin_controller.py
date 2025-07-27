@@ -9,9 +9,8 @@ from typing import List, Optional
 import traceback
 
 # Third-party Imports
-import cloudinary
-import cloudinary.uploader
-import cloudinary.utils
+import boto3
+from botocore.exceptions import ClientError, NoCredentialsError
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status, UploadFile, File, Form
 from pydantic import BaseModel
 from sqlalchemy import func
@@ -24,6 +23,7 @@ from src.app.utils.dependencies import get_current_admin_user
 from src.app.utils.email import send_application_approved_email, send_enrollment_rejected_email
 from src.app.utils.file import save_upload_and_get_url
 from src.app.utils.time import get_pakistan_time
+from src.app.config.s3_config import s3_client, S3_BUCKET_NAME
 
 # Models
 from src.app.models.assignment import Assignment, AssignmentSubmission
@@ -54,28 +54,43 @@ from src.app.schemas.video import VideoAdminRead, VideoCreate, VideoRead, VideoU
 
 router = APIRouter()
 
-# ─── Cloudinary Signature ────────────────────────────────────────────────────────────────
+# ─── AWS S3 Upload Signature ────────────────────────────────────────────────────────────────
 
 @router.post("/create-upload-signature")
 def create_upload_signature(folder: str = Form("videos")):
-    logging.info(f"Creating Cloudinary upload signature for folder: {folder}")
+    logging.info(f"Creating AWS S3 upload signature for folder: {folder}")
     """
-    Generate a signature for direct Cloudinary upload.
+    Generate a pre-signed URL for direct AWS S3 upload.
     """
-    timestamp = int(time.time())
     try:
-        params_to_sign = {"timestamp": timestamp, "folder": folder}
-        signature = cloudinary.utils.api_sign_request(params_to_sign, cloudinary.config().api_secret)
-        logging.info("Successfully created Cloudinary signature.")
+        if s3_client is None:
+            raise HTTPException(status_code=500, detail="S3 client is not configured")
+        
+        # Generate a unique key for the file
+        timestamp = int(time.time())
+        file_key = f"{folder}/{timestamp}_{uuid.uuid4().hex}"
+        
+        # Generate pre-signed URL for PUT operation (upload)
+        presigned_url = s3_client.generate_presigned_url(
+            'put_object',
+            Params={
+                'Bucket': S3_BUCKET_NAME,
+                'Key': file_key,
+                'ContentType': 'video/mp4'  # Default content type, can be overridden
+            },
+            ExpiresIn=3600  # URL expires in 1 hour
+        )
+        
+        logging.info("Successfully created S3 pre-signed URL.")
         return {
-            "signature": signature,
-            "timestamp": timestamp,
-            "api_key": cloudinary.config().api_key,
-            "cloud_name": cloudinary.config().cloud_name,
-            "folder": folder
+            "presigned_url": presigned_url,
+            "file_key": file_key,
+            "bucket": S3_BUCKET_NAME,
+            "folder": folder,
+            "expires_in": 7200
         }
     except Exception as e:
-        logging.error(f"Error creating Cloudinary signature: {e}", exc_info=True)
+        logging.error(f"Error creating S3 upload signature: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Could not create upload signature.")
 
 # 1. Enrollment Management
@@ -92,7 +107,7 @@ async def upload_image(
     admin: User = Depends(get_current_admin_user)
 ):
     """
-    Uploads an image to Cloudinary and returns the URL.
+    Uploads an image to AWS S3 and returns the URL.
     This endpoint requires admin authentication.
     """
     if not file.content_type.startswith("image/"):
@@ -172,19 +187,32 @@ async def create_course(
 @router.post("/generate-video-upload-signature", response_model=dict)
 async def generate_video_upload_signature(admin: User = Depends(get_current_admin_user)):
     """
-    Generates a signature for a direct video upload to Cloudinary.
+    Generates a pre-signed URL for a direct video upload to AWS S3.
     """
     try:
+        if s3_client is None:
+            raise HTTPException(status_code=500, detail="S3 client is not configured")
+        
+        # Generate a unique key for the video file
         timestamp = int(time.time())
-        params_to_sign = {
-            "timestamp": timestamp,
-            "folder": "videos",
-        }
-        signature = cloudinary.utils.api_sign_request(params_to_sign, cloudinary.config().api_secret)
+        file_key = f"videos/{timestamp}_{uuid.uuid4().hex}"
+        
+        # Generate pre-signed URL for PUT operation (upload)
+        presigned_url = s3_client.generate_presigned_url(
+            'put_object',
+            Params={
+                'Bucket': S3_BUCKET_NAME,
+                'Key': file_key,
+                'ContentType': 'video/mp4'  # Default content type for videos
+            },
+            ExpiresIn=7200  # URL expires in 1 hour
+        )
+        
         return {
-            "signature": signature,
-            "timestamp": timestamp,
-            "api_key": cloudinary.config().api_key
+            "presigned_url": presigned_url,
+            "file_key": file_key,
+            "bucket": S3_BUCKET_NAME,
+            "expires_in": 7200
         }
     except Exception as e:
         logging.error(f"Error generating video upload signature: {e}")
@@ -199,27 +227,27 @@ async def upload_video_for_course(
     title: str = Form(...),
     description: str = Form(None),
     is_preview: bool = Form(False),
-    video_url: str = Form(...),  # Changed from 'file' to 'video_url'
-    public_id: str = Form(...), # To store the Cloudinary public_id
+    video_url: str = Form(...),  # S3 URL of the uploaded video
+    file_key: str = Form(...),   # S3 file key for the video
     duration: float = Form(...), # Video duration in seconds
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin_user)
 ):
     """
-    Upload a video for a specific course.
+    Save video metadata for a specific course after the video has been uploaded to S3.
     """
     course = db.get(Course, course_id)
     if not course:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
 
     try:
-        # The video is already uploaded to Cloudinary. We just save its metadata.
-        # The 'video_url' is the secure URL from the Cloudinary upload response.
+        # The video is already uploaded to S3. We just save its metadata.
+        # The 'video_url' is the S3 URL from the upload response.
         new_video = Video(
             title=title,
             description=description,
             video_url=video_url,
-            public_id=public_id,
+            public_id=file_key,  # Store S3 file key in public_id field for compatibility
             duration=duration,
             course_id=course_id,
             is_preview=is_preview
@@ -922,6 +950,7 @@ def test_enrollment_expiration(
     # Notify student about expiration
     notif = Notification(
         user_id=enrollment.user_id,
+        course_id=enrollment.course_id,  # Add the required course_id field
         event_type="enrollment_expired",
         details=f"Your enrollment for course ID {enrollment.course_id} has expired today ({today.strftime('%Y-%m-%d %H:%M:%S %Z')})",
     ) 
@@ -1145,34 +1174,39 @@ def admin_update_assignment(
 
     return assignment
 
-@router.get("/cloudinary-signature")
-def get_cloudinary_signature(admin: User = Depends(get_current_admin_user)):
+@router.get("/s3-signature")
+def get_s3_signature(admin: User = Depends(get_current_admin_user)):
     """
-    Generate a signature for direct uploads to Cloudinary.
+    Generate a pre-signed URL for direct uploads to AWS S3.
     """
     try:
+        if s3_client is None:
+            raise HTTPException(status_code=500, detail="S3 client is not configured")
+        
         folder = "lms_videos"
         timestamp = int(time.time())
-        payload_to_sign = {
-            "timestamp": timestamp,
-            "folder": folder
-        }
-        # Ensure you have CLOUDINARY_API_SECRET set in your environment
-        api_secret = os.getenv("CLOUDINARY_API_SECRET")
-        if not api_secret:
-            raise HTTPException(status_code=500, detail="Cloudinary API secret is not configured.")
-
-        signature = cloudinary.utils.api_sign_request(payload_to_sign, api_secret)
+        file_key = f"{folder}/{timestamp}_{uuid.uuid4().hex}"
+        
+        # Generate pre-signed URL for PUT operation (upload)
+        presigned_url = s3_client.generate_presigned_url(
+            'put_object',
+            Params={
+                'Bucket': S3_BUCKET_NAME,
+                'Key': file_key,
+                'ContentType': 'video/mp4'  # Default content type for videos
+            },
+            ExpiresIn=3600  # URL expires in 1 hour
+        )
         
         return {
-            "api_key": os.getenv("CLOUDINARY_API_KEY"),
-            "timestamp": timestamp,
-            "signature": signature,
+            "presigned_url": presigned_url,
+            "file_key": file_key,
+            "bucket": S3_BUCKET_NAME,
             "folder": folder,
-            "cloud_name": os.getenv("CLOUDINARY_CLOUD_NAME")
+            "expires_in": 3600
         }
     except Exception as e:
-        logging.error(f"Error generating Cloudinary signature: {e}")
+        logging.error(f"Error generating S3 signature: {e}")
         raise HTTPException(status_code=500, detail="Could not generate upload signature.")
 
 @router.get("/videos/{video_id}/quiz", response_model=QuizReadWithDetails, name="get_quiz_for_video")

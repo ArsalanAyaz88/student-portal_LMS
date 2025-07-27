@@ -457,3 +457,93 @@ def submit_quiz(
     session.refresh(new_submission)
 
     return new_submission
+@router.get("/courses/{course_id}/certificate")
+def get_certificate(
+    course_id: str,
+    user=Depends(get_current_user),
+    session: Session = Depends(get_db)
+):
+    try:
+        # Validate course_id format
+        try:
+            course_uuid = uuid.UUID(course_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid course ID format"
+            )
+
+        # Get course first
+        course = session.exec(
+            select(Course).where(Course.id == course_uuid)
+        ).first()
+
+        if not course:
+            raise HTTPException(
+                status_code=404,
+                detail="Course not found"
+            )
+
+        # Check if course is completed
+        course_progress = session.exec(
+            select(CourseProgress).where(
+                CourseProgress.user_id == user.id,
+                CourseProgress.course_id == course_uuid,
+                CourseProgress.completed == True
+            )
+        ).first()
+
+        if not course_progress:
+            raise HTTPException(
+                status_code=403,
+                detail="You must complete the course to get a certificate"
+            )
+
+        # Get certificate
+        certificate = session.exec(
+            select(Certificate).where(
+                Certificate.user_id == user.id,
+                Certificate.course_id == course_uuid
+            )
+        ).first()
+
+        if not certificate:
+            # Generate new certificate if it doesn't exist
+            try:
+                if not user.full_name:
+                    raise HTTPException(status_code=400, detail="Full name is required to generate a certificate. Please complete your profile.")
+                certificate_generator = CertificateGenerator()
+                certificate_url = certificate_generator.generate(
+                    username=user.full_name,
+                    course_title=course.title,
+                    completion_date=course_progress.completed_at
+                )
+
+                # Save certificate record
+                certificate = Certificate(
+                    user_id=user.id,
+                    course_id=course_uuid,
+                    file_path=certificate_url,
+                    certificate_number=os.path.basename(certificate_url).split('/')[-1].replace('certificate_', '').replace('.pdf', '')
+                )
+                session.add(certificate)
+                session.commit()
+            except Exception as e:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Error generating certificate: {str(e)}"
+                )
+
+        # Return the B2 URL directly
+        return {
+            "certificate_url": certificate.file_path,
+            "certificate_number": certificate.certificate_number
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error retrieving certificate: {str(e)}"
+        )    

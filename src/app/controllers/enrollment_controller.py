@@ -7,11 +7,19 @@ import logging
 from src.app.db.session import get_db
 from src.app.models.user import User
 from src.app.models.course import Course
+from ..schemas.payment_proof import ProofCreate
+from ..db.session import get_db
+from ..utils.dependencies import get_current_user
+from pydantic import BaseModel
+from fastapi import UploadFile, File
+from datetime import datetime
+from ..models.payment_proof import PaymentProof
 from src.app.models.enrollment import Enrollment
 from src.app.models.enrollment_application import EnrollmentApplication, ApplicationStatus
 from src.app.models.bank_account import BankAccount
 from src.app.models.notification import Notification
 from src.app.models.payment_proof import PaymentProof
+from src.app.utils.file import save_upload_and_get_url
 
 from src.app.schemas.enrollment_application_schema import (
     EnrollmentApplicationCreate,
@@ -19,26 +27,7 @@ from src.app.schemas.enrollment_application_schema import (
     EnrollmentApplicationUpdate
 )
 
-from pydantic import BaseModel
-from datetime import datetime
 
-class PaymentProofCreate(BaseModel):
-    application_id: uuid.UUID
-    transaction_id: str
-    bank_account_id: uuid.UUID
-    proof_url: str
-
-class PaymentProofRead(BaseModel):
-    id: uuid.UUID
-    application_id: uuid.UUID
-    transaction_id: str
-    bank_account_id: uuid.UUID
-    proof_url: str
-    uploaded_at: datetime
-    is_verified: bool
-
-    class Config:
-        from_attributes = True
 
 class EnrollmentStatusResponse(BaseModel):
     status: str
@@ -98,75 +87,51 @@ def apply_for_enrollment(
     # create_admin_notification(db, notification_message, current_user.id, new_application.id)
 
     return new_application
-
-
-@router.post("/submit-payment-proof", response_model=PaymentProofRead, summary="Submit payment proof for an enrollment")
+@router.post("/{course_id}/payment-proof")
 async def submit_payment_proof(
-    payment_data: PaymentProofCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    course_id: str,
+    file: UploadFile = File(...),
+    user=Depends(get_current_user),
+    session: Session = Depends(get_db)
 ):
-    if current_user.role != 'student':
-        raise HTTPException(status_code=403, detail="Only students can submit payment proofs")
-
-    application = db.get(EnrollmentApplication, payment_data.application_id)
-
-    # Verify the application belongs to the current user
-    if not application or application.user_id != current_user.id:
-        raise HTTPException(status_code=404, detail="Application not found or access denied.")
-
-    if not application:
-        raise HTTPException(status_code=404, detail="No application found for this course.")
+    url = await save_upload_and_get_url(file, folder="payment_proofs")
+    # Convert course_id string to UUID
+    try:
+        course_uuid = uuid.UUID(course_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid course ID format")
     
-    if application.status != ApplicationStatus.APPROVED:
-        raise HTTPException(status_code=403, detail="Your application must be approved before submitting payment.")
-
-    # Create the payment proof record with all details
-    proof = PaymentProof(
-        application_id=application.id,
-        transaction_id=payment_data.transaction_id,
-        bank_account_id=payment_data.bank_account_id,
-        proof_url=payment_data.proof_url
+    # Check course
+    course = session.exec(select(Course).where(Course.id == course_uuid)).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    # Create pending enrollment if not exists
+    enrollment = session.exec(select(Enrollment).where(Enrollment.user_id == user.id, Enrollment.course_id == course_uuid)).first()
+    if not enrollment:
+        enrollment = Enrollment(user_id=user.id, course_id=course_uuid, status="pending", enroll_date=datetime.utcnow(), is_accessible=False, audit_log=[])
+        session.add(enrollment)
+        session.commit()
+        session.refresh(enrollment)
+    # Save payment proof
+    payment_proof = PaymentProof(enrollment_id=enrollment.id, proof_url=url)
+    session.add(payment_proof)
+    session.commit()
+    # Notify admin, include user details and picture URL in details
+    notif = Notification(
+        user_id=user.id,
+        course_id=course.id,  # Add the required course_id field
+        event_type="payment_proof",
+        details=(
+            f"Payment proof submitted for course {course.title}.\n"
+            f"User: {user.full_name or user.email} (ID: {user.id})\n"
+            f"Email: {user.email}\n"
+            f"Proof image: {url}"
+        ),
     )
-    db.add(proof)
+    session.add(notif)
+    session.commit()
+    return {"detail": "Payment proof submitted, pending admin approval."}
 
-    # Set the application status back to PENDING for admin to verify the payment
-    application.status = ApplicationStatus.PENDING
-    db.add(application)
-
-    # Create a notification for the admin
-    notification = Notification(
-        user_id=current_user.id,
-        course_id=application.course_id, # Get course_id from the application
-        event_type="payment_proof_submitted",
-        details=f"Payment proof submitted by {current_user.name} for course: {application.course.title}. Please verify."
-    )
-    db.add(notification)
-
-    db.commit()
-    db.refresh(proof)
-    db.refresh(application)
-
-    return proof
-
-
-@router.get("/{course_id}/status", response_model=EnrollmentStatusResponse, summary="Check enrollment status for a course")
-def get_enrollment_status(
-    course_id: uuid.UUID,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    application = db.exec(
-        select(EnrollmentApplication).where(
-            EnrollmentApplication.course_id == course_id,
-            EnrollmentApplication.user_id == current_user.id
-        )
-    ).first()
-
-    if not application:
-        return {"status": "not_applied", "application_id": None}
-    
-    return {"status": application.status.value, "application_id": application.id}
 
 
 @router.get("/enrollments/{enrollment_id}/status", response_model=EnrollmentStatusResponse, summary="Check enrollment status by enrollment ID")

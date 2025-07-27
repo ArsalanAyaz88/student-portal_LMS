@@ -5,13 +5,14 @@ import logging
 from typing import Optional
 import asyncio
 import functools
+from io import BytesIO
 
 from fastapi import UploadFile, HTTPException, status
-import cloudinary.uploader
-from cloudinary.utils import cloudinary_url
+import boto3
+from botocore.exceptions import ClientError, NoCredentialsError
 
-# Import Cloudinary configuration
-from ..config.cloudinary_config import cloudinary
+# Import S3 configuration
+from ..config.s3_config import s3_client, S3_BUCKET_NAME
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -20,73 +21,121 @@ logger.setLevel(logging.DEBUG)
 # File logging to a specific path is disabled for the serverless environment.
 # The logger will now output to stdout/stderr, which is captured by Vercel.
 
-async def upload_file_to_cloudinary(file_obj, public_id: str, folder: Optional[str] = None) -> str:
+async def upload_file_to_s3(file_obj, key: str, content_type: Optional[str] = None) -> str:
     """
-    Upload file to Cloudinary.
+    Upload file to AWS S3.
     
     Args:
         file_obj: File-like object containing the data
-        public_id: The public ID to assign to the uploaded file
-        folder: Optional folder path in Cloudinary
+        key: The S3 key (path) for the uploaded file
+        content_type: Optional content type for the file
         
     Returns:
         str: URL to the uploaded file
     """
     try:
-        file_obj.seek(0)
+        # Check if S3 client is properly initialized
+        if s3_client is None:
+            logger.error("S3 client is not initialized. Check your AWS configuration.")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="S3 service is not configured properly. Please check AWS credentials and bucket settings."
+            )
         
-        # Prepare upload options
-        upload_options = {
-            'resource_type': 'auto',  # Automatically detect the resource type
-            'public_id': public_id,
-        }
+        # Reset file pointer to beginning
+        if hasattr(file_obj, 'seek'):
+            file_obj.seek(0)
         
-        if folder:
-            upload_options['folder'] = folder.rstrip('/')
-        
-        # Upload the file
+        # Upload the file using upload_fileobj
         loop = asyncio.get_event_loop()
-        # Use a lambda to pass keyword arguments to the executor
-        upload_func = functools.partial(cloudinary.uploader.upload, file_obj, **upload_options)
-        result = await loop.run_in_executor(None, upload_func)
-
-        # Get the secure URL
-        url, options = cloudinary_url(
-            result['public_id'],
-            format=result.get('format', ''),
-            secure=True
-        )
         
-        logger.debug(f"Successfully uploaded file to Cloudinary: {url}")
+        # For upload_fileobj, we pass the file object directly, not as a parameter
+        upload_func = functools.partial(s3_client.upload_fileobj, file_obj, S3_BUCKET_NAME, key)
+        await loop.run_in_executor(None, upload_func)
+
+        # Generate the URL
+        url = f"https://{S3_BUCKET_NAME}.s3.amazonaws.com/{key}"
+        
+        logger.debug(f"Successfully uploaded file to S3: {url}")
         return url
         
-    except Exception as e:
-        logger.error(f"Cloudinary upload failed: {str(e)}")
+    except NoCredentialsError:
+        logger.error("AWS credentials not found")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to upload file to Cloudinary: {str(e)}"
+            detail="AWS credentials not configured. Please check your environment variables."
+        )
+    except ClientError as e:
+        error_code = e.response['Error']['Code']
+        if error_code == 'NoSuchBucket':
+            logger.error(f"S3 bucket '{S3_BUCKET_NAME}' does not exist")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"S3 bucket '{S3_BUCKET_NAME}' does not exist. Please check your bucket configuration."
+            )
+        elif error_code == 'AccessDenied':
+            logger.error(f"Access denied to S3 bucket '{S3_BUCKET_NAME}'")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Access denied to S3 bucket '{S3_BUCKET_NAME}'. Please check your IAM permissions."
+            )
+        else:
+            logger.error(f"S3 upload failed: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to upload file to S3: {str(e)}"
+            )
+    except Exception as e:
+        logger.error(f"S3 upload failed: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to upload file to S3: {str(e)}"
         )
 
 async def save_upload_and_get_url(file: UploadFile, folder: str = "") -> str:
     """
-    Upload the file to Cloudinary and return the URL.
+    Upload the file to S3 and return the URL.
     
     Args:
         file: UploadFile object from FastAPI
-        folder: Optional folder path in Cloudinary
+        folder: Optional folder path in S3
         
     Returns:
         str: URL to the uploaded file
     """
     try:
+        # Validate S3 configuration first
+        if s3_client is None:
+            logger.error("S3 client is not initialized")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="File upload service is not configured. Please check AWS S3 configuration."
+            )
+        
+        if not S3_BUCKET_NAME:
+            logger.error("S3 bucket name is not configured")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="S3 bucket name is not configured. Please check your environment variables."
+            )
+        
         # Generate a unique filename
         ext = os.path.splitext(file.filename)[1].lower()
         file_id = uuid.uuid4().hex
-        public_id = f"{file_id}"
+        filename = f"{file_id}{ext}"
+        
+        # Create the S3 key (path)
+        if folder:
+            key = f"{folder.rstrip('/')}/{filename}"
+        else:
+            key = filename
+        
+        # Read file content
+        file_content = await file.read()
+        file_obj = BytesIO(file_content)
         
         # Upload the file
-        file_content = await file.read()
-        return await upload_file_to_cloudinary(file_content, public_id, folder)
+        return await upload_file_to_s3(file_obj, key, file.content_type)
         
     except Exception as e:
         logger.error(f"Error processing file upload: {str(e)}")

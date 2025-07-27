@@ -7,7 +7,7 @@ from fastapi import HTTPException, status, Response
 from dotenv import load_dotenv
 
 # Load environment variables
-load_dotenv()
+load_dotenv() 
  
 # Security settings
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
