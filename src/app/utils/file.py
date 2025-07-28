@@ -50,7 +50,17 @@ async def upload_file_to_s3(file_obj, key: str, content_type: Optional[str] = No
         loop = asyncio.get_event_loop()
         
         # For upload_fileobj, we pass the file object directly, not as a parameter
-        upload_func = functools.partial(s3_client.upload_fileobj, file_obj, S3_BUCKET_NAME, key)
+        extra_args = {'ACL': 'public-read'}
+        if content_type:
+            extra_args['ContentType'] = content_type
+
+        upload_func = functools.partial(
+            s3_client.upload_fileobj, 
+            file_obj, 
+            S3_BUCKET_NAME, 
+            key, 
+            ExtraArgs=extra_args
+        )
         await loop.run_in_executor(None, upload_func)
 
         # Generate the URL
