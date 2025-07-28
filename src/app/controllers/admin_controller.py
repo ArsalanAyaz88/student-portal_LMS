@@ -76,8 +76,7 @@ def create_upload_signature(folder: str = Form("videos")):
             Params={
                 'Bucket': S3_BUCKET_NAME,
                 'Key': file_key,
-                'ContentType': 'video/mp4',
-                'ACL': 'public-read'
+                'ContentType': 'video/mp4'
             },
             ExpiresIn=3600  # URL expires in 1 hour
         )
@@ -212,11 +211,10 @@ async def generate_video_upload_signature(
         # Generate pre-signed URL for PUT operation (upload)
         presigned_url = s3_client.generate_presigned_url(
             'put_object',
-            Params={
+            params={
                 'Bucket': S3_BUCKET_NAME,
                 'Key': file_key,
-                'ContentType': content_type,
-                'ACL': 'public-read'
+                'ContentType': content_type
             },
             ExpiresIn=7200  # URL expires in 2 hours
         )
