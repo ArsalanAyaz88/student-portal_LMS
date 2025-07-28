@@ -1147,45 +1147,48 @@ def admin_list_on_time_submissions(
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin_user),
 ):
-    # 1) load assignment and its course
-    stmt = select(Assignment).where(Assignment.id == assignment_id).options(selectinload(Assignment.course))
-    assignment = db.exec(stmt).first()
-    if not assignment or assignment.course_id != course_id:
-        raise HTTPException(status_code=404, detail="Assignment not found in this course")
+    logging.info(f"Fetching submissions for assignment {assignment_id} in course {course_id}")
+    try:
+        assignment = db.get(Assignment, assignment_id)
+        if not assignment or str(assignment.course_id) != str(course_id):
+            raise HTTPException(status_code=404, detail="Assignment not found")
 
-    # 2) load submissions + students
-    stmt = (
-        select(AssignmentSubmission)
-        .where(AssignmentSubmission.assignment_id == assignment_id)
-        .options(selectinload(AssignmentSubmission.student))
-    )
-    submissions_from_db = db.exec(stmt).all()
+        # Get all submissions for the assignment
+        submissions_query = (
+            select(AssignmentSubmission)
+            .where(AssignmentSubmission.assignment_id == assignment_id)
+            .options(selectinload(AssignmentSubmission.student))
+        )
+        submissions = db.exec(submissions_query).all()
 
-    students = []
-    for sub in submissions_from_db:
-        if sub.student:
-            students.append(
-                SubmissionStudent(
-                    id=sub.id,
-                    student_id=sub.student.id,
-                    email=sub.student.email,
-                    full_name=sub.student.full_name,
-                    submitted_at=sub.submitted_at,
-                    content_url=sub.content_url,
-                    grade=sub.grade,
-                    feedback=sub.feedback
+        student_submissions = []
+        for sub in submissions:
+            if sub.student:
+                student_submissions.append(
+                    SubmissionStudent(
+                        id=sub.id,
+                        student_id=sub.student.id,
+                        email=sub.student.email,
+                        full_name=sub.student.full_name,
+                        submitted_at=sub.submitted_at,
+                        content_url=sub.content_url,
+                        grade=sub.grade,
+                        feedback=sub.feedback,
+                    )
                 )
-            )
+            else:
+                logging.warning(f"Submission {sub.id} is missing a student relationship.")
 
-    # 3) return with the correct schema
-    assignment_details = AssignmentRead(
-        id=assignment.id,
-        course_id=assignment.course_id,
-        title=assignment.title,
-        description=assignment.description,
-        due_date=assignment.due_date,
-        status='n/a',  # Status is student-specific, not applicable here
-        course_title=assignment.course.title,
+        # Manually build the assignment read part of the response
+        assignment_read = AssignmentRead(
+            id=assignment.id,
+            course_id=assignment.course_id,
+            title=assignment.title,
+            description=assignment.description,
+            due_date=assignment.due_date,
+            status='pending', # Placeholder status
+            course_title=db.get(Course, course_id).title or "N/A"
+        )
         submission=None
     )
 
