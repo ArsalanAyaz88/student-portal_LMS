@@ -1250,11 +1250,6 @@ def get_s3_signature(admin: User = Depends(get_current_admin_user)):
         logging.error(f"Error generating S3 signature: {e}")
         raise HTTPException(status_code=500, detail="Could not generate upload signature.")
 
-
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Could not generate upload signature: {e}"
-        )
-
 @router.get("/videos/{video_id}/quiz", response_model=QuizReadWithDetails, name="get_quiz_for_video")
 def get_quiz_for_video(video_id: uuid.UUID, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
     logging.info(f"Attempting to fetch quiz for video_id: {video_id}")
