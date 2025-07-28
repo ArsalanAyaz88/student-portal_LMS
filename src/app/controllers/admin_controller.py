@@ -216,7 +216,8 @@ async def generate_video_upload_signature(
         params = {
             'Bucket': S3_BUCKET_NAME,
             'Key': file_key,
-            'ContentType': content_type
+            'ContentType': content_type,
+            'ACL': 'public-read'  # Make the file publicly readable
         }
         logging.info(f"Generating S3 pre-signed URL with params: {params}")
 
