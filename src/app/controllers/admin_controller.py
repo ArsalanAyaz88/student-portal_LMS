@@ -1158,19 +1158,19 @@ def admin_list_on_time_submissions(
         submissions_query = (
             select(AssignmentSubmission)
             .where(AssignmentSubmission.assignment_id == assignment_id)
-            .options(selectinload(AssignmentSubmission.student))
+            .options(selectinload(AssignmentSubmission.user))
         )
         submissions = db.exec(submissions_query).all()
 
         student_submissions = []
         for sub in submissions:
-            if sub.student:
+            if sub.user:
                 student_submissions.append(
                     SubmissionStudent(
                         id=sub.id,
-                        student_id=sub.student.id,
-                        email=sub.student.email,
-                        full_name=sub.student.full_name,
+                        student_id=sub.user.id,
+                        email=sub.user.email,
+                        full_name=sub.user.full_name,
                         submitted_at=sub.submitted_at,
                         content_url=sub.content_url,
                         grade=sub.grade,
@@ -1178,7 +1178,7 @@ def admin_list_on_time_submissions(
                     )
                 )
             else:
-                logging.warning(f"Submission {sub.id} is missing a student relationship.")
+                logging.warning(f"Submission {sub.id} is missing a user relationship.")
 
         assignment_read = AssignmentRead(
             id=assignment.id,
