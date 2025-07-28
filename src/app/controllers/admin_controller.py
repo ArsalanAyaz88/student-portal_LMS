@@ -193,54 +193,53 @@ class SignatureRequest(BaseModel):
 @router.post("/generate-video-upload-signature", response_model=dict)
 async def generate_video_upload_signature(
     request_data: SignatureRequest,
-    db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin_user)
 ):
-    if not admin.is_admin:
-        raise HTTPException(status_code=403, detail="Not authorized")
-
+    """
+    Generates a pre-signed URL for a direct video upload to AWS S3, 
+    using the Content-Type provided by the client.
+    """
+    logging.info(f"--- Generating video upload signature for content_type: {request_data.content_type} ---")
     try:
-        logging.info(f"Request received to generate signature for content type: {request_data.content_type}")
-        
-        s3_client = boto3.client(
-            's3',
-            aws_access_key_id=settings.aws_access_key_id,
-            aws_secret_access_key=settings.aws_secret_access_key,
-            region_name=settings.aws_region
-        )
-        
+        if s3_client is None:
+            logging.error("S3 client is not configured. Make sure AWS credentials and region are set.")
+            raise HTTPException(status_code=500, detail="S3 client is not configured")
+
+        content_type = request_data.content_type
+        if not content_type.startswith('video/'):
+            logging.warning(f"Invalid content type received: {content_type}")
+            raise HTTPException(status_code=400, detail="Invalid content type. Only video files are allowed.")
+
+        # Generate a unique key for the video file
         timestamp = int(time.time())
-        unique_id = uuid.uuid4().hex
-        file_name = request_data.file_name
-        safe_file_name = re.sub(r'[^a-zA-Z0-9_.-]', '', file_name)
-        file_key = f"videos/{timestamp}_{unique_id}_{safe_file_name}"
+        file_key = f"videos/{timestamp}_{uuid.uuid4().hex}"
         logging.info(f"Generated S3 file key: {file_key}")
 
+        # Generate pre-signed URL for PUT operation (upload)
         presigned_url = s3_client.generate_presigned_url(
             'put_object',
             Params={
-                'Bucket': settings.aws_s3_bucket_name,
+                'Bucket': S3_BUCKET_NAME,
                 'Key': file_key,
-                'ContentType': request_data.content_type,
-                'ACL': 'public-read'
+                'ContentType': content_type
             },
-            ExpiresIn=3600  # 1 hour
+            ExpiresIn=7200  # URL expires in 2 hours
         )
-
-        logging.info(f"Generated presigned URL: {presigned_url}")
-
+        
+        logging.info(f"Successfully generated pre-signed URL for {file_key}")
         return {
             "presigned_url": presigned_url,
             "file_key": file_key,
-            "bucket": settings.aws_s3_bucket_name,
+            "bucket": S3_BUCKET_NAME,
             "expires_in": 7200
         }
-    except ClientError as e:
-        logging.error(f"Error generating S3 pre-signed URL: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
-        logging.error(f"Unexpected error generating video upload signature: {e}")
-        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
+        tb_str = traceback.format_exc()
+        logging.error(f"Error generating video upload signature: {e}\nTraceback:\n{tb_str}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Could not generate upload signature: {e}"
+        )
 
 class VideoCreateAdmin(BaseModel):
     title: str
@@ -1250,6 +1249,11 @@ def get_s3_signature(admin: User = Depends(get_current_admin_user)):
     except Exception as e:
         logging.error(f"Error generating S3 signature: {e}")
         raise HTTPException(status_code=500, detail="Could not generate upload signature.")
+
+
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Could not generate upload signature: {e}"
+        )
 
 @router.get("/videos/{video_id}/quiz", response_model=QuizReadWithDetails, name="get_quiz_for_video")
 def get_quiz_for_video(video_id: uuid.UUID, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
