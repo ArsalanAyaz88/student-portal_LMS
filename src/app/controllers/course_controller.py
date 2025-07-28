@@ -82,25 +82,29 @@ def explore_course_detail(course_id: str, session: Session = Depends(get_db)):
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid course ID format")
 
-    # Use selectinload to efficiently fetch the related videos
     course = session.exec(
-        select(Course).options(selectinload(Course.videos)).where(Course.id == course_uuid)
+        select(Course).options(
+            selectinload(Course.sections).options(
+                selectinload(Section.videos),
+                selectinload(Section.quizzes)
+            )
+        ).where(Course.id == course_uuid)
     ).first()
 
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
 
-    # The videos are already loaded in course.videos
+    # The instructor's name needs to be fetched from the related User model
+    instructor_name = course.instructor.name if course.instructor else "N/A"
+
     return CourseExploreDetail(
         id=course.id,
         title=course.title,
+        description=course.description or "",
         price=course.price,
-        thumbnail_url=course.thumbnail_url,
-        description=course.description,
-        outcomes=course.outcomes or "",
-        prerequisites=course.prerequisites or "",
-        curriculum=course.curriculum or "",
-        videos=course.videos  # Pass the loaded videos
+        instructor_name=instructor_name,
+        image_url=course.thumbnail_url or "",
+        sections=course.sections
     )
 
 
