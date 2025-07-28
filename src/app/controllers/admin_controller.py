@@ -76,12 +76,14 @@ def create_upload_signature(folder: str = Form("videos")):
             Params={
                 'Bucket': S3_BUCKET_NAME,
                 'Key': file_key,
-                'ContentType': 'video/mp4'
+                'ContentType': request_data.content_type,
+                'ACL': 'public-read'
             },
-            ExpiresIn=3600  # URL expires in 1 hour
+            ExpiresIn=3600  # 1 hour
         )
-        
-        logging.info("Successfully created S3 pre-signed URL.")
+
+        logging.info(f"Generated presigned URL: {presigned_url}")
+
         return {
             "presigned_url": presigned_url,
             "file_key": file_key,
@@ -191,49 +193,46 @@ class SignatureRequest(BaseModel):
 @router.post("/generate-video-upload-signature", response_model=dict)
 async def generate_video_upload_signature(
     request_data: SignatureRequest,
-    admin: User = Depends(get_current_admin_user)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_active_user)
 ):
-    """
-    Generates a pre-signed URL for a direct video upload to AWS S3, 
-    using the Content-Type provided by the client.
-    """
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
     try:
-        if s3_client is None:
-            raise HTTPException(status_code=500, detail="S3 client is not configured")
-
-        content_type = request_data.content_type
-        if not content_type.startswith('video/'):
-            raise HTTPException(status_code=400, detail="Invalid content type. Only video files are allowed.")
-
-        # Generate a unique file key for S3
+        logging.info(f"Request received to generate signature for content type: {request_data.content_type}")
+        
+        s3_client = boto3.client(
+            's3',
+            aws_access_key_id=settings.aws_access_key_id,
+            aws_secret_access_key=settings.aws_secret_access_key,
+            region_name=settings.aws_region
+        )
+        
         timestamp = int(time.time())
         unique_id = uuid.uuid4().hex
-        # Sanitize the file_name to remove problematic characters
         file_name = request_data.file_name
         safe_file_name = re.sub(r'[^a-zA-Z0-9_.-]', '', file_name)
         file_key = f"videos/{timestamp}_{unique_id}_{safe_file_name}"
         logging.info(f"Generated S3 file key: {file_key}")
-        
-        # Generate pre-signed URL for PUT operation (upload)
-        params = {
-            'Bucket': S3_BUCKET_NAME,
-            'Key': file_key,
-            'ContentType': content_type,
-            'ACL': 'public-read'  # Make the file publicly readable
-        }
-        logging.info(f"Generating S3 pre-signed URL with params: {params}")
 
         presigned_url = s3_client.generate_presigned_url(
             'put_object',
-            Params=params,
-            ExpiresIn=7200  # URL expires in 2 hours
+            Params={
+                'Bucket': settings.aws_s3_bucket_name,  
+                'Key': file_key,
+                'ContentType': request_data.content_type,
+                'ACL': 'public-read'
+            },
+            ExpiresIn=3600  # 1 hour
         )
-        logging.info(f"Successfully generated pre-signed URL: {presigned_url}")
+
+        logging.info(f"Generated presigned URL: {presigned_url}")
 
         return {
             "presigned_url": presigned_url,
             "file_key": file_key,
-            "bucket": S3_BUCKET_NAME,
+            "bucket": settings.aws_s3_bucket_name
             "expires_in": 7200
         }
     except ClientError as e:
