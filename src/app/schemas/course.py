@@ -5,7 +5,7 @@ from datetime import datetime
 import uuid
 
 # Import the video schema module to resolve forward references at runtime
-from . import video
+from . import video, quiz
 
 class CourseBase(BaseModel):
     title: str = Field(..., example="The Complete Web Development Bootcamp")
@@ -54,9 +54,28 @@ class CourseExploreList(BaseModel):
     price: float
     thumbnail_url: Optional[str] = None
 
+class VideoInEploreCourse(BaseModel):
+    id: uuid.UUID
+    title: str
+
+class QuizInEploreCourse(BaseModel):
+    id: uuid.UUID
+    title: str
+
+class SectionInEploreCourse(BaseModel):
+    id: str
+    title: str
+    videos: List[VideoInEploreCourse]
+    quizzes: List[QuizInEploreCourse]
+
 class CourseExploreDetail(BaseModel):
     id: uuid.UUID
-    videos: List["video.VideoPreview"] = []
+    title: str
+    description: str
+    price: float
+    instructor_name: str
+    image_url: Optional[str]
+    sections: List[SectionInEploreCourse]
 
 class CourseCurriculumDetail(BaseModel):
     curriculum: str
