@@ -89,7 +89,6 @@ def explore_course_detail(course_id: str, session: Session = Depends(get_db)):
 
         course = session.exec(
             select(Course).options(
-                selectinload(Course.instructor),
                 selectinload(Course.videos),
                 selectinload(Course.quizzes)
             ).where(Course.id == course_uuid)
@@ -98,7 +97,12 @@ def explore_course_detail(course_id: str, session: Session = Depends(get_db)):
         if not course:
             raise HTTPException(status_code=404, detail="Course not found")
 
-        instructor_name = course.instructor.full_name if course.instructor else "N/A"
+        instructor_name = "N/A"
+        if course.created_by:
+            instructor_id = uuid.UUID(course.created_by)
+            instructor = session.get(User, instructor_id)
+            if instructor:
+                instructor_name = instructor.full_name
 
         # Manually construct the sections to match the frontend's expectation
         sections = [
