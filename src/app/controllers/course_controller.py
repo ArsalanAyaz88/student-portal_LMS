@@ -4,7 +4,7 @@ from sqlmodel import Session, select, func
 from sqlalchemy.orm import selectinload
 from src.app.models.course import Course
 from src.app.models.video import Video
-from src.app.models.section import Section
+from src.app.models.quiz import Quiz
 from src.app.models.quiz import Quiz, QuizSubmission, Question
 from src.app.schemas.quiz import QuizSubmissionRead, QuizSubmissionCreate
 from src.app.schemas.video import VideoWithProgress
@@ -90,10 +90,8 @@ def explore_course_detail(course_id: str, session: Session = Depends(get_db)):
         course = session.exec(
             select(Course).options(
                 selectinload(Course.instructor),
-                selectinload(Course.sections).options(
-                    selectinload(Section.videos),
-                    selectinload(Section.quizzes)
-                )
+                selectinload(Course.videos),
+                selectinload(Course.quizzes)
             ).where(Course.id == course_uuid)
         ).first()
 
@@ -102,6 +100,16 @@ def explore_course_detail(course_id: str, session: Session = Depends(get_db)):
 
         instructor_name = course.instructor.full_name if course.instructor else "N/A"
 
+        # Manually construct the sections to match the frontend's expectation
+        sections = [
+            {
+                "id": "main-section",
+                "title": "Course Content",
+                "videos": course.videos,
+                "quizzes": course.quizzes
+            }
+        ]
+
         return CourseExploreDetail(
             id=course.id,
             title=course.title,
@@ -109,7 +117,7 @@ def explore_course_detail(course_id: str, session: Session = Depends(get_db)):
             price=course.price,
             instructor_name=instructor_name,
             image_url=course.thumbnail_url or "",
-            sections=course.sections
+            sections=sections
         )
     except Exception as e:
         logger.exception(f"Error fetching course detail for {course_id}: {e}")
