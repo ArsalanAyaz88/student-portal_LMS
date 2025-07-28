@@ -207,7 +207,9 @@ async def generate_video_upload_signature(
         # Generate a unique file key for S3
         timestamp = int(time.time())
         unique_id = uuid.uuid4().hex
-        file_key = f"videos/{timestamp}_{unique_id}"
+        # Sanitize the file_name to remove problematic characters
+        safe_file_name = re.sub(r'[^a-zA-Z0-9_.-]', '', file_name)
+        file_key = f"videos/{timestamp}_{unique_id}_{safe_file_name}"
         logging.info(f"Generated S3 file key: {file_key}")
         
         # Generate pre-signed URL for PUT operation (upload)
