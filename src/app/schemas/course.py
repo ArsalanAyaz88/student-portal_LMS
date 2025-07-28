@@ -58,9 +58,15 @@ class VideoInEploreCourse(BaseModel):
     id: uuid.UUID
     title: str
 
+    class Config:
+        from_attributes = True
+
 class QuizInEploreCourse(BaseModel):
     id: uuid.UUID
     title: str
+
+    class Config:
+        from_attributes = True
 
 class SectionInEploreCourse(BaseModel):
     id: str
@@ -73,7 +79,7 @@ class CourseExploreDetail(BaseModel):
     title: str
     description: str
     price: float
-    instructor_name: str
+    instructor_name: Optional[str]
     image_url: Optional[str]
     sections: List[SectionInEploreCourse]
 
