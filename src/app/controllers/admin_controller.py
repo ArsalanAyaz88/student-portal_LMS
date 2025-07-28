@@ -1416,4 +1416,56 @@ def create_quiz(
 
 
 
-    return application    
+    return application
+
+
+@router.get("/debug-video-info", dependencies=[Depends(get_current_admin_user)])
+def debug_video_info(db: Session = Depends(get_db)):
+    logging.info("--- DEBUG: Fetching video info for working vs non-working videos ---")
+    try:
+        # Case 1: Working Video
+        # Course: "introduction to programming", Video: "888888"
+        working_course_title = "introduction to programming"
+        working_video_title = "888888"
+        
+        working_video = db.exec(
+            select(Video)
+            .join(Course)
+            .where(Course.title == working_course_title, Video.title == working_video_title)
+        ).first()
+
+        # Case 2: Non-Working Video
+        # Course: "Programming with Arsal", Video: "wqerwqer"
+        non_working_course_title = "Programming with Arsal"
+        non_working_video_title = "wqerwqer"
+
+        non_working_video = db.exec(
+            select(Video)
+            .join(Course)
+            .where(Course.title == non_working_course_title, Video.title == non_working_video_title)
+        ).first()
+
+        response = {
+            "working_video": video_to_dict(working_video) if working_video else None,
+            "non_working_video": video_to_dict(non_working_video) if non_working_video else None,
+        }
+        logging.info(f"--- DEBUG: Successfully fetched video info: {response} ---")
+        return response
+
+    except Exception as e:
+        logging.error(f"--- DEBUG: Error fetching debug video info: {e} ---", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+def video_to_dict(video: Video):
+    if not video:
+        return None
+    return {
+        "id": str(video.id),
+        "title": video.title,
+        "video_url": video.video_url,
+        "cloudinary_url": video.cloudinary_url,
+        "file_key": video.file_key,
+        "course_id": str(video.course_id),
+        "created_at": video.created_at.isoformat() if video.created_at else None,
+        "updated_at": video.updated_at.isoformat() if video.updated_at else None,
+    }
