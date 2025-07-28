@@ -63,8 +63,14 @@ async def upload_file_to_s3(file_obj, key: str, content_type: Optional[str] = No
         )
         await loop.run_in_executor(None, upload_func)
 
-        # Generate the URL using the client's endpoint to ensure region-correctness
-        url = f"{s3_client.meta.endpoint_url}/{S3_BUCKET_NAME}/{key}"
+        # Generate a region-aware public URL for the object
+        region = s3_client.get_bucket_location(Bucket=S3_BUCKET_NAME).get('LocationConstraint')
+
+        if region is None:
+            # us-east-1 does not have a location constraint in the response
+            url = f"https://{S3_BUCKET_NAME}.s3.amazonaws.com/{key}"
+        else:
+            url = f"https://{S3_BUCKET_NAME}.s3.{region}.amazonaws.com/{key}"
         
         logger.debug(f"Successfully uploaded file to S3: {url}")
         return url
