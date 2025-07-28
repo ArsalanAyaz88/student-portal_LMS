@@ -221,8 +221,7 @@ async def generate_video_upload_signature(
             Params={
                 'Bucket': S3_BUCKET_NAME,
                 'Key': file_key,
-                'ContentType': content_type,
-                'ACL': 'public-read'
+                'ContentType': content_type
             },
             ExpiresIn=7200  # URL expires in 2 hours
         )
@@ -426,6 +425,51 @@ def delete_video(
         logging.error(f"[ADMIN] Unexpected error during video deletion process: {e}", exc_info=True)
         db.rollback()
         raise HTTPException(status_code=500, detail="An unexpected error occurred while deleting the video.")
+
+
+@router.get("/videos/{video_id}/view-url", response_model=dict)
+def get_video_view_url(
+    video_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    """
+    Generate a pre-signed URL for viewing a private video from S3.
+    """
+    logging.info(f"Request to generate view URL for video_id: {video_id}")
+    
+    video = db.get(Video, video_id)
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    if not video.public_id: # public_id should store the S3 key
+        logging.error(f"Video {video_id} does not have a file key (public_id) associated with it.")
+        raise HTTPException(status_code=500, detail="Video file key not found.")
+
+    try:
+        if s3_client is None:
+            logging.error("S3 client is not configured.")
+            raise HTTPException(status_code=500, detail="S3 client is not configured")
+
+        presigned_url = s3_client.generate_presigned_url(
+            'get_object',
+            Params={
+                'Bucket': S3_BUCKET_NAME,
+                'Key': video.public_id 
+            },
+            ExpiresIn=3600  # URL expires in 1 hour
+        )
+        
+        logging.info(f"Successfully generated view URL for video {video_id}")
+        return {"view_url": presigned_url}
+
+    except Exception as e:
+        tb_str = traceback.format_exc()
+        logging.error(f"Error generating video view URL for {video.public_id}: {e}\nTraceback:\n{tb_str}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not generate video view URL."
+        )
 
 
 # 2. Notifications
