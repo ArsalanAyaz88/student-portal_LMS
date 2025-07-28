@@ -11,7 +11,7 @@ from ..utils.file import save_upload_and_get_url
 from fastapi.logger import logger
 
 router = APIRouter(tags=["Profile"])
-
+ 
 @router.get("/profile", response_model=ProfileRead)
 def read_profile(
     user = Depends(get_current_user),  # This allows both regular users and admins

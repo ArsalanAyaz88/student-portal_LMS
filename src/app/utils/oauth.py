@@ -6,7 +6,7 @@ from ..schemas.oauth import GoogleToken, GoogleUserInfo
 from ..utils.security import create_access_token
 
 load_dotenv()
-
+ 
 # Google OAuth Configuration
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
