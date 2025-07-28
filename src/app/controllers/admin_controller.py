@@ -1187,9 +1187,9 @@ def admin_list_on_time_submissions(
             description=assignment.description,
             due_date=assignment.due_date,
             status='pending', # Placeholder status
-            course_title=db.get(Course, course_id).title or "N/A"
+            course_title=db.get(Course, course_id).title or "N/A",
+            submission=None
         )
-        submission=None
     )
 
     return SubmissionStudentsResponse(
