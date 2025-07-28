@@ -221,7 +221,8 @@ async def generate_video_upload_signature(
             Params={
                 'Bucket': S3_BUCKET_NAME,
                 'Key': file_key,
-                'ContentType': content_type
+                'ContentType': content_type,
+                'ACL': 'public-read'
             },
             ExpiresIn=7200  # URL expires in 2 hours
         )
