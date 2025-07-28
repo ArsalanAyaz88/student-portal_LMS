@@ -1245,7 +1245,14 @@ def admin_update_assignment(
     """Update an assignment's title, description, and due date."""
     logging.info(f"Attempting to update assignment {assignment_id} for course {course_id}")
     try:
-        assignment = db.get(Assignment, assignment_id)
+        # Eagerly load the course to access its title for the response
+        query = (
+            select(Assignment)
+            .where(Assignment.id == assignment_id)
+            .options(selectinload(Assignment.course))
+        )
+        assignment = db.exec(query).first()
+
         if not assignment or str(assignment.course_id) != str(course_id):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -1260,7 +1267,19 @@ def admin_update_assignment(
         db.commit()
         db.refresh(assignment)
         logging.info(f"Successfully updated assignment {assignment_id}")
-        return assignment
+
+        # Manually construct the response to match the AssignmentRead schema
+        return AssignmentRead(
+            id=assignment.id,
+            course_id=assignment.course_id,
+            title=assignment.title,
+            description=assignment.description,
+            due_date=assignment.due_date,
+            status='pending',  # Default status for admin view
+            course_title=assignment.course.title if assignment.course else "N/A",
+            submission=None
+        )
+
     except Exception as e:
         db.rollback()
         tb_str = traceback.format_exc()
