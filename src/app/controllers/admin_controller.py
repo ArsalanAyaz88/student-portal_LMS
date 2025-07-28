@@ -219,7 +219,7 @@ async def generate_video_upload_signature(
         presigned_url = s3_client.generate_presigned_url(
             'put_object',
             Params={
-                'Bucket': settings.aws_s3_bucket_name,  
+                'Bucket': settings.aws_s3_bucket_name,
                 'Key': file_key,
                 'ContentType': request_data.content_type,
                 'ACL': 'public-read'
@@ -232,21 +232,15 @@ async def generate_video_upload_signature(
         return {
             "presigned_url": presigned_url,
             "file_key": file_key,
-            "bucket": settings.aws_s3_bucket_name
+            "bucket": settings.aws_s3_bucket_name,
             "expires_in": 7200
         }
     except ClientError as e:
-        logging.error(f"AWS Client Error generating video upload signature: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"An AWS error occurred: {e}"
-        )
+        logging.error(f"Error generating S3 pre-signed URL: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
-        logging.error(f"Unexpected error generating video upload signature: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"An unexpected error occurred: {e}"
-        )
+        logging.error(f"Unexpected error generating video upload signature: {e}")
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
 
 class VideoCreateAdmin(BaseModel):
     title: str
