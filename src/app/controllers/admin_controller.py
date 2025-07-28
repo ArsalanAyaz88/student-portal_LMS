@@ -186,6 +186,7 @@ async def create_course(
 
 class SignatureRequest(BaseModel):
     content_type: str
+    file_name: str
 
 @router.post("/generate-video-upload-signature", response_model=dict)
 async def generate_video_upload_signature(
