@@ -32,12 +32,12 @@ def create_video(video: VideoCreate, db: Session = Depends(get_db), admin: User 
     logging.info(f"Successfully created video with ID: {db_video.id} for course ID: {video.course_id}")
     return db_video
 
-@router.get("/videos", response_model=List[VideoAdminRead])
+@router.get("/videos") 
 def get_videos_for_course(course_id: uuid.UUID, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
     """
-    Get all videos for a specific course.
+    Get all videos for a specific course, ensuring all URL fields are returned.
     """
-    videos = db.exec(select(Video).where(Video.course_id == course_id)).all()
+    videos = db.query(Video).filter(Video.course_id == course_id).order_by(Video.order).all()
     return videos
 
 @router.put("/videos/{video_id}", response_model=VideoRead)

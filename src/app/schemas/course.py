@@ -86,6 +86,8 @@ class CourseExploreDetail(BaseModel):
 class CourseCurriculumDetail(BaseModel):
     curriculum: str
 
+
+
 class CourseDetail(BaseModel):
     id: uuid.UUID
     title: str
