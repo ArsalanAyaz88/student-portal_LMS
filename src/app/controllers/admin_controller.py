@@ -362,26 +362,39 @@ def delete_video(
     admin: User = Depends(get_current_admin_user)
 ):
     """
-    Delete a video with detailed error logging.
+    Delete a video from the database and the corresponding file from S3.
     """
-    import logging
     logging.info(f"[ADMIN] Attempting to delete video with ID: {video_id}")
-    try:
-        db_video = db.get(Video, video_id)
-        if not db_video:
-            logging.warning(f"[ADMIN] Video not found for deletion: {video_id}")
-            raise HTTPException(status_code=404, detail="Video not found")
 
-        logging.info(f"[ADMIN] Deleting video: {db_video.id} - {getattr(db_video, 'title', '')}")
+    db_video = db.get(Video, video_id)
+    if not db_video:
+        logging.warning(f"[ADMIN] Video not found for deletion: {video_id}")
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    s3_file_key = db_video.public_id  # Assuming public_id stores the S3 file key
+
+    try:
+        # Step 1: Delete the database record
+        logging.info(f"[ADMIN] Deleting video from DB: {db_video.id} - {db_video.title}")
         db.delete(db_video)
         db.commit()
-        logging.info(f"[ADMIN] Successfully deleted video: {video_id}")
+        logging.info(f"[ADMIN] Successfully deleted video from DB: {video_id}")
+
+        # Step 2: Delete the file from S3
+        if s3_file_key and s3_client:
+            try:
+                logging.info(f"[ADMIN] Deleting file from S3 with key: {s3_file_key}")
+                s3_client.delete_object(Bucket=S3_BUCKET_NAME, Key=s3_file_key)
+                logging.info(f"[ADMIN] Successfully deleted file from S3: {s3_file_key}")
+            except Exception as s3_error:
+                # Log the S3 error but don't prevent the API from confirming DB deletion
+                logging.error(f"[ADMIN] Failed to delete file from S3. Key: {s3_file_key}. Error: {s3_error}", exc_info=True)
+                # Optionally, you could raise an exception or handle this case differently
+
         return
-    except HTTPException as e:
-        logging.error(f"[ADMIN] HTTPException during video deletion: {e.detail}", exc_info=True)
-        raise
+
     except Exception as e:
-        logging.error(f"[ADMIN] Unexpected error during video deletion: {e}", exc_info=True)
+        logging.error(f"[ADMIN] Unexpected error during video deletion process: {e}", exc_info=True)
         db.rollback()
         raise HTTPException(status_code=500, detail="An unexpected error occurred while deleting the video.")
 
