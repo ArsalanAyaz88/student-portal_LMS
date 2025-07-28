@@ -1149,11 +1149,12 @@ def admin_list_on_time_submissions(
 ):
     logging.info(f"Fetching submissions for assignment {assignment_id} in course {course_id}")
     try:
-        assignment = db.get(Assignment, assignment_id)
+        assignment_query = select(Assignment).where(Assignment.id == assignment_id).options(selectinload(Assignment.course))
+        assignment = db.exec(assignment_query).first()
+
         if not assignment or str(assignment.course_id) != str(course_id):
             raise HTTPException(status_code=404, detail="Assignment not found")
 
-        # Get all submissions for the assignment
         submissions_query = (
             select(AssignmentSubmission)
             .where(AssignmentSubmission.assignment_id == assignment_id)
@@ -1179,23 +1180,29 @@ def admin_list_on_time_submissions(
             else:
                 logging.warning(f"Submission {sub.id} is missing a student relationship.")
 
-        # Manually build the assignment read part of the response
         assignment_read = AssignmentRead(
             id=assignment.id,
             course_id=assignment.course_id,
             title=assignment.title,
             description=assignment.description,
             due_date=assignment.due_date,
-            status='pending', # Placeholder status
-            course_title=db.get(Course, course_id).title or "N/A",
+            status='pending',
+            course_title=assignment.course.title if assignment.course else "N/A",
             submission=None
         )
-    )
 
-    return SubmissionStudentsResponse(
-        assignment=assignment_details,
-        submissions=students,
-    )
+        return SubmissionStudentsResponse(
+            assignment=assignment_read,
+            submissions=student_submissions,
+        )
+    except Exception as e:
+        db.rollback()
+        tb_str = traceback.format_exc()
+        logging.error(f"Error fetching submissions for assignment {assignment_id}: {e}\nTraceback:\n{tb_str}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected error occurred while fetching submissions: {e}"
+        )
 
 @router.put(
     "/courses/{course_id}/assignments/{assignment_id}/submissions/{submission_id}/grade",
