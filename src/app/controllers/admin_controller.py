@@ -1243,22 +1243,32 @@ def admin_update_assignment(
     admin: User = Depends(get_current_admin_user),
 ):
     """Update an assignment's title, description, and due date."""
-    assignment = db.get(Assignment, assignment_id)
-    if not assignment or assignment.course_id != course_id:
-        raise HTTPException(status_code=404, detail="Assignment not found")
+    logging.info(f"Attempting to update assignment {assignment_id} for course {course_id}")
+    try:
+        assignment = db.get(Assignment, assignment_id)
+        if not assignment or str(assignment.course_id) != str(course_id):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Assignment not found in this course.",
+            )
 
-    # Get the update data, excluding unset fields
-    update_data = payload.dict(exclude_unset=True)
+        update_data = payload.model_dump(exclude_unset=True)
+        for key, value in update_data.items():
+            setattr(assignment, key, value)
 
-    # Update the assignment object with the new data
-    for key, value in update_data.items():
-        setattr(assignment, key, value)
-
-    db.add(assignment)
-    db.commit()
-    db.refresh(assignment)
-
-    return assignment
+        db.add(assignment)
+        db.commit()
+        db.refresh(assignment)
+        logging.info(f"Successfully updated assignment {assignment_id}")
+        return assignment
+    except Exception as e:
+        db.rollback()
+        tb_str = traceback.format_exc()
+        logging.error(f"Error updating assignment {assignment_id}: {e}\nTraceback:\n{tb_str}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected error occurred while updating the assignment: {e}"
+        )
 
 @router.get("/s3-signature")
 def get_s3_signature(admin: User = Depends(get_current_admin_user)):
