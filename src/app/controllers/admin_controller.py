@@ -184,15 +184,26 @@ async def create_course(
         )
 
 
+class SignatureRequest(BaseModel):
+    content_type: str
+
 @router.post("/generate-video-upload-signature", response_model=dict)
-async def generate_video_upload_signature(admin: User = Depends(get_current_admin_user)):
+async def generate_video_upload_signature(
+    request_data: SignatureRequest,
+    admin: User = Depends(get_current_admin_user)
+):
     """
-    Generates a pre-signed URL for a direct video upload to AWS S3.
+    Generates a pre-signed URL for a direct video upload to AWS S3, 
+    using the Content-Type provided by the client.
     """
     try:
         if s3_client is None:
             raise HTTPException(status_code=500, detail="S3 client is not configured")
-        
+
+        content_type = request_data.content_type
+        if not content_type.startswith('video/'):
+            raise HTTPException(status_code=400, detail="Invalid content type. Only video files are allowed.")
+
         # Generate a unique key for the video file
         timestamp = int(time.time())
         file_key = f"videos/{timestamp}_{uuid.uuid4().hex}"
@@ -203,9 +214,9 @@ async def generate_video_upload_signature(admin: User = Depends(get_current_admi
             Params={
                 'Bucket': S3_BUCKET_NAME,
                 'Key': file_key,
-                'ContentType': 'video/mp4'  # Default content type for videos
+                'ContentType': content_type
             },
-            ExpiresIn=7200  # URL expires in 1 hour
+            ExpiresIn=7200  # URL expires in 2 hours
         )
         
         return {
