@@ -4,6 +4,7 @@ from sqlmodel import Session, select, func
 from sqlalchemy.orm import selectinload
 from src.app.models.course import Course
 from src.app.models.video import Video
+from src.app.models.section import Section
 from src.app.models.quiz import Quiz, QuizSubmission, Question
 from src.app.schemas.quiz import QuizSubmissionRead, QuizSubmissionCreate
 from src.app.schemas.video import VideoWithProgress
@@ -22,6 +23,9 @@ from src.app.utils.certificate_generator import CertificateGenerator
 from src.app.utils.time import get_pakistan_time
 import uuid
 import cloudinary.uploader
+import logging
+
+logger = logging.getLogger(__name__)
 from fastapi.logger import logger
 from datetime import datetime
 
@@ -78,34 +82,38 @@ def explore_courses(session: Session = Depends(get_db)):
 @router.get("/explore-courses/{course_id}", response_model=CourseExploreDetail)
 def explore_course_detail(course_id: str, session: Session = Depends(get_db)):
     try:
-        course_uuid = uuid.UUID(course_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid course ID format")
+        try:
+            course_uuid = uuid.UUID(course_id)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid course ID format")
 
-    course = session.exec(
-        select(Course).options(
-            selectinload(Course.sections).options(
-                selectinload(Section.videos),
-                selectinload(Section.quizzes)
-            )
-        ).where(Course.id == course_uuid)
-    ).first()
+        course = session.exec(
+            select(Course).options(
+                selectinload(Course.instructor),
+                selectinload(Course.sections).options(
+                    selectinload(Section.videos),
+                    selectinload(Section.quizzes)
+                )
+            ).where(Course.id == course_uuid)
+        ).first()
 
-    if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
+        if not course:
+            raise HTTPException(status_code=404, detail="Course not found")
 
-    # The instructor's name needs to be fetched from the related User model
-    instructor_name = course.instructor.name if course.instructor else "N/A"
+        instructor_name = course.instructor.full_name if course.instructor else "N/A"
 
-    return CourseExploreDetail(
-        id=course.id,
-        title=course.title,
-        description=course.description or "",
-        price=course.price,
-        instructor_name=instructor_name,
-        image_url=course.thumbnail_url or "",
-        sections=course.sections
-    )
+        return CourseExploreDetail(
+            id=course.id,
+            title=course.title,
+            description=course.description or "",
+            price=course.price,
+            instructor_name=instructor_name,
+            image_url=course.thumbnail_url or "",
+            sections=course.sections
+        )
+    except Exception as e:
+        logger.exception(f"Error fetching course detail for {course_id}: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error while fetching course details.")
 
 
 @router.get("/my-courses/{course_id}/enrollment-status", response_model=dict)
