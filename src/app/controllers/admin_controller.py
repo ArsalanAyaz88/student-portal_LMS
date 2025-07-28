@@ -194,9 +194,9 @@ class SignatureRequest(BaseModel):
 async def generate_video_upload_signature(
     request_data: SignatureRequest,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
+    admin: models.User = Depends(get_current_admin_user)
 ):
-    if not current_user.is_admin:
+    if not admin.is_admin:
         raise HTTPException(status_code=403, detail="Not authorized")
 
     try:
