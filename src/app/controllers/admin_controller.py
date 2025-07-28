@@ -232,48 +232,56 @@ async def generate_video_upload_signature(
             detail="Could not generate upload signature."
         )
 
+class VideoCreateAdmin(BaseModel):
+    title: str
+    description: Optional[str] = None
+    is_preview: bool = False
+    video_url: str
+    file_key: str
+    duration: float
+    order: int
+
 @router.post("/courses/{course_id}/videos", response_model=VideoRead)
 async def upload_video_for_course(
     course_id: uuid.UUID,
-    title: str = Form(...),
-    description: str = Form(None),
-    is_preview: bool = Form(False),
-    video_url: str = Form(...),  # S3 URL of the uploaded video
-    file_key: str = Form(...),   # S3 file key for the video
-    duration: float = Form(...), # Video duration in seconds
+    video_data: VideoCreateAdmin,
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin_user)
 ):
     """
     Save video metadata for a specific course after the video has been uploaded to S3.
     """
+    logging.info(f"Received request to create video for course {course_id}")
+    logging.debug(f"Video creation payload: {video_data.model_dump_json()}")
+
     course = db.get(Course, course_id)
     if not course:
+        logging.warning(f"Course with ID {course_id} not found.")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
 
     try:
-        # The video is already uploaded to S3. We just save its metadata.
-        # The 'video_url' is the S3 URL from the upload response.
         new_video = Video(
-            title=title,
-            description=description,
-            video_url=video_url,
-            public_id=file_key,  # Store S3 file key in public_id field for compatibility
-            duration=duration,
+            title=video_data.title,
+            description=video_data.description,
+            video_url=video_data.video_url,
+            public_id=video_data.file_key,  # Store S3 file key
+            duration=video_data.duration,
             course_id=course_id,
-            is_preview=is_preview
+            is_preview=video_data.is_preview,
+            order=video_data.order
         )
         db.add(new_video)
         db.commit()
         db.refresh(new_video)
+        logging.info(f"Successfully created video with ID {new_video.id} for course {course_id}")
         return new_video
 
     except Exception as e:
         db.rollback()
-        logging.error(f"Error uploading video for course {course_id}: {e}")
+        logging.error(f"Error creating video for course {course_id}: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to upload video: {str(e)}"
+            detail=f"An unexpected error occurred while creating the video: {str(e)}"
         )
 
 
