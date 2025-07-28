@@ -63,8 +63,8 @@ async def upload_file_to_s3(file_obj, key: str, content_type: Optional[str] = No
         )
         await loop.run_in_executor(None, upload_func)
 
-        # Generate the URL
-        url = f"https://{S3_BUCKET_NAME}.s3.amazonaws.com/{key}"
+        # Generate the URL using the client's endpoint to ensure region-correctness
+        url = f"{s3_client.meta.endpoint_url}/{S3_BUCKET_NAME}/{key}"
         
         logger.debug(f"Successfully uploaded file to S3: {url}")
         return url
