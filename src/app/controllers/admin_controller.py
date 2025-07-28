@@ -501,6 +501,32 @@ def get_notifications(session: Session = Depends(get_db), admin: User = Depends(
         )
     return response_data
 
+@router.delete("/notifications/{notification_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_notification(
+    notification_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    """Delete a notification by its ID."""
+    logging.info(f"Attempting to delete notification {notification_id}")
+    try:
+        notification = db.get(Notification, notification_id)
+        if not notification:
+            logging.warning(f"Notification {notification_id} not found for deletion.")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
+
+        db.delete(notification)
+        db.commit()
+        logging.info(f"Successfully deleted notification {notification_id}")
+        return
+    except Exception as e:
+        db.rollback()
+        tb_str = traceback.format_exc()
+        logging.error(f"Error deleting notification {notification_id}: {e}\nTraceback:\n{tb_str}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected error occurred while deleting the notification: {e}"
+        )
 
 @router.get("/enrollment-applications", response_model=List[EnrollmentApplicationRead])
 def get_enrollment_applications(
