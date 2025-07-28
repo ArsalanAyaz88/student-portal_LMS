@@ -204,32 +204,44 @@ async def generate_video_upload_signature(
         if not content_type.startswith('video/'):
             raise HTTPException(status_code=400, detail="Invalid content type. Only video files are allowed.")
 
-        # Generate a unique key for the video file
+        # Generate a unique file key for S3
         timestamp = int(time.time())
-        file_key = f"videos/{timestamp}_{uuid.uuid4().hex}"
+        unique_id = uuid.uuid4().hex
+        file_key = f"videos/{timestamp}_{unique_id}"
+        logging.info(f"Generated S3 file key: {file_key}")
         
         # Generate pre-signed URL for PUT operation (upload)
+        params = {
+            'Bucket': S3_BUCKET_NAME,
+            'Key': file_key,
+            'ContentType': content_type
+        }
+        logging.info(f"Generating S3 pre-signed URL with params: {params}")
+
         presigned_url = s3_client.generate_presigned_url(
             'put_object',
-            params={
-                'Bucket': S3_BUCKET_NAME,
-                'Key': file_key,
-                'ContentType': content_type
-            },
+            Params=params,
             ExpiresIn=7200  # URL expires in 2 hours
         )
-        
+        logging.info(f"Successfully generated pre-signed URL: {presigned_url}")
+
         return {
             "presigned_url": presigned_url,
             "file_key": file_key,
             "bucket": S3_BUCKET_NAME,
             "expires_in": 7200
         }
-    except Exception as e:
-        logging.error(f"Error generating video upload signature: {e}")
+    except ClientError as e:
+        logging.error(f"AWS Client Error generating video upload signature: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Could not generate upload signature."
+            detail=f"An AWS error occurred: {e}"
+        )
+    except Exception as e:
+        logging.error(f"Unexpected error generating video upload signature: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected error occurred: {e}"
         )
 
 class VideoCreateAdmin(BaseModel):
