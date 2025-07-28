@@ -263,8 +263,8 @@ async def upload_video_for_course(
         new_video = Video(
             title=video_data.title,
             description=video_data.description,
-            video_url=video_data.video_url,
-            public_id=video_data.file_key,  # Store S3 file key
+            cloudinary_url=video_data.video_url, # Use S3 URL for this field
+            public_id=video_data.file_key,      # Store S3 file key
             duration=video_data.duration,
             course_id=course_id,
             is_preview=video_data.is_preview,
