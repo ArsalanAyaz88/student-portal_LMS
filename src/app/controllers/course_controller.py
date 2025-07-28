@@ -22,8 +22,28 @@ from src.app.utils.dependencies import get_current_user
 from src.app.utils.certificate_generator import CertificateGenerator
 from src.app.utils.time import get_pakistan_time
 import uuid
+import cloudinary
 import cloudinary.uploader
+import cloudinary.api
 import logging
+
+# Utility function to generate a signed URL for a Cloudinary public ID
+def get_signed_cloudinary_url(public_id):
+    if not public_id:
+        return None
+    try:
+        # Generate a signed URL that is valid for 60 minutes
+        signed_url = cloudinary.utils.cloudinary_url(
+            public_id,
+            sign_url=True,
+            secure=True,
+            resource_type="image",
+            type="upload"
+        )
+        return signed_url[0]
+    except Exception as e:
+        logger.error(f"Error generating signed URL for {public_id}: {e}")
+        return None
 
 logger = logging.getLogger(__name__)
 from fastapi.logger import logger
@@ -74,7 +94,7 @@ def explore_courses(session: Session = Depends(get_db)):
             id=course.id,
             title=course.title,
             price=course.price,
-            thumbnail_url=course.thumbnail_url
+            thumbnail_url=get_signed_cloudinary_url(course.thumbnail_url)
         ) for course in courses
     ]
 
