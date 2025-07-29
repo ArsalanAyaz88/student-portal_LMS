@@ -7,6 +7,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import List, Optional
 import traceback
+from urllib.parse import urlparse
 
 # Third-party Imports
 import boto3
@@ -400,18 +401,23 @@ def get_all_courses(
 
         for course in courses:
             if course.thumbnail_url:
-                # Assuming thumbnail_url is the full S3 URL, extract the key
-                # e.g., https://<bucket-name>.s3.amazonaws.com/course_thumbnails/image.png
-                # The key is 'course_thumbnails/image.png'
                 try:
-                    object_key = course.thumbnail_url.split(f"s3.amazonaws.com/")[1]
+                    # More robustly parse the object key from the S3 URL
+                    parsed_url = urlparse(course.thumbnail_url)
+                    object_key = parsed_url.path.lstrip('/')
+                    
+                    if not object_key:
+                        logging.warning(f"Could not parse object key from URL: {course.thumbnail_url}")
+                        course.thumbnail_url = None # Set to None if URL is invalid
+                        continue
+
                     presigned_url = s3_client.generate_presigned_url(
                         'get_object',
                         Params={'Bucket': S3_BUCKET_NAME, 'Key': object_key},
                         ExpiresIn=3600  # 1 hour
                     )
                     course.thumbnail_url = presigned_url
-                except (ClientError, IndexError) as e:
+                except (ClientError, IndexError, AttributeError) as e:
                     logging.error(f"Error generating presigned URL for {course.thumbnail_url}: {e}")
                     # If URL generation fails, set it to None to avoid broken links
                     course.thumbnail_url = None
