@@ -395,25 +395,10 @@ def get_all_courses(
     """
     try:
         logging.info(f"Fetching courses for admin panel. Skip: {skip}, Limit: {limit}")
-        statement = (
-            select(Course, User.full_name)
-            .join(User, Course.created_by == User.id)
-            .order_by(Course.created_at.desc())
-            .offset(skip)
-            .limit(limit)
-        )
-        results = db.exec(statement).all()
-        logging.info(f"Found {len(results)} courses.")
-
-        courses_with_creator = []
-        for course, creator_name in results:
-            course_data = course.model_dump()
-            course_data['created_by'] = creator_name
-            courses_with_creator.append(AdminCourseList(**course_data))
-            
-        logging.info("Successfully constructed course list response.")
-        return courses_with_creator
-
+        statement = select(Course).order_by(Course.created_at.desc()).offset(skip).limit(limit)
+        courses = db.exec(statement).all()
+        logging.info(f"Found {len(courses)} courses.")
+        return courses
     except Exception as e:
         logging.error(f"Error fetching courses for admin panel: {e}", exc_info=True)
         raise HTTPException(

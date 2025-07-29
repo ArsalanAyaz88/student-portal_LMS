@@ -32,5 +32,3 @@ class User(SQLModel, table=True):
     video_progress: List["VideoProgress"] = Relationship(back_populates="user")
     quiz_submissions: List["QuizSubmission"] = Relationship(back_populates="user")
     enrollment_applications: List["EnrollmentApplication"] = Relationship(back_populates="user")
-    created_courses: List["Course"] = Relationship(back_populates="creator", sa_relationship_kwargs={"foreign_keys": "[Course.created_by]"})
-    updated_courses: List["Course"] = Relationship(back_populates="updater", sa_relationship_kwargs={"foreign_keys": "[Course.updated_by]"})
