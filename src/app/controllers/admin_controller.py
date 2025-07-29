@@ -401,25 +401,30 @@ def get_all_courses(
 
         for course in courses:
             if course.thumbnail_url:
+                original_url = course.thumbnail_url
+                logging.info(f"Processing thumbnail for course '{course.title}'. Original URL: {original_url}")
                 try:
-                    # More robustly parse the object key from the S3 URL
-                    parsed_url = urlparse(course.thumbnail_url)
+                    # S3 URL se file ka naam (key) nikalna
+                    parsed_url = urlparse(original_url)
                     object_key = parsed_url.path.lstrip('/')
                     
                     if not object_key:
-                        logging.warning(f"Could not parse object key from URL: {course.thumbnail_url}")
-                        course.thumbnail_url = None # Set to None if URL is invalid
+                        logging.warning(f"Could not parse object key from URL: {original_url}")
+                        course.thumbnail_url = None # Agar URL ghalat hai to None set kar do
                         continue
 
+                    # Secure, temporary (presigned) URL banana
                     presigned_url = s3_client.generate_presigned_url(
                         'get_object',
                         Params={'Bucket': S3_BUCKET_NAME, 'Key': object_key},
-                        ExpiresIn=3600  # 1 hour
+                        ExpiresIn=3600  # 1 ghante ke liye valid
                     )
                     course.thumbnail_url = presigned_url
+                    logging.info(f"Successfully generated presigned URL for course '{course.title}'. New URL starts with: {presigned_url[:70]}...")
+
                 except (ClientError, IndexError, AttributeError) as e:
-                    logging.error(f"Error generating presigned URL for {course.thumbnail_url}: {e}")
-                    # If URL generation fails, set it to None to avoid broken links
+                    logging.error(f"Error generating presigned URL for {original_url}: {e}", exc_info=True)
+                    # Agar URL generate na ho sake to None set kar do
                     course.thumbnail_url = None
 
         logging.info(f"Found and processed {len(courses)} courses.")
