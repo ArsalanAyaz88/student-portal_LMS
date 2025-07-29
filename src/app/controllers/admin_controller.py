@@ -383,6 +383,34 @@ def update_video(
         raise HTTPException(status_code=500, detail="An unexpected error occurred while updating the video.")
 
 
+@router.get("/courses", response_model=List[AdminCourseList])
+def get_all_courses(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(10, ge=1, le=100),
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    """
+    Retrieve all courses with creator information for the admin panel.
+    """
+    statement = (
+        select(Course, User.full_name)
+        .join(User, Course.created_by == User.id)
+        .offset(skip)
+        .limit(limit)
+    )
+    results = db.exec(statement).all()
+    
+    # Manually construct the response to match the Pydantic model
+    courses_with_creator = []
+    for course, creator_name in results:
+        course_data = course.model_dump()
+        course_data['created_by'] = creator_name
+        courses_with_creator.append(AdminCourseList(**course_data))
+        
+    return courses_with_creator
+
+
 @router.delete("/videos/{video_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_video(
     video_id: uuid.UUID,
