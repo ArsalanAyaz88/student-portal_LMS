@@ -13,7 +13,7 @@ load_dotenv()
 # AWS S3 Configuration
 AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
 AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
-AWS_REGION = os.getenv('AWS_REGION', 'us-east-1')
+AWS_REGION = os.getenv('AWS_REGION')
 S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
 
 # Check for missing required configuration
@@ -24,6 +24,8 @@ if not AWS_SECRET_ACCESS_KEY:
     missing_vars.append('AWS_SECRET_ACCESS_KEY')
 if not S3_BUCKET_NAME:
     missing_vars.append('S3_BUCKET_NAME')
+if not AWS_REGION:
+    missing_vars.append('AWS_REGION')
 
 if missing_vars:
     logger.error(f"Missing required AWS S3 configuration: {', '.join(missing_vars)}")

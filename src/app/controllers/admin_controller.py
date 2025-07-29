@@ -403,29 +403,35 @@ def get_all_courses(
             if course.thumbnail_url:
                 original_url = course.thumbnail_url
                 logging.info(f"Processing thumbnail for course '{course.title}'. Original URL: {original_url}")
-                try:
-                    # S3 URL se file ka naam (key) nikalna
-                    parsed_url = urlparse(original_url)
-                    object_key = parsed_url.path.lstrip('/')
-                    
-                    if not object_key:
-                        logging.warning(f"Could not parse object key from URL: {original_url}")
-                        course.thumbnail_url = None # Agar URL ghalat hai to None set kar do
-                        continue
 
-                    # Secure, temporary (presigned) URL banana
-                    presigned_url = s3_client.generate_presigned_url(
-                        'get_object',
-                        Params={'Bucket': S3_BUCKET_NAME, 'Key': object_key},
-                        ExpiresIn=3600  # 1 ghante ke liye valid
-                    )
-                    course.thumbnail_url = presigned_url
-                    logging.info(f"Successfully generated presigned URL for course '{course.title}'. New URL starts with: {presigned_url[:70]}...")
+                # Check if the URL is an S3 URL before trying to generate a presigned URL
+                if 's3.amazonaws.com' in original_url or 's3.ap-southeast-2.amazonaws.com' in original_url:
+                    try:
+                        # S3 URL se file ka naam (key) nikalna
+                        parsed_url = urlparse(original_url)
+                        object_key = parsed_url.path.lstrip('/')
+                        
+                        if not object_key:
+                            logging.warning(f"Could not parse S3 object key from URL: {original_url}")
+                            course.thumbnail_url = None
+                            continue
 
-                except (ClientError, IndexError, AttributeError) as e:
-                    logging.error(f"Error generating presigned URL for {original_url}: {e}", exc_info=True)
-                    # Agar URL generate na ho sake to None set kar do
-                    course.thumbnail_url = None
+                        # Secure, temporary (presigned) URL banana
+                        presigned_url = s3_client.generate_presigned_url(
+                            'get_object',
+                            Params={'Bucket': S3_BUCKET_NAME, 'Key': object_key},
+                            ExpiresIn=3600  # 1 ghante ke liye valid
+                        )
+                        course.thumbnail_url = presigned_url
+                        logging.info(f"Successfully generated S3 presigned URL for course '{course.title}'.")
+
+                    except (ClientError, IndexError, AttributeError) as e:
+                        logging.error(f"Error generating S3 presigned URL for {original_url}: {e}", exc_info=True)
+                        course.thumbnail_url = None
+                else:
+                    # If it's not an S3 URL (e.g., Cloudinary), leave it as is.
+                    logging.info(f"URL for course '{course.title}' is not an S3 URL. Skipping presigned generation.")
+                    pass # Keep the original_url
 
         logging.info(f"Found and processed {len(courses)} courses.")
         return courses
