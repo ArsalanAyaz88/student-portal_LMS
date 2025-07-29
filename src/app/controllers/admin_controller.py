@@ -391,12 +391,32 @@ def get_all_courses(
 ):
     """
     Retrieve all courses with creator information for the admin panel.
+    Generates presigned URLs for thumbnails if they exist.
     """
     try:
         logging.info(f"Fetching courses for admin panel. Skip: {skip}, Limit: {limit}")
         statement = select(Course).order_by(Course.created_at.desc()).offset(skip).limit(limit)
-        courses = db.exec(statement).all()
-        logging.info(f"Found {len(courses)} courses.")
+        courses = list(db.exec(statement).all())
+
+        for course in courses:
+            if course.thumbnail_url:
+                # Assuming thumbnail_url is the full S3 URL, extract the key
+                # e.g., https://<bucket-name>.s3.amazonaws.com/course_thumbnails/image.png
+                # The key is 'course_thumbnails/image.png'
+                try:
+                    object_key = course.thumbnail_url.split(f"s3.amazonaws.com/")[1]
+                    presigned_url = s3_client.generate_presigned_url(
+                        'get_object',
+                        Params={'Bucket': S3_BUCKET_NAME, 'Key': object_key},
+                        ExpiresIn=3600  # 1 hour
+                    )
+                    course.thumbnail_url = presigned_url
+                except (ClientError, IndexError) as e:
+                    logging.error(f"Error generating presigned URL for {course.thumbnail_url}: {e}")
+                    # If URL generation fails, set it to None to avoid broken links
+                    course.thumbnail_url = None
+
+        logging.info(f"Found and processed {len(courses)} courses.")
         return courses
     except Exception as e:
         logging.error(f"Error fetching courses for admin panel: {e}", exc_info=True)
