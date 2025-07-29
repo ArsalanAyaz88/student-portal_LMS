@@ -90,32 +90,51 @@ def get_my_courses(user: User = Depends(get_current_user), session: Session = De
 
 @router.get("/explore-courses", response_model=list[CourseExploreList])
 def explore_courses(session: Session = Depends(get_db)):
-    courses = session.exec(select(Course)).all()
-    
-    response_courses = []
-    for course in courses:
-        thumbnail_url = course.thumbnail_url
-        if thumbnail_url and 's3.amazonaws.com' in thumbnail_url:
-            try:
-                key = urlparse(thumbnail_url).path.lstrip('/')
-                thumbnail_url = s3_client.generate_presigned_url(
-                    'get_object',
-                    Params={'Bucket': S3_BUCKET_NAME, 'Key': key},
-                    ExpiresIn=3600
-                )
-            except Exception as e:
-                logger.error(f"Error generating presigned URL for explore-courses {course.id}: {e}")
-                thumbnail_url = None # Or a placeholder URL
+    logger.info("Request received for explore-courses")
+    try:
+        courses = session.exec(select(Course)).all()
+        logger.info(f"Found {len(courses)} courses to explore.")
+        
+        response_courses = []
+        for course in courses:
+            thumbnail_url = course.thumbnail_url
+            logger.info(f"Processing course '{course.title}' (ID: {course.id}). Original thumbnail: {thumbnail_url}")
 
-        response_courses.append(
-            CourseExploreList(
-                id=course.id,
-                title=course.title,
-                price=course.price,
-                thumbnail_url=thumbnail_url
+            if thumbnail_url and 's3.amazonaws.com' in thumbnail_url:
+                logger.info(f"Course ID {course.id}: URL is from S3. Attempting to generate presigned URL.")
+                try:
+                    key = urlparse(thumbnail_url).path.lstrip('/')
+                    if not key:
+                        logger.warning(f"Course ID {course.id}: Could not parse a valid key from S3 URL: {thumbnail_url}")
+                        thumbnail_url = None
+                    else:
+                        thumbnail_url = s3_client.generate_presigned_url(
+                            'get_object',
+                            Params={'Bucket': S3_BUCKET_NAME, 'Key': key},
+                            ExpiresIn=3600
+                        )
+                        logger.info(f"Course ID {course.id}: Successfully generated presigned URL.")
+                except Exception as e:
+                    logger.error(f"Course ID {course.id}: Error generating presigned URL: {e}", exc_info=True)
+                    thumbnail_url = None
+            elif thumbnail_url:
+                logger.info(f"Course ID {course.id}: URL is not from S3, returning it directly.")
+            else:
+                logger.info(f"Course ID {course.id}: Has no thumbnail URL.")
+
+            response_courses.append(
+                CourseExploreList(
+                    id=course.id,
+                    title=course.title,
+                    price=course.price,
+                    thumbnail_url=thumbnail_url
+                )
             )
-        )
-    return response_courses
+        logger.info("Finished processing all courses for explore-courses.")
+        return response_courses
+    except Exception as e:
+        logger.exception(f"An unexpected error occurred in explore_courses: {e}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred while fetching courses.")
 
 
 @router.get("/{course_id}/thumbnail-url", response_model=dict)
@@ -163,10 +182,12 @@ def get_course_thumbnail_url(
 
 @router.get("/explore-courses/{course_id}", response_model=CourseExploreDetail)
 def explore_course_detail(course_id: str, session: Session = Depends(get_db)):
+    logger.info(f"Fetching course detail for course_id: {course_id}")
     try:
         try:
             course_uuid = uuid.UUID(course_id)
         except ValueError:
+            logger.warning(f"Invalid UUID format for course_id: {course_id}")
             raise HTTPException(status_code=400, detail="Invalid course ID format")
 
         course = session.exec(
@@ -177,16 +198,21 @@ def explore_course_detail(course_id: str, session: Session = Depends(get_db)):
         ).first()
 
         if not course:
+            logger.warning(f"Course not found for course_id: {course_id}")
             raise HTTPException(status_code=404, detail="Course not found")
+        
+        logger.info(f"Course found: {course.title}")
 
         instructor_name = "N/A"
         if course.created_by:
-            instructor_id = uuid.UUID(course.created_by)
-            instructor = session.get(User, instructor_id)
-            if instructor:
-                instructor_name = instructor.full_name
+            try:
+                instructor_id = uuid.UUID(course.created_by)
+                instructor = session.get(User, instructor_id)
+                if instructor:
+                    instructor_name = instructor.full_name
+            except Exception as e:
+                logger.error(f"Error fetching instructor for course {course.id}: {e}")
 
-        # Manually construct the sections to match the frontend's expectation
         sections = [
             {
                 "id": "main-section",
@@ -197,19 +223,31 @@ def explore_course_detail(course_id: str, session: Session = Depends(get_db)):
         ]
 
         thumbnail_url = course.thumbnail_url
+        logger.info(f"Original thumbnail URL from DB for course {course.id}: {thumbnail_url}")
+
         if thumbnail_url and 's3.amazonaws.com' in thumbnail_url:
+            logger.info(f"URL is from S3. Attempting to generate presigned URL.")
             try:
                 key = urlparse(thumbnail_url).path.lstrip('/')
-                thumbnail_url = s3_client.generate_presigned_url(
-                    'get_object',
-                    Params={'Bucket': S3_BUCKET_NAME, 'Key': key},
-                    ExpiresIn=3600
-                )
+                if not key:
+                    logger.warning(f"Could not parse a valid key from S3 URL: {thumbnail_url}")
+                    thumbnail_url = None
+                else:
+                    thumbnail_url = s3_client.generate_presigned_url(
+                        'get_object',
+                        Params={'Bucket': S3_BUCKET_NAME, 'Key': key},
+                        ExpiresIn=3600
+                    )
+                    logger.info(f"Successfully generated presigned URL for course {course.id}")
             except Exception as e:
-                logger.error(f"Error generating presigned URL for course detail {course.id}: {e}")
-                thumbnail_url = None # Or a placeholder URL
+                logger.error(f"Error generating presigned URL for course detail {course.id}: {e}", exc_info=True)
+                thumbnail_url = None
+        elif thumbnail_url:
+            logger.info(f"URL is not from S3, returning it directly: {thumbnail_url}")
+        else:
+            logger.info(f"Course {course.id} has no thumbnail URL.")
 
-        return CourseExploreDetail(
+        response_data = CourseExploreDetail(
             id=course.id,
             title=course.title,
             description=course.description or "",
@@ -218,8 +256,14 @@ def explore_course_detail(course_id: str, session: Session = Depends(get_db)):
             image_url=thumbnail_url or "",
             sections=sections
         )
+        logger.info(f"Returning final image_url to frontend: {response_data.image_url}")
+        return response_data
+
+    except HTTPException as http_exc:
+        logger.error(f"HTTPException in explore_course_detail for {course_id}: {http_exc.detail}")
+        raise http_exc
     except Exception as e:
-        logger.exception(f"Error fetching course detail for {course_id}: {e}")
+        logger.exception(f"Unexpected error fetching course detail for {course_id}: {e}")
         raise HTTPException(status_code=500, detail="Internal server error while fetching course details.")
 
 
