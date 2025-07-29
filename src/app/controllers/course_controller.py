@@ -100,7 +100,8 @@ def explore_courses(session: Session = Depends(get_db)):
             thumbnail_url = course.thumbnail_url
             logger.info(f"Processing course '{course.title}' (ID: {course.id}). Original thumbnail: {thumbnail_url}")
 
-            if thumbnail_url and 's3.amazonaws.com' in thumbnail_url:
+            parsed_url = urlparse(thumbnail_url)
+            if thumbnail_url and 'amazonaws.com' in parsed_url.netloc:
                 logger.info(f"Course ID {course.id}: URL is from S3. Attempting to generate presigned URL.")
                 try:
                     key = urlparse(thumbnail_url).path.lstrip('/')
@@ -225,7 +226,8 @@ def explore_course_detail(course_id: str, session: Session = Depends(get_db)):
         thumbnail_url = course.thumbnail_url
         logger.info(f"Original thumbnail URL from DB for course {course.id}: {thumbnail_url}")
 
-        if thumbnail_url and 's3.amazonaws.com' in thumbnail_url:
+        parsed_url = urlparse(thumbnail_url)
+        if thumbnail_url and 'amazonaws.com' in parsed_url.netloc:
             logger.info(f"URL is from S3. Attempting to generate presigned URL.")
             try:
                 key = urlparse(thumbnail_url).path.lstrip('/')
