@@ -4,7 +4,6 @@ from sqlmodel import Session, select, func
 from sqlalchemy.orm import selectinload
 from src.app.models.course import Course
 from src.app.models.video import Video
-from src.app.models.quiz import Quiz
 from src.app.models.quiz import Quiz, QuizSubmission, Question
 from src.app.schemas.quiz import QuizSubmissionRead, QuizSubmissionCreate
 from src.app.schemas.video import VideoWithProgress
@@ -32,26 +31,8 @@ from urllib.parse import urlparse
 import traceback
 from ..config.s3_config import s3_client, S3_BUCKET_NAME
 
-# Utility function to generate a signed URL for a Cloudinary public ID
-def get_signed_cloudinary_url(public_id):
-    if not public_id:
-        return None
-    try:
-        # Generate a signed URL that is valid for 60 minutes
-        signed_url = cloudinary.utils.cloudinary_url(
-            public_id,
-            sign_url=True,
-            secure=True,
-            resource_type="image",
-            type="upload"
-        )
-        return signed_url[0]
-    except Exception as e:
-        logger.error(f"Error generating signed URL for {public_id}: {e}")
-        return None
-
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-from fastapi.logger import logger
 from datetime import datetime
 
 router = APIRouter(tags=["Courses"])
@@ -99,7 +80,7 @@ def explore_courses(session: Session = Depends(get_db)):
             id=course.id,
             title=course.title,
             price=course.price,
-            thumbnail_url=get_signed_cloudinary_url(course.thumbnail_url)
+            thumbnail_url=course.thumbnail_url # Return the raw URL
         ) for course in courses
     ]
 
@@ -110,45 +91,41 @@ def get_course_thumbnail_url(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user) 
 ): 
-    """
-    Generate a pre-signed URL for viewing a course thumbnail from S3.
-    """
-    logging.info(f"Request to generate thumbnail URL for course_id: {course_id}")
-    
-    course = db.get(Course, course_id)
-    if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
-
-    if not course.thumbnail_url:
-        logging.error(f"Course {course_id} does not have a thumbnail key associated with it.")
-        raise HTTPException(status_code=404, detail="Course thumbnail not found.")
-
+    logger.info(f"Request received for thumbnail, course_id: {course_id}")
     try:
-        if s3_client is None:
-            logging.error("S3 client is not configured.")
-            raise HTTPException(status_code=500, detail="S3 client is not configured")
+        course = db.get(Course, course_id)
+        if not course:
+            logger.warning(f"Course with id {course_id} not found.")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+
+        if not course.thumbnail_url:
+            logger.warning(f"Course {course_id} found, but it has no thumbnail_url.")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thumbnail not available")
+
+        logger.info(f"Course {course_id} found with thumbnail_url: {course.thumbnail_url}")
+
+        # Ensure it's an S3 URL before attempting to generate a pre-signed URL
+        if 's3.amazonaws.com' not in course.thumbnail_url:
+            logger.info(f"URL for course {course_id} is not an S3 URL. Returning it directly.")
+            return {"thumbnail_url": course.thumbnail_url}
 
         key = urlparse(course.thumbnail_url).path.lstrip('/')
+        logger.info(f"Extracted S3 key for course {course_id}: {key}")
 
         presigned_url = s3_client.generate_presigned_url(
             'get_object',
-            Params={
-                'Bucket': S3_BUCKET_NAME,
-                'Key': key
-            },
+            Params={'Bucket': S3_BUCKET_NAME, 'Key': key},
             ExpiresIn=3600
         )
-        
-        logging.info(f"Successfully generated thumbnail URL for course {course_id}")
+        logger.info(f"Successfully generated pre-signed URL for course {course_id}")
         return {"thumbnail_url": presigned_url}
 
+    except HTTPException as http_exc:
+        # Re-raise HTTPException to ensure FastAPI handles it correctly
+        raise http_exc
     except Exception as e:
-        tb_str = traceback.format_exc()
-        logging.error(f"Error generating thumbnail URL for {course.thumbnail_url}: {e}\nTraceback:\n{tb_str}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Could not generate course thumbnail URL."
-        )
+        logger.error(f"An unexpected error occurred while generating thumbnail URL for course {course_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
 
 @router.get("/explore-courses/{course_id}", response_model=CourseExploreDetail)
