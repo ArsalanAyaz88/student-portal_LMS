@@ -85,7 +85,7 @@ def explore_courses(session: Session = Depends(get_db)):
     ]
 
 
-@router.get("/courses/{course_id}/thumbnail-url", response_model=dict)
+@router.get("/{course_id}/thumbnail-url", response_model=dict)
 def get_course_thumbnail_url(
     course_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -200,7 +200,7 @@ def get_enrollment_status(course_id: str, user: User = Depends(get_current_user)
     return {"is_enrolled": False}
 
 
-@router.get("/courses/{course_id}/curriculum", response_model=CurriculumSchema)
+@router.get("/{course_id}/curriculum", response_model=CurriculumSchema)
 def get_course_curriculum(course_id: str, session: Session = Depends(get_db)):
     try:
         course_uuid = uuid.UUID(course_id)
@@ -212,7 +212,7 @@ def get_course_curriculum(course_id: str, session: Session = Depends(get_db)):
     return CurriculumSchema(curriculum=course.curriculum or "")
 
 
-@router.get("/courses/{course_id}/outcomes", response_model=OutcomesSchema)
+@router.get("/{course_id}/outcomes", response_model=OutcomesSchema)
 def get_course_outcomes(course_id: str, session: Session = Depends(get_db)):
     try:
         course_uuid = uuid.UUID(course_id)
@@ -224,7 +224,7 @@ def get_course_outcomes(course_id: str, session: Session = Depends(get_db)):
     return OutcomesSchema(outcomes=course.outcomes or "")
 
 
-@router.get("/courses/{course_id}/prerequisites", response_model=PrerequisitesSchema)
+@router.get("/{course_id}/prerequisites", response_model=PrerequisitesSchema)
 def get_course_prerequisites(course_id: str, session: Session = Depends(get_db)):
     try:
         course_uuid = uuid.UUID(course_id)
@@ -236,7 +236,7 @@ def get_course_prerequisites(course_id: str, session: Session = Depends(get_db))
     return PrerequisitesSchema(prerequisites=course.prerequisites or "")
 
 
-@router.get("/courses/{course_id}/description", response_model=DescriptionSchema)
+@router.get("/{course_id}/description", response_model=DescriptionSchema)
 def get_course_description(course_id: str, session: Session = Depends(get_db)):
     try:
         course_uuid = uuid.UUID(course_id)
