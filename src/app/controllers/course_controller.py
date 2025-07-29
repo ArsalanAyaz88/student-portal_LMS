@@ -30,7 +30,7 @@ import boto3
 from botocore.client import Config
 from urllib.parse import urlparse
 import traceback
-from src.app.core.config import settings
+from ..core.config import settings
 
 # S3 Client Initialization
 if settings.S3_ACCESS_KEY and settings.S3_SECRET_KEY and settings.S3_BUCKET_NAME:
