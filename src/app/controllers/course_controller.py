@@ -30,23 +30,7 @@ import boto3
 from botocore.client import Config
 from urllib.parse import urlparse
 import traceback
-from ..core.config import settings
-
-# S3 Client Initialization
-if settings.S3_ACCESS_KEY and settings.S3_SECRET_KEY and settings.S3_BUCKET_NAME:
-    s3_client = boto3.client(
-        's3',
-        aws_access_key_id=settings.S3_ACCESS_KEY,
-        aws_secret_access_key=settings.S3_SECRET_KEY,
-        config=Config(signature_version='s3v4'),
-        region_name=settings.S3_REGION
-    )
-    S3_BUCKET_NAME = settings.S3_BUCKET_NAME
-else:
-    s3_client = None
-    S3_BUCKET_NAME = None
-    logging.warning("S3 credentials are not fully configured. S3 related operations will be disabled.")
-
+from ..config.s3_config import s3_client, S3_BUCKET_NAME
 
 # Utility function to generate a signed URL for a Cloudinary public ID
 def get_signed_cloudinary_url(public_id):
