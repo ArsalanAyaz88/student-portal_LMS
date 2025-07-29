@@ -1,7 +1,7 @@
 from sqlmodel import SQLModel, Field, Relationship
 import uuid
 from typing import List, Optional, TYPE_CHECKING
-from sqlalchemy import Column, Text, ForeignKey
+from sqlalchemy import Column, Text, ForeignKey, Uuid
 from datetime import datetime
 from src.app.utils.time import get_pakistan_time
 
@@ -25,8 +25,8 @@ class Course(SQLModel, table=True):
     thumbnail_url: Optional[str] = None
     preview_video_id: Optional[uuid.UUID] = Field(default=None, sa_column=Column(ForeignKey("video.id", ondelete="SET NULL")))
     difficulty_level: Optional[str] = None
-    created_by: Optional[uuid.UUID] = Field(default=None, foreign_key="user.id")
-    updated_by: Optional[uuid.UUID] = Field(default=None, foreign_key="user.id")
+    created_by: Optional[uuid.UUID] = Field(default=None, sa_column=Column(Uuid, ForeignKey("user.id")))
+    updated_by: Optional[uuid.UUID] = Field(default=None, sa_column=Column(Uuid, ForeignKey("user.id")))
     created_at: datetime = Field(default_factory=get_pakistan_time)
     updated_at: datetime = Field(default_factory=get_pakistan_time)
     outcomes: str = Field(default="", sa_column=Column(Text))
