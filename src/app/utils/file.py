@@ -50,8 +50,7 @@ async def upload_file_to_s3(file_obj, key: str, content_type: Optional[str] = No
         loop = asyncio.get_event_loop()
         
         # For upload_fileobj, we pass the file object directly, not as a parameter
-        # Diagnostic Test: Force the object to be public-read
-        extra_args = {'ACL': 'public-read'}
+        extra_args = {}
         if content_type:
             extra_args['ContentType'] = content_type
 
