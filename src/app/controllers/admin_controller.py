@@ -43,7 +43,7 @@ from src.app.schemas.assignment import (
     SubmissionRead, SubmissionGrade, SubmissionStudent, SubmissionStudentsResponse
 )
 from src.app.schemas.course import (
-    AdminCourseList, AdminCourseDetail, AdminCourseStats,
+    AdminCourseDetail, AdminCourseStats,
     CourseCreate, CourseUpdate, CourseRead, CourseCreateAdmin
 )
 from src.app.schemas.enrollment_application_schema import EnrollmentApplicationRead, EnrollmentApplicationUpdate
@@ -383,7 +383,7 @@ def update_video(
         raise HTTPException(status_code=500, detail="An unexpected error occurred while updating the video.")
 
 
-@router.get("/courses", response_model=List[AdminCourseList])
+@router.get("/courses", response_model=List[Course], tags=["Admin"])
 def get_all_courses(
     skip: int = Query(0, ge=0),
     limit: int = Query(10, ge=1, le=100),
@@ -824,7 +824,7 @@ async def get_dashboard_stats(
             detail=f"Error fetching dashboard stats: {str(e)}"
         )
 
-@router.get("/courses", response_model=List[AdminCourseList])
+@router.get("/courses", response_model=List[Course], tags=["Admin"])
 async def list_courses(
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(10, ge=1, le=100, description="Number of records to return"),
