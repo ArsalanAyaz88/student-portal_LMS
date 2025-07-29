@@ -4,6 +4,7 @@ import uuid
 from typing import Optional, List, TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from src.app.models.course import Course
     from src.app.models.assignment import AssignmentSubmission
     from src.app.models.enrollment import Enrollment
     from src.app.models.oauth import OAuthAccount
@@ -31,3 +32,5 @@ class User(SQLModel, table=True):
     video_progress: List["VideoProgress"] = Relationship(back_populates="user")
     quiz_submissions: List["QuizSubmission"] = Relationship(back_populates="user")
     enrollment_applications: List["EnrollmentApplication"] = Relationship(back_populates="user")
+    created_courses: List["Course"] = Relationship(back_populates="creator", sa_relationship_kwargs={"foreign_keys": "[Course.created_by]"})
+    updated_courses: List["Course"] = Relationship(back_populates="updater", sa_relationship_kwargs={"foreign_keys": "[Course.updated_by]"})

@@ -6,6 +6,7 @@ from datetime import datetime
 from src.app.utils.time import get_pakistan_time
 
 if TYPE_CHECKING:
+    from src.app.models.user import User
     from src.app.models.video import Video
     from src.app.models.enrollment import Enrollment
     from src.app.models.course_progress import CourseProgress
@@ -24,8 +25,8 @@ class Course(SQLModel, table=True):
     thumbnail_url: Optional[str] = None
     preview_video_id: Optional[uuid.UUID] = Field(default=None, sa_column=Column(ForeignKey("video.id", ondelete="SET NULL")))
     difficulty_level: Optional[str] = None
-    created_by: Optional[str] = None
-    updated_by: Optional[str] = None
+    created_by: Optional[uuid.UUID] = Field(default=None, foreign_key="user.id")
+    updated_by: Optional[uuid.UUID] = Field(default=None, foreign_key="user.id")
     created_at: datetime = Field(default_factory=get_pakistan_time)
     updated_at: datetime = Field(default_factory=get_pakistan_time)
     outcomes: str = Field(default="", sa_column=Column(Text))
@@ -34,6 +35,8 @@ class Course(SQLModel, table=True):
     status: str = Field(default="active")
 
     # Relationships
+    creator: Optional["User"] = Relationship(back_populates="created_courses", sa_relationship_kwargs={"foreign_keys": "[Course.created_by]"})
+    updater: Optional["User"] = Relationship(back_populates="updated_courses", sa_relationship_kwargs={"foreign_keys": "[Course.updated_by]"})
     preview_video: Optional["Video"] = Relationship(sa_relationship_kwargs={"primaryjoin": "Course.preview_video_id == Video.id", "foreign_keys": "[Course.preview_video_id]", "uselist": False, "post_update": True})
     videos: List["Video"] = Relationship(back_populates="course", sa_relationship_kwargs={"foreign_keys": "[Video.course_id]", "cascade": "all, delete-orphan"})
     enrollments: List["Enrollment"] = Relationship(back_populates="course", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
