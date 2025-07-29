@@ -62,27 +62,60 @@ def get_my_courses(user: User = Depends(get_current_user), session: Session = De
     
     courses = session.exec(select(Course).where(Course.id.in_(course_ids))).all()
     
-    return [
-        CourseRead(
-            id=course.id,
-            title=course.title,
-            thumbnail_url=course.thumbnail_url,
-            expiration_date=valid_enrollment_map.get(course.id)
-        ) for course in courses
-    ]
+    response_courses = []
+    for course in courses:
+        thumbnail_url = course.thumbnail_url
+        if thumbnail_url and 's3.amazonaws.com' in thumbnail_url:
+            try:
+                key = urlparse(thumbnail_url).path.lstrip('/')
+                thumbnail_url = s3_client.generate_presigned_url(
+                    'get_object',
+                    Params={'Bucket': S3_BUCKET_NAME, 'Key': key},
+                    ExpiresIn=3600
+                )
+            except Exception as e:
+                logger.error(f"Error generating presigned URL for my-courses {course.id}: {e}")
+                thumbnail_url = None # Or a placeholder URL
+
+        response_courses.append(
+            CourseRead(
+                id=course.id,
+                title=course.title,
+                thumbnail_url=thumbnail_url,
+                expiration_date=valid_enrollment_map.get(course.id)
+            )
+        )
+    return response_courses
 
 
 @router.get("/explore-courses", response_model=list[CourseExploreList])
 def explore_courses(session: Session = Depends(get_db)):
     courses = session.exec(select(Course)).all()
-    return [
-        CourseExploreList(
-            id=course.id,
-            title=course.title,
-            price=course.price,
-            thumbnail_url=course.thumbnail_url # Return the raw URL
-        ) for course in courses
-    ]
+    
+    response_courses = []
+    for course in courses:
+        thumbnail_url = course.thumbnail_url
+        if thumbnail_url and 's3.amazonaws.com' in thumbnail_url:
+            try:
+                key = urlparse(thumbnail_url).path.lstrip('/')
+                thumbnail_url = s3_client.generate_presigned_url(
+                    'get_object',
+                    Params={'Bucket': S3_BUCKET_NAME, 'Key': key},
+                    ExpiresIn=3600
+                )
+            except Exception as e:
+                logger.error(f"Error generating presigned URL for explore-courses {course.id}: {e}")
+                thumbnail_url = None # Or a placeholder URL
+
+        response_courses.append(
+            CourseExploreList(
+                id=course.id,
+                title=course.title,
+                price=course.price,
+                thumbnail_url=thumbnail_url
+            )
+        )
+    return response_courses
 
 
 @router.get("/{course_id}/thumbnail-url", response_model=dict)
@@ -163,13 +196,26 @@ def explore_course_detail(course_id: str, session: Session = Depends(get_db)):
             }
         ]
 
+        thumbnail_url = course.thumbnail_url
+        if thumbnail_url and 's3.amazonaws.com' in thumbnail_url:
+            try:
+                key = urlparse(thumbnail_url).path.lstrip('/')
+                thumbnail_url = s3_client.generate_presigned_url(
+                    'get_object',
+                    Params={'Bucket': S3_BUCKET_NAME, 'Key': key},
+                    ExpiresIn=3600
+                )
+            except Exception as e:
+                logger.error(f"Error generating presigned URL for course detail {course.id}: {e}")
+                thumbnail_url = None # Or a placeholder URL
+
         return CourseExploreDetail(
             id=course.id,
             title=course.title,
             description=course.description or "",
             price=course.price,
             instructor_name=instructor_name,
-            image_url=course.thumbnail_url or "",
+            image_url=thumbnail_url or "",
             sections=sections
         )
     except Exception as e:
