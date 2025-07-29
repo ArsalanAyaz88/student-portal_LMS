@@ -19,7 +19,7 @@ from sqlmodel import Session, select
 
 # Application-specific Imports
 from src.app.db.session import get_db
-from src.app.utils.dependencies import get_current_admin_user
+from src.app.utils.dependencies import get_current_admin_user, get_current_user
 from src.app.utils.email import send_application_approved_email, send_enrollment_rejected_email
 from src.app.utils.file import save_upload_and_get_url
 from src.app.utils.time import get_pakistan_time
@@ -470,6 +470,7 @@ def get_video_view_url(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Could not generate video view URL."
         )
+
 
 
 # 2. Notifications

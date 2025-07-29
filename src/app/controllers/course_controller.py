@@ -26,6 +26,27 @@ import cloudinary
 import cloudinary.uploader
 import cloudinary.api
 import logging
+import boto3
+from botocore.client import Config
+from urllib.parse import urlparse
+import traceback
+from src.app.core.config import settings
+
+# S3 Client Initialization
+if settings.S3_ACCESS_KEY and settings.S3_SECRET_KEY and settings.S3_BUCKET_NAME:
+    s3_client = boto3.client(
+        's3',
+        aws_access_key_id=settings.S3_ACCESS_KEY,
+        aws_secret_access_key=settings.S3_SECRET_KEY,
+        config=Config(signature_version='s3v4'),
+        region_name=settings.S3_REGION
+    )
+    S3_BUCKET_NAME = settings.S3_BUCKET_NAME
+else:
+    s3_client = None
+    S3_BUCKET_NAME = None
+    logging.warning("S3 credentials are not fully configured. S3 related operations will be disabled.")
+
 
 # Utility function to generate a signed URL for a Cloudinary public ID
 def get_signed_cloudinary_url(public_id):
@@ -97,6 +118,53 @@ def explore_courses(session: Session = Depends(get_db)):
             thumbnail_url=get_signed_cloudinary_url(course.thumbnail_url)
         ) for course in courses
     ]
+
+
+@router.get("/courses/{course_id}/thumbnail-url", response_model=dict)
+def get_course_thumbnail_url(
+    course_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user) 
+): 
+    """
+    Generate a pre-signed URL for viewing a course thumbnail from S3.
+    """
+    logging.info(f"Request to generate thumbnail URL for course_id: {course_id}")
+    
+    course = db.get(Course, course_id)
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    if not course.thumbnail_url:
+        logging.error(f"Course {course_id} does not have a thumbnail key associated with it.")
+        raise HTTPException(status_code=404, detail="Course thumbnail not found.")
+
+    try:
+        if s3_client is None:
+            logging.error("S3 client is not configured.")
+            raise HTTPException(status_code=500, detail="S3 client is not configured")
+
+        key = urlparse(course.thumbnail_url).path.lstrip('/')
+
+        presigned_url = s3_client.generate_presigned_url(
+            'get_object',
+            Params={
+                'Bucket': S3_BUCKET_NAME,
+                'Key': key
+            },
+            ExpiresIn=3600
+        )
+        
+        logging.info(f"Successfully generated thumbnail URL for course {course_id}")
+        return {"thumbnail_url": presigned_url}
+
+    except Exception as e:
+        tb_str = traceback.format_exc()
+        logging.error(f"Error generating thumbnail URL for {course.thumbnail_url}: {e}\nTraceback:\n{tb_str}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not generate course thumbnail URL."
+        )
 
 
 @router.get("/explore-courses/{course_id}", response_model=CourseExploreDetail)
