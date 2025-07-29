@@ -167,8 +167,7 @@ async def create_course(
             prerequisites=prerequisites,
             curriculum=curriculum,
             status=status,
-            created_by=admin.id,
-            updated_by=admin.id
+
         )
 
         db.add(course)
@@ -667,7 +666,7 @@ async def update_course(
                 logger.warning(f"Field '{key}' not found in Course model, skipping.")
 
         db_course.updated_at = get_pakistan_time()
-        db_course.updated_by = admin.id
+    
 
         # 5. Commit changes to the database
         db.add(db_course)
