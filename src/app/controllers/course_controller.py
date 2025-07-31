@@ -205,14 +205,6 @@ def explore_course_detail(course_id: str, session: Session = Depends(get_db)):
         logger.info(f"Course found: {course.title}")
 
         instructor_name = "N/A"
-        if course.created_by:
-            try:
-                instructor_id = uuid.UUID(course.created_by)
-                instructor = session.get(User, instructor_id)
-                if instructor:
-                    instructor_name = instructor.full_name
-            except Exception as e:
-                logger.error(f"Error fetching instructor for course {course.id}: {e}")
 
         sections = [
             {
