@@ -15,6 +15,7 @@ from src.app.models.enrollment_application import EnrollmentApplication, Applica
 from src.app.models.bank_account import BankAccount
 from src.app.models.notification import Notification
 from src.app.models.payment_proof import PaymentProof
+from ..models.bank_account import BankAccount
 from src.app.schemas.enrollment_application_schema import (
     EnrollmentApplicationCreate,
     EnrollmentApplicationRead,
@@ -31,6 +32,25 @@ logger = logging.getLogger(__name__)
 class EnrollmentStatusResponse(BaseModel):
     status: str
     application_id: uuid.UUID | None
+
+@router.get("/courses/{course_id}/purchase-info")
+def get_purchase_info(course_id: str, session: Session = Depends(get_db)):
+    course = session.exec(select(Course).where(Course.id == course_id)).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    bank_accounts = session.exec(select(BankAccount).where(BankAccount.is_active == True)).all()
+    return {
+        "course_title": course.title,
+        "course_price": course.price,
+        "bank_accounts": [
+            {
+                "bank_name": acc.bank_name,
+                "account_name": acc.account_name,
+                "account_number": acc.account_number
+            }
+            for acc in bank_accounts
+        ]
+    }
 
 @router.post("/apply", response_model=EnrollmentApplicationRead, summary="Apply for a course enrollment")
 async def apply_for_enrollment(
