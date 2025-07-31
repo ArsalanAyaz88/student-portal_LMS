@@ -6,7 +6,6 @@ from src.app.models.course import Course
 from src.app.models.video import Video
 from src.app.models.quiz import Quiz, QuizSubmission, Question
 from src.app.schemas.quiz import QuizSubmissionRead, QuizSubmissionCreate
-from src.app.schemas.video import VideoWithProgress
 from src.app.schemas.course import (
     CourseRead, CourseExploreList, CourseExploreDetail,
     CurriculumSchema, OutcomesSchema, PrerequisitesSchema, DescriptionSchema,
