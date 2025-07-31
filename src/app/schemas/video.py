@@ -61,15 +61,7 @@ class VideoPreview(BaseModel):
 
 
 
-class VideoWithProgress(VideoBase):
-    id: uuid.UUID
-    course_id: uuid.UUID
-    quiz_id: Optional[uuid.UUID] = None
-    watched: bool = False
-    quiz_status: Optional[str] = None  # 'passed', 'failed', or 'not_taken'
-    is_accessible: bool = True
-    is_next_available: bool = False
-    quiz: Optional['QuizRead'] = None
+
 
     class Config:
         from_attributes = True

@@ -12,6 +12,7 @@ from src.app.schemas.course import (
     CurriculumSchema, OutcomesSchema, PrerequisitesSchema, DescriptionSchema,
     CourseProgress as CourseProgressSchema
 )
+from src.app.schemas.course import VideoWithCheckpoint
 from src.app.models.user import User
 from src.app.models.enrollment import Enrollment
 from src.app.models.enrollment_application import EnrollmentApplication
@@ -344,95 +345,97 @@ def get_course_description(course_id: str, session: Session = Depends(get_db)):
     return DescriptionSchema(description=course.description or "")
 
 
-@router.get("/my-courses/{course_id}/videos-with-progress", response_model=list[VideoWithProgress])
-def get_course_videos_with_progress(
-    course_id: str,
-    user: User = Depends(get_current_user),
+@router.get("/my-courses/{course_id}/videos-with-checkpoint", response_model=list[VideoWithCheckpoint])
+def get_course_videos_with_checkpoint(
+    course_id: uuid.UUID,  
+    user=Depends(get_current_user),
     session: Session = Depends(get_db)
 ):
     try:
-        course_uuid = uuid.UUID(course_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid course ID format")
+        # No need to convert course_id as it's already a UUID object
+        course_uuid = course_id
+        
+        # Fetch the enrollment record
+        enrollment = session.exec(
+            select(Enrollment).where(
+                Enrollment.user_id == user.id,
+                Enrollment.course_id == course_uuid,
+                Enrollment.status == "approved"
+            )
+        ).first()
 
-    # Check if the user is enrolled and approved
-    enrollment = session.exec(
-        select(Enrollment).where(
-            Enrollment.user_id == user.id,
-            Enrollment.course_id == course_uuid,
-            Enrollment.status == "approved"
-        )
-    ).first()
+        if not enrollment:
+            raise HTTPException(
+                status_code=403,
+                detail="You are not enrolled in this course."
+            )
 
-    if not enrollment:
-        raise HTTPException(status_code=403, detail="You are not enrolled in this course.")
+        # Get current time in Pakistan timezone
+        current_time = get_pakistan_time()
+        
+        # An enrollment is not accessible if it has an expiration date that is in the past
+        if enrollment.expiration_date:
+            # Make both datetimes timezone-naive for comparison
+            expiration_date = enrollment.expiration_date
+            if expiration_date.tzinfo is not None:
+                expiration_date = expiration_date.replace(tzinfo=None)
+            
+            if expiration_date < current_time.replace(tzinfo=None):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Your access to this course has expired."
+                )
+        
+        # Also respect the is_accessible flag which might be set to false for other reasons.
+        if not enrollment.is_accessible:
+            raise HTTPException(
+                status_code=403,
+                detail="You do not have access to this course."
+            )
 
-    # Get all videos for the course, ordered by the 'order' field
-    videos = session.exec(
-        select(Video).where(Video.course_id == course_uuid).order_by(Video.order)
-    ).all()
+        # Get course videos
+        course = session.exec(
+            select(Course)
+            .where(Course.id == course_uuid)
+            .options(selectinload(Course.videos))
+        ).first()
+        
+        if not course:
+            raise HTTPException(status_code=404, detail="Course not found")
 
-    if not videos:
-        return []
+        # Get all video IDs
+        video_ids = [video.id for video in course.videos]
+        if not video_ids:
+            return []
 
-    # Get all of the user's progress for this course in one go
-    progress_records = session.exec(
-        select(VideoProgress).where(
-            VideoProgress.user_id == user.id,
-            VideoProgress.video_id.in_([v.id for v in videos])
-        )
-    ).all()
-    watched_video_ids = {p.video_id for p in progress_records}
+        # Get video progress
+        progresses = session.exec(
+            select(VideoProgress).where(
+                VideoProgress.user_id == user.id,
+                VideoProgress.video_id.in_(video_ids)
+            )
+        ).all()
+        
+        # Create progress map using UUIDs
+        progress_map = {str(p.video_id): p.completed for p in progresses}
 
-    # Get all of the user's quiz submissions for this course
-    quiz_submissions = session.exec(
-        select(QuizSubmission).where(
-            QuizSubmission.user_id == user.id,
-            QuizSubmission.quiz_id.in_([v.quiz_id for v in videos if v.quiz_id])
-        )
-    ).all()
-    passed_quiz_ids = {s.quiz_id for s in quiz_submissions if s.passed}
-
-    response_videos = []
-    previous_video_unlocked = True  # The first video is always accessible
-
-    for video in videos:
-        is_accessible = False
-        if previous_video_unlocked:
-            is_accessible = True
-
-        watched = video.id in watched_video_ids
-        quiz_passed = video.quiz_id in passed_quiz_ids if video.quiz_id else True
-
-        # Determine if the next video should be unlocked
-        previous_video_unlocked = is_accessible and watched and quiz_passed
-
-        quiz_status = 'not_taken'
-        if video.quiz_id:
-            if video.quiz_id in passed_quiz_ids:
-                quiz_status = 'passed'
-            # Check if there is any submission, to mark as 'failed'
-            elif any(s.quiz_id == video.quiz_id for s in quiz_submissions):
-                quiz_status = 'failed'
-
-        response_videos.append(
-            VideoWithProgress(
-                id=video.id,
+        # Build response
+        result = []
+        for video in course.videos:
+            result.append(VideoWithCheckpoint(
+                id=str(video.id),
+                cloudinary_url=video.cloudinary_url,
                 title=video.title,
                 description=video.description,
-                url=video.video_url, # Assuming url is the field name in VideoWithProgress
-                duration=video.duration,
-                order=video.order,
-                is_preview=video.is_preview,
-                course_id=video.course_id,
-                quiz_id=video.quiz_id,
-                watched=watched,
-                quiz_status=quiz_status,
-                is_accessible=is_accessible
-            )
-        )
+                watched=progress_map.get(str(video.id), False)
+            ))
+        return result
 
-    return response_videos
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"An error occurred while fetching course videos: {str(e)}"
+        )
 
 
 @router.post("/videos/{video_id}/complete", status_code=status.HTTP_200_OK)

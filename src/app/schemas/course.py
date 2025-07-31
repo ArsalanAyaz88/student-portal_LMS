@@ -164,3 +164,13 @@ class AdminCourseDetail(BaseModel):
 
     class Config:
         from_attributes = True
+
+class VideoWithCheckpoint(BaseModel):
+    id: str = Field(..., description="Video ID")
+    cloudinary_url: str = Field(..., description="Cloudinary video URL")
+    title: Optional[str] = Field(None, description="Video title")
+    description: Optional[str] = Field(None, description="Video description")
+    watched: bool = Field(..., description="Whether the video has been watched")
+
+    class Config:
+        from_attributes = True        
