@@ -28,6 +28,7 @@ import cloudinary.api
 import logging
 import boto3
 from botocore.client import Config
+from botocore.exceptions import ClientError
 from urllib.parse import urlparse
 import traceback
 from ..config.s3_config import s3_client, S3_BUCKET_NAME
@@ -437,80 +438,97 @@ def get_course_videos_with_checkpoint(
         )
 
 
-@router.post("/videos/{video_id}/complete", status_code=status.HTTP_200_OK)
-def toggle_video_completion(
+@router.post("/videos/{video_id}/complete")
+def mark_video_completed(
     video_id: str,
-    user: User = Depends(get_current_user),
+    user=Depends(get_current_user),
     session: Session = Depends(get_db)
-):
+): 
     try:
+        # Validate video_id format
         try:
             video_uuid = uuid.UUID(video_id)
         except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid video ID format.")
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid video ID format"
+            )
 
-        video = session.get(Video, video_uuid)
+        # Check if video exists
+        video = session.exec(
+            select(Video).where(Video.id == video_uuid)
+        ).first()
+        
         if not video:
-            raise HTTPException(status_code=404, detail="Video not found.")
+            raise HTTPException(
+                status_code=404,
+                detail="Video not found"
+            )
 
+        # Check enrollment and expiration
+        current_time = datetime.utcnow()
         enrollment = session.exec(
-            select(Enrollment).where(Enrollment.course_id == video.course_id, Enrollment.student_id == user.id)
+            select(Enrollment).where(
+                Enrollment.user_id == user.id,
+                Enrollment.course_id == video.course_id,
+                Enrollment.status == "approved",
+                Enrollment.is_accessible == True,
+                (Enrollment.expiration_date > current_time) | (Enrollment.expiration_date == None)
+            )
         ).first()
 
         if not enrollment:
-            raise HTTPException(status_code=403, detail="You are not enrolled in this course.")
-
-        if enrollment.access_expires_on and enrollment.access_expires_on < get_pakistan_time().date():
-            raise HTTPException(status_code=403, detail="Your access to this course has expired.")
-
+            raise HTTPException(
+                status_code=403,
+                detail="You are not enrolled in this course or your access has expired"
+            )
+        
+        # Get video progress
         progress = session.exec(
-            select(VideoProgress).where(VideoProgress.video_id == video_uuid, VideoProgress.user_id == user.id)
+            select(VideoProgress).where(
+                VideoProgress.user_id == user.id,
+                VideoProgress.video_id == video_uuid
+            )
         ).first()
 
         if progress:
-            progress.is_completed = not progress.is_completed
-            status_message = "completed" if progress.is_completed else "incomplete"
+            # Toggle the completed status
+            progress.completed = not progress.completed
+            action = "unmarked as" if not progress.completed else "marked as"
+            message = f"Video {action} completed"
         else:
-            progress = VideoProgress(video_id=video_uuid, user_id=user.id, is_completed=True)
+            # Create new progress entry as completed (first click)
+            progress = VideoProgress(
+                user_id=user.id,
+                video_id=video_uuid,
+                completed=True
+            )
             session.add(progress)
-            status_message = "completed"
+            message = "Video marked as completed"
 
-        session.commit()
-        session.refresh(progress)
-
-        # Update course progress
-        completed_videos_count = session.exec(
-            select(func.count(VideoProgress.id))
-            .join(Video, Video.id == VideoProgress.video_id)
-            .where(Video.course_id == video.course_id, VideoProgress.user_id == user.id, VideoProgress.is_completed == True)
-        ).one()
-
-        total_videos_count = session.exec(
-            select(func.count(Video.id)).where(Video.course_id == video.course_id)
-        ).one()
-
-        course_progress = session.exec(
-            select(CourseProgress).where(CourseProgress.course_id == video.course_id, CourseProgress.user_id == user.id)
-        ).first()
-
-        if not course_progress:
-            course_progress = CourseProgress(course_id=video.course_id, user_id=user.id)
-            session.add(course_progress)
-
-        course_progress.completion_percentage = (completed_videos_count / total_videos_count) * 100 if total_videos_count > 0 else 0
-        course_progress.last_updated = get_pakistan_time()
-
-        session.commit()
-
-        return {"message": f"Video marked as {status_message}", "is_completed": progress.is_completed}
+        try:
+            session.commit()
+        except Exception as commit_error:
+            session.rollback()
+            logger.error(f"Commit error in mark_video_completed: {str(commit_error)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Database error while saving video progress: {str(commit_error)}"
+            )
+        # Refresh the object to get the updated state if needed, though for just returning a message it's not strictly necessary
+        # session.refresh(progress)
+        return {"detail": message}
 
     except HTTPException:
         raise
     except Exception as e:
-        # Log the full error for debugging
-        print(f"Error in toggle_video_completion: {e}")
-        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
-
+        session.rollback()
+        logger.error(f"Error in mark_video_completed: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"An error occurred while processing video completion status: {str(e)}"
+        )
 
 @router.put("/courses/{course_id}/thumbnail", response_model=CourseRead)
 def upload_course_thumbnail(
@@ -591,7 +609,7 @@ def submit_quiz(
     existing_submission = session.exec(
         select(QuizSubmission).where(
             QuizSubmission.quiz_id == quiz_id, 
-            QuizSubmission.user_id == user.id
+            QuizSubmission.student_id == user.id
         )
     ).first()
 
@@ -617,7 +635,7 @@ def submit_quiz(
 
     new_submission = QuizSubmission(
         quiz_id=quiz_id,
-        user_id=user.id,
+        student_id=user.id,
         score=score,
         passed=passed,
         answers_data=submission.dict() # Storing the submission for review
