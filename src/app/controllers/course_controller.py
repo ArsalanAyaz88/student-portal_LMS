@@ -268,6 +268,7 @@ def get_enrollment_status(course_id: str, user: User = Depends(get_current_user)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid course ID format")
 
+    # 1. Check for an approved enrollment first
     enrollment = session.exec(
         select(Enrollment).where(
             Enrollment.user_id == user.id,
@@ -277,11 +278,21 @@ def get_enrollment_status(course_id: str, user: User = Depends(get_current_user)
     ).first()
 
     if enrollment:
-        enrollment.update_expiration_status()
-        if enrollment.is_accessible:
-            return {"is_enrolled": True}
+        return {"status": "APPROVED"}
 
-    return {"is_enrolled": False}
+    # 2. If not enrolled, check for a pending or rejected application
+    application = session.exec(
+        select(EnrollmentApplication).where(
+            EnrollmentApplication.user_id == user.id,
+            EnrollmentApplication.course_id == course_uuid
+        ).order_by(EnrollmentApplication.created_at.desc())
+    ).first()
+
+    if application:
+        return {"status": application.status.upper()}
+
+    # 3. If no enrollment or application exists, the user has not applied
+    return {"status": "NOT_APPLIED"}
 
 
 @router.get("/{course_id}/curriculum", response_model=CurriculumSchema)
