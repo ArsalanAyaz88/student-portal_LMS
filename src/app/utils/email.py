@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Load .env at module import
+# Load .env at module import 
 load_dotenv()
 
 # Read SMTP settings directly from environment

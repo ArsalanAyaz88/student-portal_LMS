@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from sqlmodel import select
 import uuid
 import logging
+import os
 from datetime import datetime
 from pydantic import BaseModel
 
@@ -32,35 +33,76 @@ class EnrollmentStatusResponse(BaseModel):
     application_id: uuid.UUID | None
 
 @router.post("/apply", response_model=EnrollmentApplicationRead, summary="Apply for a course enrollment")
-def apply_for_enrollment(
-    application_data: EnrollmentApplicationCreate,
+async def apply_for_enrollment(
+    first_name: str = Form(...),
+    last_name: str = Form(...),
+    qualification: str = Form(...),
+    ultrasound_experience: str = Form(None),
+    contact_number: str = Form(...),
+    course_id: str = Form(...),
+    qualification_certificate: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     if current_user.role != 'student':
         raise HTTPException(status_code=403, detail="Only students can apply for enrollment")
 
+    # Validate file type
+    allowed_extensions = {'.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx'}
+    file_extension = os.path.splitext(qualification_certificate.filename)[1].lower()
+    
+    if file_extension not in allowed_extensions:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Invalid file type. Allowed types: {', '.join(allowed_extensions)}"
+        )
+    
+    # Validate file size (max 10MB)
+    if qualification_certificate.size and qualification_certificate.size > 10 * 1024 * 1024:
+        raise HTTPException(
+            status_code=400,
+            detail="File size too large. Maximum size is 10MB."
+        )
+
+    # Upload qualification certificate to S3
+    certificate_url = await save_upload_and_get_url(qualification_certificate, folder="qualification_certificates")
+
+    # Convert course_id string to UUID
+    try:
+        course_uuid = uuid.UUID(course_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid course ID format")
+
     existing_application = db.exec(
         select(EnrollmentApplication).where(
             EnrollmentApplication.user_id == current_user.id,
-            EnrollmentApplication.course_id == application_data.course_id
+            EnrollmentApplication.course_id == course_uuid
         )
     ).first()
 
     if existing_application:
         raise HTTPException(status_code=400, detail="You have already applied for this course")
 
-    new_application = EnrollmentApplication.from_orm(application_data)
-    new_application.user_id = current_user.id
-    new_application.status = ApplicationStatus.PENDING
+    # Create new application with form data
+    new_application = EnrollmentApplication(
+        first_name=first_name,
+        last_name=last_name,
+        qualification=qualification,
+        ultrasound_experience=ultrasound_experience,
+        contact_number=contact_number,
+        course_id=course_uuid,
+        user_id=current_user.id,
+        status=ApplicationStatus.PENDING,
+        qualification_certificate_url=certificate_url
+    )
     
     db.add(new_application)
 
     notification = Notification(
         user_id=current_user.id,
-        course_id=application_data.course_id,
+        course_id=course_uuid,
         event_type="new_enrollment_application",
-        details=f"New enrollment application from {current_user.name} for course: {application_data.course_id}."
+        details=f"New enrollment application from {current_user.full_name or current_user.email} for course: {course_uuid}. Certificate uploaded: {certificate_url}"
     )
     db.add(notification)
     

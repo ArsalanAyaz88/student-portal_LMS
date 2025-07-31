@@ -21,6 +21,37 @@ logger.setLevel(logging.DEBUG)
 # File logging to a specific path is disabled for the serverless environment.
 # The logger will now output to stdout/stderr, which is captured by Vercel.
 
+def check_s3_bucket_public_access():
+    """
+    Check if the S3 bucket is configured for public access.
+    This is a helper function to diagnose public access issues.
+    """
+    try:
+        if s3_client is None:
+            return False, "S3 client is not initialized"
+        
+        # Check bucket ownership controls
+        try:
+            ownership = s3_client.get_bucket_ownership_controls(Bucket=S3_BUCKET_NAME)
+            logger.info(f"Bucket ownership controls: {ownership}")
+        except ClientError as e:
+            if e.response['Error']['Code'] == 'OwnershipControlsNotFoundError':
+                logger.warning("No ownership controls found on bucket")
+            else:
+                logger.error(f"Error checking ownership controls: {e}")
+        
+        # Check bucket ACL
+        try:
+            acl = s3_client.get_bucket_acl(Bucket=S3_BUCKET_NAME)
+            logger.info(f"Bucket ACL: {acl}")
+        except ClientError as e:
+            logger.error(f"Error checking bucket ACL: {e}")
+        
+        return True, "Bucket access check completed"
+        
+    except Exception as e:
+        return False, f"Error checking bucket access: {str(e)}"
+
 async def upload_file_to_s3(file_obj, key: str, content_type: Optional[str] = None) -> str:
     """
     Upload file to AWS S3.
@@ -53,6 +84,11 @@ async def upload_file_to_s3(file_obj, key: str, content_type: Optional[str] = No
         extra_args = {}
         if content_type:
             extra_args['ContentType'] = content_type
+        else:
+            extra_args['ContentType'] = 'application/octet-stream'
+        
+        # Note: ACL is not set because the bucket has ACLs disabled
+        # Public access must be configured via bucket policy instead
 
         upload_func = functools.partial(
             s3_client.upload_fileobj, 
@@ -161,3 +197,4 @@ async def save_upload_and_get_url(file: UploadFile, folder: str = "") -> str:
                 detail=f"Failed to process file upload: {str(e)}"
             )
         raise
+
