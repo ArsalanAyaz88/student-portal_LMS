@@ -206,7 +206,7 @@ def explore_course_detail(course_id: str, session: Session = Depends(get_db)):
         
         logger.info(f"Course found: {course.title}")
 
-        instructor_name = "N/A"
+        instructor_name = "DR Sabir ALi Butt"
 
         sections = [
             {
