@@ -13,10 +13,8 @@ class VideoBase(BaseModel):
     is_preview: bool = Field(default=False)
 
 
-
 # Schema for creating a new video
 class VideoCreate(BaseModel):
-
     title: str
     description: Optional[str] = None
     cloudinary_url: str
@@ -33,35 +31,27 @@ class VideoUpdate(BaseModel):
     is_preview: Optional[bool] = None
     order: Optional[int] = None
 
-    # Schema for reading video data (e.g., in API responses)
+# Schema for reading video data (e.g., in API responses)
 class VideoRead(VideoBase):
-        id: uuid.UUID
-        course_id: uuid.UUID
-        quiz: Optional['QuizRead'] = None
+    id: uuid.UUID
+    course_id: uuid.UUID
+    quiz: Optional['QuizRead'] = None
 
-        class Config:
-            from_attributes = True
+    class Config:
+        from_attributes = True
 
-    # Schema for reading video data for the admin panel
+# Schema for reading video data for the admin panel
 class VideoAdminRead(VideoBase):
-        id: uuid.UUID
+    id: uuid.UUID
 
-        class Config:
-            from_attributes = True
+    class Config:
+        from_attributes = True
 
-    # Schema for video previews on the course explore page
+# Schema for video previews on the course explore page
 class VideoPreview(BaseModel):
-        title: str
-        duration: Optional[float] = None
-        is_preview: bool = False
-
-        class Config:
-            from_attributes = True
-
-
-
-
-
+    title: str
+    duration: Optional[float] = None
+    is_preview: bool = False
 
     class Config:
         from_attributes = True
