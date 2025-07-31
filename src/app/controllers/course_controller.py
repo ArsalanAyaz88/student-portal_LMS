@@ -16,12 +16,14 @@ from src.app.models.user import User
 from src.app.models.enrollment import Enrollment
 from src.app.models.enrollment_application import EnrollmentApplication
 from src.app.models.video_progress import VideoProgress
+from src.app.models.course_progress import CourseProgress
 from src.app.models.certificate import Certificate
 from src.app.db.session import get_db
 from src.app.utils.dependencies import get_current_user
 from src.app.utils.certificate_generator import CertificateGenerator
 from src.app.utils.time import get_pakistan_time
 import uuid
+import os
 import cloudinary
 import cloudinary.uploader
 import cloudinary.api
@@ -206,7 +208,7 @@ def explore_course_detail(course_id: str, session: Session = Depends(get_db)):
         
         logger.info(f"Course found: {course.title}")
 
-        instructor_name = "DR Sabir ALi Butt"
+        instructor_name = "Dr Sabir ALi Butt"
 
         sections = [
             {
@@ -647,7 +649,7 @@ def submit_quiz(
 
     return new_submission
 @router.get("/courses/{course_id}/certificate")
-def get_certificate(
+async def get_certificate(
     course_id: str,
     user=Depends(get_current_user),
     session: Session = Depends(get_db)
@@ -702,7 +704,7 @@ def get_certificate(
                 if not user.full_name:
                     raise HTTPException(status_code=400, detail="Full name is required to generate a certificate. Please complete your profile.")
                 certificate_generator = CertificateGenerator()
-                certificate_url = certificate_generator.generate(
+                certificate_url = await certificate_generator.generate(
                     username=user.full_name,
                     course_title=course.title,
                     completion_date=course_progress.completed_at
