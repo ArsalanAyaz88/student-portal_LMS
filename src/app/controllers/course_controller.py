@@ -286,7 +286,7 @@ def get_enrollment_status(course_id: str, user: User = Depends(get_current_user)
         select(EnrollmentApplication).where(
             EnrollmentApplication.user_id == user.id,
             EnrollmentApplication.course_id == course_uuid
-        ).order_by(EnrollmentApplication.created_at.desc())
+        )
     ).first()
 
     if application:
