@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Body
+
+router = APIRouter()
 from sqlalchemy.orm import Session
 from sqlmodel import select
 import uuid
