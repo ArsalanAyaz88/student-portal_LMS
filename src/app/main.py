@@ -28,14 +28,8 @@ from src.app.models import (
 
 # Import routers
 from src.app.routers import (
-    auth_router,
-    profile_router,
-    course_router,
-    student_assignment_router as sa_router,
-    student_quiz_router as sq_router,
-    student_dashboard_router,
-    admin_quiz_router,
-    admin_router
+    auth_router, profile_router, course_router, sa_router, sq_router, 
+    student_dashboard_router, admin_quiz_router, admin_router
 )
 from src.app.controllers import enrollment_controller
 
