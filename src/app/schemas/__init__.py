@@ -2,7 +2,7 @@
 
 # Import all the necessary models directly into this namespace.
 # This creates a shared namespace where all models can find each other.
-from .video import VideoRead, VideoWithProgress
+from .video import VideoRead
 from .quiz import QuizRead, QuizReadWithDetails
 from .course import CourseRead
 from .user import UserRead
@@ -12,9 +12,8 @@ from .user import UserRead
 # current (shared) namespace to find the string references like 'QuizRead'.
 
 VideoRead.model_rebuild(_types_namespace=globals())
-VideoWithProgress.model_rebuild(_types_namespace=globals())
 QuizRead.model_rebuild(_types_namespace=globals())
 QuizReadWithDetails.model_rebuild(_types_namespace=globals())
-CourseRead.model_rebuild(_types_namespace=globals())
+CourseRead.model_rebuild(_types_namespace=globals()) 
 UserRead.model_rebuild(_types_namespace=globals())
 

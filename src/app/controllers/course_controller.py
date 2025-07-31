@@ -12,7 +12,7 @@ from src.app.schemas.course import (
     CourseProgress as CourseProgressSchema
 )
 from src.app.schemas.course import VideoWithCheckpoint
-from src.app.models.user import User
+from src.app.models.user import User 
 from src.app.models.enrollment import Enrollment
 from src.app.models.enrollment_application import EnrollmentApplication
 from src.app.models.video_progress import VideoProgress
