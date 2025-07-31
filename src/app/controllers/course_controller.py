@@ -14,6 +14,7 @@ from src.app.schemas.course import (
 )
 from src.app.models.user import User
 from src.app.models.enrollment import Enrollment
+from src.app.models.enrollment_application import EnrollmentApplication
 from src.app.models.video_progress import VideoProgress
 from src.app.models.certificate import Certificate
 from src.app.db.session import get_db
