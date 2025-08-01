@@ -21,7 +21,7 @@ from sqlmodel import Session, select
 # Application-specific Imports
 from src.app.db.session import get_db
 from src.app.utils.dependencies import get_current_admin_user, get_current_user
-from src.app.utils.email import send_application_approved_email, send_enrollment_rejected_email
+from src.app.utils.email import send_application_approved_email, send_enrollment_rejected_email,send_enrollment_approved_email
 from src.app.utils.file import save_upload_and_get_url
 from src.app.utils.time import get_pakistan_time
 from src.app.config.s3_config import s3_client, S3_BUCKET_NAME
@@ -253,7 +253,7 @@ async def generate_video_upload_signature(
         tb_str = traceback.format_exc()
         logging.error(f"Error generating video upload signature: {e}\nTraceback:\n{tb_str}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=500,
             detail=f"Could not generate upload signature: {e}"
         )
 
@@ -651,6 +651,22 @@ def update_enrollment_application_status(
 
     # If the application is being approved for the first time OR after payment verification
     if update_data.status == ApplicationStatus.APPROVED and old_status != ApplicationStatus.APPROVED:
+        # Get the user and course details for the email
+        user = db.get(User, application.user_id)
+        course = db.get(Course, application.course_id)
+        
+        # Send approval email
+        if user and course:
+            try:
+                send_application_approved_email(
+                    to_email=user.email,
+                    course_title=course.title
+                )
+            except Exception as e:
+                # Log the error but don't fail the request
+                logger.error(f"Failed to send approval email: {str(e)}")
+                # You might want to log this to a monitoring system
+
         # Check if an enrollment already exists to avoid duplicates
         existing_enrollment = db.exec(
             select(Enrollment).where(
@@ -671,6 +687,24 @@ def update_enrollment_application_status(
                 expiration_date=datetime.utcnow() + timedelta(days=365)
             )
             db.add(new_enrollment)
+    
+    # If the application is being rejected, send a rejection email
+    elif update_data.status == ApplicationStatus.REJECTED and old_status != ApplicationStatus.REJECTED:
+        # Get the user and course details for the email
+        user = db.get(User, application.user_id)
+        course = db.get(Course, application.course_id)
+        
+        if user and course:
+            try:
+                send_enrollment_rejected_email(
+                    to_email=user.email,
+                    course_title=course.title,
+                    rejection_reason=update_data.rejection_reason or "No specific reason provided."
+                )
+            except Exception as e:
+                # Log the error but don't fail the request
+                logger.error(f"Failed to send rejection email: {str(e)}")
+                # You might want to log this to a monitoring system
 
     db.add(application)
     db.commit()
