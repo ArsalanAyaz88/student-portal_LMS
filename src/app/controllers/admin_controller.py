@@ -164,24 +164,40 @@ async def create_course(
             price=price,
             thumbnail_url=thumbnail_url,
             difficulty_level=difficulty_level,
-            outcomes=outcomes,
-            prerequisites=prerequisites,
-            curriculum=curriculum,
+            outcomes=outcomes or "",
+            prerequisites=prerequisites or "",
+            curriculum=curriculum or "",
             status=status,
-
         )
 
         db.add(course)
         db.commit()
         db.refresh(course)
-        return course
+        
+        # Return the course with the required fields for AdminCourseDetail
+        return {
+            "id": course.id,
+            "title": course.title,
+            "description": course.description,
+            "price": course.price,
+            "thumbnail_url": course.thumbnail_url,
+            "difficulty_level": course.difficulty_level,
+            "created_by": admin.email,  # Using email since first_name/last_name aren't available
+            "updated_by": admin.email,  # Using email since first_name/last_name aren't available
+            "created_at": course.created_at,
+            "updated_at": course.updated_at,
+            "status": course.status,
+            "outcomes": course.outcomes,
+            "prerequisites": course.prerequisites,
+            "curriculum": course.curriculum
+        }
 
     except Exception as e:
         db.rollback()
         # Log the full error for debugging
         logging.error(f"Error creating course: {e}", exc_info=True)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=500,
             detail=f"An unexpected error occurred on the server: {str(e)}"
         )
 
@@ -202,7 +218,7 @@ async def generate_video_upload_signature(
     logging.info(f"--- Generating video upload signature for content_type: {request_data.content_type} ---")
     try:
         if s3_client is None:
-            logging.error("S3 client is not configured. Make sure AWS credentials and region are set.")
+            logging.error("S3 client is not configured.")
             raise HTTPException(status_code=500, detail="S3 client is not configured")
 
         content_type = request_data.content_type
