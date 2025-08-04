@@ -139,6 +139,9 @@ async def submit_payment_proof(
     session: Session = Depends(get_db)
 ):
     url = await save_upload_and_get_url(file, folder="payment_proofs")
+
+    # Attach the detached user object to the current session to prevent SAWarning
+    user = session.merge(user)
     try:
         course_uuid = uuid.UUID(course_id)
     except ValueError:
