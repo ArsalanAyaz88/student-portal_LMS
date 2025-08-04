@@ -164,22 +164,31 @@ async def submit_payment_proof(
         if not application:
             raise HTTPException(status_code=403, detail="Your application is not approved. You cannot submit payment proof.")
 
-        # Find or create the enrollment record to link the payment proof to
-        enrollment = session.exec(select(Enrollment).where(Enrollment.user_id == user.id, Enrollment.course_id == course_uuid)).first()
-        if not enrollment:
-            enrollment = Enrollment(user_id=user.id, course_id=course_uuid, status="pending", enroll_date=datetime.utcnow(), is_accessible=False)
-            session.add(enrollment)
-            session.commit()
-            session.refresh(enrollment)
+        # Find the enrollment record. If it doesn't exist, create a new one.
+        enrollment = session.exec(
+            select(Enrollment).where(Enrollment.user_id == user.id, Enrollment.course_id == course_uuid)
+        ).first()
 
-        # Create the payment proof with the correct enrollment_id
+        if not enrollment:
+            enrollment = Enrollment(
+                user_id=user.id, 
+                course_id=course_uuid, 
+                enroll_date=datetime.utcnow(), 
+                is_accessible=False,
+                status="pending" # Ensure status is set
+            )
+            session.add(enrollment)
+        
+        # Create the payment proof and link it to the enrollment using the relationship.
+        # This is the correct way to handle the foreign key relationship in SQLAlchemy.
         payment_proof = PaymentProof(
-            enrollment_id=enrollment.id,
             proof_url=url,
-            status=PaymentStatus.PENDING  # Correctly set the enum value
+            status=PaymentStatus.PENDING,
+            enrollment=enrollment  # Assign the parent object directly
         )
         session.add(payment_proof)
 
+        # Create a notification for the admin.
         notif = Notification(
             user_id=user.id,
             course_id=course_uuid,
@@ -187,6 +196,8 @@ async def submit_payment_proof(
             details=f"Payment proof submitted for course {course.title}. User: {user.full_name or user.email} (ID: {user.id}). Proof: {url}"
         )
         session.add(notif)
+
+        # Commit all changes (enrollment, payment proof, notification) in a single transaction.
         session.commit()
         return {"detail": "Payment proof submitted, pending admin approval.", "status": "pending"}
     except Exception as e:

@@ -3,23 +3,23 @@ from sqlmodel import SQLModel, Field, Relationship, Column, Enum
 import uuid
 from datetime import datetime
 from src.app.utils.time import get_pakistan_time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 from enum import Enum as PyEnum
 
 if TYPE_CHECKING:
-    from src.app.models.enrollment import Enrollment
+    from .enrollment import Enrollment
 
 class PaymentStatus(str, PyEnum):
     PENDING = "PENDING"
     APPROVED = "APPROVED"
     REJECTED = "REJECTED"
 
-class PaymentProof(SQLModel, table=True):
-    __table_args__ = {"extend_existing": True}
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    enrollment_id: uuid.UUID = Field(foreign_key="enrollment.id", nullable=False)
+class PaymentProofBase(SQLModel):
     proof_url: str
     submitted_at: datetime = Field(default_factory=get_pakistan_time)
     status: PaymentStatus = Field(default=PaymentStatus.PENDING, sa_column=Column(Enum(PaymentStatus), nullable=False))
 
-    enrollment: "src.app.models.enrollment.Enrollment" = Relationship(back_populates="payment_proofs")
+class PaymentProof(PaymentProofBase, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    enrollment_id: uuid.UUID = Field(foreign_key="enrollment.id")
+    enrollment: "Enrollment" = Relationship(back_populates="payment_proofs")
