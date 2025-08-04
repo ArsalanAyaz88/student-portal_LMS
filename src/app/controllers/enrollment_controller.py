@@ -201,7 +201,12 @@ def get_payment_proof_status(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # --- FINAL FIX: Find the enrollment record first ---
+    """
+    Checks the status of a payment proof for a given course for the current user.
+    This endpoint is crucial for the frontend to determine whether to show the
+    'Submit Payment' button or the 'Payment Pending' status on page load.
+    """
+    # First, find the user's enrollment for the specified course.
     enrollment = db.exec(
         select(Enrollment).where(
             Enrollment.course_id == course_id,
@@ -209,18 +214,33 @@ def get_payment_proof_status(
         )
     ).first()
 
+    # If there is no enrollment record, then no payment proof can exist.
+    # This is a clean way to signal to the frontend that payment has not been made.
     if not enrollment:
-        # If there's no enrollment record, there can be no payment proof.
-        raise HTTPException(status_code=404, detail="Enrollment not found, so no payment proof available.")
+        raise HTTPException(
+            status_code=404, 
+            detail="Enrollment not found. No payment proof submitted."
+        )
 
-    # --- FINAL FIX: Find the proof using the enrollment_id ---
+    # With the enrollment found, query for the associated payment proof.
+    # We order by `submitted_at` descending to get the most recent proof
+    # in case there are multiple, though there should typically only be one.
     payment_proof = db.exec(
-        select(PaymentProof).where(PaymentProof.enrollment_id == enrollment.id)
+        select(PaymentProof)
+        .where(PaymentProof.enrollment_id == enrollment.id)
+        .order_by(PaymentProof.submitted_at.desc())
     ).first()
 
+    # If no payment proof is found for this enrollment, it's not an error.
+    # It simply means the user has not submitted it yet.
     if not payment_proof:
-        raise HTTPException(status_code=404, detail="Payment proof not found.")
+        raise HTTPException(
+            status_code=404, 
+            detail="Payment proof not yet submitted."
+        )
 
+    # If a payment proof is found, return its status.
+    # The status is an enum, so we use .value to get the string representation (e.g., "PENDING").
     return {"status": payment_proof.status.value}
 
 @router.get("/enrollments/{enrollment_id}/status", response_model=EnrollmentStatusResponse, summary="Check enrollment status by enrollment ID")
