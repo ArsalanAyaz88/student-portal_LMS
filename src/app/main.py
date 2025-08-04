@@ -72,6 +72,8 @@ async def on_startup():
         logging.error(f"Failed to create database and tables: {e}", exc_info=True)
         raise
 
+
+
 # ─── Routers ───────────────────────────────────────────────────
 app.include_router(auth_router.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(profile_router.router, prefix="/api/profile", tags=["Profile"])
