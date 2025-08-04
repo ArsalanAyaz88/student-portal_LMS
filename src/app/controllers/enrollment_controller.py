@@ -16,7 +16,6 @@ from src.app.models.enrollment_application import EnrollmentApplication, Applica
 from src.app.models.bank_account import BankAccount
 from src.app.models.notification import Notification
 from src.app.models.payment_proof import PaymentProof, PaymentStatus
-from ..models.bank_account import BankAccount
 from src.app.schemas.enrollment_application_schema import (
     EnrollmentApplicationCreate,
     EnrollmentApplicationRead,
@@ -24,11 +23,12 @@ from src.app.schemas.enrollment_application_schema import (
 from src.app.utils.dependencies import get_current_user
 from src.app.utils.file import save_upload_and_get_url
 
-# Single, non-prefixed router. The prefix is applied in main.py.
-router = APIRouter(prefix="/enrollments")
-
+# Setup basic logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Single, non-prefixed router. The prefix is applied in main.py.
+router = APIRouter(prefix="/enrollments")
 
 class EnrollmentStatusResponse(BaseModel):
     status: str
@@ -139,18 +139,17 @@ async def submit_payment_proof(
     user: User = Depends(get_current_user),
     session: Session = Depends(get_db)
 ):
-    url = await save_upload_and_get_url(file, folder="payment_proofs")
-
-    # Attach the detached user object to the current session to prevent SAWarning
-    user = session.merge(user)
+    logger.info(f"[SUBMIT_PROOF_START] User '{user.id}' submitting proof for course '{course_id}'.")
     try:
+        url = await save_upload_and_get_url(file, folder="payment_proofs")
+        logger.info(f"[SUBMIT_PROOF] File uploaded to S3, URL: {url}")
+
+        user = session.merge(user)
         course_uuid = uuid.UUID(course_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid course ID format")
-
-    try:
+        
         course = session.get(Course, course_uuid)
         if not course:
+            logger.error(f"[SUBMIT_PROOF_FAIL] Course with ID '{course_id}' not found.")
             raise HTTPException(status_code=404, detail="Course not found")
 
         application = session.exec(
@@ -162,33 +161,33 @@ async def submit_payment_proof(
         ).first()
 
         if not application:
+            logger.error(f"[SUBMIT_PROOF_FAIL] User '{user.id}' application for course '{course_id}' not approved.")
             raise HTTPException(status_code=403, detail="Your application is not approved. You cannot submit payment proof.")
 
-        # Find the enrollment record. If it doesn't exist, create a new one.
         enrollment = session.exec(
             select(Enrollment).where(Enrollment.user_id == user.id, Enrollment.course_id == course_uuid)
         ).first()
 
         if not enrollment:
+            logger.info(f"[SUBMIT_PROOF] No existing enrollment found for user '{user.id}' and course '{course_id}'. Creating new one.")
             enrollment = Enrollment(
                 user_id=user.id, 
                 course_id=course_uuid, 
                 enroll_date=datetime.utcnow(), 
                 is_accessible=False,
-                status="pending" # Ensure status is set
+                status="pending"
             )
             session.add(enrollment)
-        
-        # Create the payment proof and link it to the enrollment using the relationship.
-        # This is the correct way to handle the foreign key relationship in SQLAlchemy.
+        else:
+            logger.info(f"[SUBMIT_PROOF] Found existing enrollment: {enrollment.id}")
+
         payment_proof = PaymentProof(
             proof_url=url,
             status=PaymentStatus.PENDING,
-            enrollment=enrollment  # Assign the parent object directly
+            enrollment=enrollment
         )
         session.add(payment_proof)
-
-        # Create a notification for the admin.
+        
         notif = Notification(
             user_id=user.id,
             course_id=course_uuid,
@@ -196,13 +195,20 @@ async def submit_payment_proof(
             details=f"Payment proof submitted for course {course.title}. User: {user.full_name or user.email} (ID: {user.id}). Proof: {url}"
         )
         session.add(notif)
-
-        # Commit all changes (enrollment, payment proof, notification) in a single transaction.
+        
+        logger.info("[SUBMIT_PROOF] Committing transaction...")
         session.commit()
+        logger.info("[SUBMIT_PROOF] Commit successful.")
+
+        session.refresh(enrollment)
+        session.refresh(payment_proof)
+        
+        logger.info(f"[SUBMIT_PROOF_SUCCESS] Refreshed Enrollment ID: {enrollment.id}, PaymentProof ID: {payment_proof.id}, Linked Enrollment ID: {payment_proof.enrollment_id}")
         return {"detail": "Payment proof submitted, pending admin approval.", "status": "pending"}
+        
     except Exception as e:
-        tb_str = traceback.format_exc()
-        logging.error(f"Error submitting payment proof. Exception: {e}\nTraceback:\n{tb_str}")
+        logger.error(f"[SUBMIT_PROOF_EXCEPTION] An unexpected error occurred: {e}")
+        logger.error(traceback.format_exc())
         session.rollback()
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred. Please check logs for details.")
 
@@ -212,12 +218,8 @@ def get_payment_proof_status(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """
-    Checks the status of a payment proof for a given course for the current user.
-    This endpoint is crucial for the frontend to determine whether to show the
-    'Submit Payment' button or the 'Payment Pending' status on page load.
-    """
-    # First, find the user's enrollment for the specified course.
+    logger.info(f"[GET_STATUS_START] User '{current_user.id}' checking status for course '{course_id}'.")
+    
     enrollment = db.exec(
         select(Enrollment).where(
             Enrollment.course_id == course_id,
@@ -225,34 +227,26 @@ def get_payment_proof_status(
         )
     ).first()
 
-    # If there is no enrollment record, then no payment proof can exist.
-    # This is a clean way to signal to the frontend that payment has not been made.
     if not enrollment:
+        logger.warning(f"[GET_STATUS_FAIL] No enrollment record found for user '{current_user.id}' and course '{course_id}'.")
         raise HTTPException(
             status_code=404, 
             detail="Enrollment not found. No payment proof submitted."
         )
-
-    # With the enrollment found, query for the associated payment proof.
-    # We order by `submitted_at` descending to get the most recent proof
-    # in case there are multiple, though there should typically only be one.
-    payment_proof = db.exec(
-        select(PaymentProof)
-        .where(PaymentProof.enrollment_id == enrollment.id)
-        .order_by(PaymentProof.submitted_at.desc())
-    ).first()
-
-    # If no payment proof is found for this enrollment, it's not an error.
-    # It simply means the user has not submitted it yet.
-    if not payment_proof:
+    
+    logger.info(f"[GET_STATUS] Found enrollment record with ID: {enrollment.id}. Checking for linked payment proofs.")
+    
+    if enrollment.payment_proofs:
+        logger.info(f"[GET_STATUS] Found {len(enrollment.payment_proofs)} payment proof(s) on the relationship.")
+        payment_proof = sorted(enrollment.payment_proofs, key=lambda p: p.submitted_at, reverse=True)[0]
+        logger.info(f"[GET_STATUS_SUCCESS] Latest proof found with ID: {payment_proof.id} and status: '{payment_proof.status.value}'.")
+        return {"status": payment_proof.status.value}
+    else:
+        logger.warning(f"[GET_STATUS_FAIL] Enrollment {enrollment.id} found, but it has no linked payment proofs.")
         raise HTTPException(
             status_code=404, 
             detail="Payment proof not yet submitted."
         )
-
-    # If a payment proof is found, return its status.
-    # The status is an enum, so we use .value to get the string representation (e.g., "PENDING").
-    return {"status": payment_proof.status.value}
 
 @router.get("/enrollments/{enrollment_id}/status", response_model=EnrollmentStatusResponse, summary="Check enrollment status by enrollment ID")
 def get_enrollment_status_by_id(
