@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from sqlmodel import select
 import uuid
 import logging
+import traceback
 import os
 from datetime import datetime
 from pydantic import BaseModel
@@ -189,9 +190,10 @@ async def submit_payment_proof(
         session.commit()
         return {"detail": "Payment proof submitted, pending admin approval.", "status": "pending"}
     except Exception as e:
-        logging.exception("Error submitting payment proof.") # This will log the full traceback
+        tb_str = traceback.format_exc()
+        logging.error(f"Error submitting payment proof. Exception: {e}\nTraceback:\n{tb_str}")
         session.rollback()
-        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred. Please check logs for details.")
 
 @router.get("/enrollments/{course_id}/payment-proof/status", summary="Check payment proof status for a course")
 def get_payment_proof_status(
