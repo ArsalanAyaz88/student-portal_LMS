@@ -146,48 +146,52 @@ async def submit_payment_proof(
         course_uuid = uuid.UUID(course_id)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid course ID format")
-    
-    course = session.get(Course, course_uuid)
-    if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
 
-    # Find the enrollment application to ensure the user is approved
-    application = session.exec(
-        select(EnrollmentApplication).where(
-            EnrollmentApplication.user_id == user.id,
-            EnrollmentApplication.course_id == course_uuid,
-            EnrollmentApplication.status == ApplicationStatus.APPROVED
+    try:
+        course = session.get(Course, course_uuid)
+        if not course:
+            raise HTTPException(status_code=404, detail="Course not found")
+
+        application = session.exec(
+            select(EnrollmentApplication).where(
+                EnrollmentApplication.user_id == user.id,
+                EnrollmentApplication.course_id == course_uuid,
+                EnrollmentApplication.status == ApplicationStatus.APPROVED
+            )
+        ).first()
+
+        if not application:
+            raise HTTPException(status_code=403, detail="Your application is not approved. You cannot submit payment proof.")
+
+        # Find or create the enrollment record to link the payment proof to
+        enrollment = session.exec(select(Enrollment).where(Enrollment.user_id == user.id, Enrollment.course_id == course_uuid)).first()
+        if not enrollment:
+            enrollment = Enrollment(user_id=user.id, course_id=course_uuid, status="pending", enroll_date=datetime.utcnow(), is_accessible=False)
+            session.add(enrollment)
+            session.commit()
+            session.refresh(enrollment)
+
+        # Create the payment proof with the correct enrollment_id
+        payment_proof = PaymentProof(
+            enrollment_id=enrollment.id,
+            proof_url=url,
+            status=PaymentStatus.PENDING  # Correctly set the enum value
         )
-    ).first()
+        session.add(payment_proof)
 
-    if not application:
-        raise HTTPException(status_code=403, detail="Your application is not approved. You cannot submit payment proof.")
-
-    # Find or create the enrollment record to link the payment proof to
-    enrollment = session.exec(select(Enrollment).where(Enrollment.user_id == user.id, Enrollment.course_id == course_uuid)).first()
-    if not enrollment:
-        enrollment = Enrollment(user_id=user.id, course_id=course_uuid, status="pending", enroll_date=datetime.utcnow(), is_accessible=False)
-        session.add(enrollment)
+        notif = Notification(
+            user_id=user.id,
+            course_id=course_uuid,
+            event_type="payment_proof",
+            details=f"Payment proof submitted for course {course.title}. User: {user.full_name or user.email} (ID: {user.id}). Proof: {url}"
+        )
+        session.add(notif)
         session.commit()
-        session.refresh(enrollment)
-
-    # Create the payment proof with the correct enrollment_id
-    payment_proof = PaymentProof(
-        enrollment_id=enrollment.id,
-        proof_url=url,
-        status=PaymentStatus.PENDING  # Correctly set the enum value
-    )
-    session.add(payment_proof)
-
-    notif = Notification(
-        user_id=user.id,
-        course_id=course_uuid,
-        event_type="payment_proof",
-        details=f"Payment proof submitted for course {course.title}. User: {user.full_name or user.email} (ID: {user.id}). Proof: {url}"
-    )
-    session.add(notif)
-    session.commit()
-    return {"detail": "Payment proof submitted, pending admin approval.", "status": "pending"}
+        return {"detail": "Payment proof submitted, pending admin approval.", "status": "pending"}
+    except Exception as e:
+        logging.exception("Error submitting payment proof.") # This will log the full traceback
+        session.rollback()
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
 
 @router.get("/enrollments/{course_id}/payment-proof/status", summary="Check payment proof status for a course")
 def get_payment_proof_status(
