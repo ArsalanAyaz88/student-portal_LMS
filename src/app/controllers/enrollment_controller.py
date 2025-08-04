@@ -151,22 +151,30 @@ async def submit_payment_proof(
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
 
-    # --- CRITICAL FIX: Find the application, not the enrollment ---
+    # Find the enrollment application to ensure the user is approved
     application = session.exec(
         select(EnrollmentApplication).where(
             EnrollmentApplication.user_id == user.id,
-            EnrollmentApplication.course_id == course_uuid
+            EnrollmentApplication.course_id == course_uuid,
+            EnrollmentApplication.status == ApplicationStatus.APPROVED
         )
     ).first()
 
     if not application:
-        # This case should ideally not happen if the user follows the UI flow
-        raise HTTPException(status_code=404, detail="You must apply for the course before submitting payment proof.")
+        raise HTTPException(status_code=403, detail="Your application is not approved. You cannot submit payment proof.")
 
-    # --- CRITICAL FIX: Link the proof to the application_id ---
-    payment_proof = PaymentProof(application_id=application.id, proof_url=url, status="pending")
+    # Find or create the enrollment record to link the payment proof to
+    enrollment = session.exec(select(Enrollment).where(Enrollment.user_id == user.id, Enrollment.course_id == course_uuid)).first()
+    if not enrollment:
+        enrollment = Enrollment(user_id=user.id, course_id=course_uuid, status="pending", enroll_date=datetime.utcnow(), is_accessible=False)
+        session.add(enrollment)
+        session.commit()
+        session.refresh(enrollment)
+
+    # Create the payment proof with the correct enrollment_id
+    payment_proof = PaymentProof(enrollment_id=enrollment.id, proof_url=url, status="pending")
     session.add(payment_proof)
-    
+
     notif = Notification(
         user_id=user.id,
         course_id=course_uuid,
@@ -174,12 +182,7 @@ async def submit_payment_proof(
         details=f"Payment proof submitted for course {course.title}. User: {user.full_name or user.email} (ID: {user.id}). Proof: {url}"
     )
     session.add(notif)
-    try:
-        session.commit()
-    except Exception as e:
-        logger.error(f"Database commit failed: {e}", exc_info=True)
-        session.rollback()
-        raise HTTPException(status_code=500, detail="Could not process payment proof due to a database error.")
+    session.commit()
     return {"detail": "Payment proof submitted, pending admin approval.", "status": "pending"}
 
 @router.get("/enrollments/{course_id}/payment-proof/status", summary="Check payment proof status for a course")
