@@ -148,14 +148,20 @@ async def submit_payment_proof(
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
 
-    enrollment = session.exec(select(Enrollment).where(Enrollment.user_id == user.id, Enrollment.course_id == course_uuid)).first()
-    if not enrollment:
-        enrollment = Enrollment(user_id=user.id, course_id=course_uuid, status="pending", enroll_date=datetime.utcnow(), is_accessible=False)
-        session.add(enrollment)
-        session.commit()
-        session.refresh(enrollment)
+    # --- CRITICAL FIX: Find the application, not the enrollment ---
+    application = session.exec(
+        select(EnrollmentApplication).where(
+            EnrollmentApplication.user_id == user.id,
+            EnrollmentApplication.course_id == course_uuid
+        )
+    ).first()
 
-    payment_proof = PaymentProof(enrollment_id=enrollment.id, proof_url=url)
+    if not application:
+        # This case should ideally not happen if the user follows the UI flow
+        raise HTTPException(status_code=404, detail="You must apply for the course before submitting payment proof.")
+
+    # --- CRITICAL FIX: Link the proof to the application_id ---
+    payment_proof = PaymentProof(application_id=application.id, proof_url=url, status="pending")
     session.add(payment_proof)
     
     notif = Notification(
@@ -166,7 +172,33 @@ async def submit_payment_proof(
     )
     session.add(notif)
     session.commit()
-    return {"detail": "Payment proof submitted, pending admin approval."}
+    return {"detail": "Payment proof submitted, pending admin approval.", "status": "pending"}
+
+@router.get("/enrollments/{course_id}/payment-proof/status", summary="Check payment proof status for a course")
+def get_payment_proof_status(
+    course_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    application = db.exec(
+        select(EnrollmentApplication).where(
+            EnrollmentApplication.course_id == course_id,
+            EnrollmentApplication.user_id == current_user.id
+        )
+    ).first()
+
+    if not application:
+        raise HTTPException(status_code=404, detail="Enrollment application not found.")
+
+    # --- CRITICAL FIX: Find the proof using the application_id ---
+    payment_proof = db.exec(
+        select(PaymentProof).where(PaymentProof.application_id == application.id)
+    ).first()
+
+    if not payment_proof:
+        raise HTTPException(status_code=404, detail="Payment proof not found.")
+
+    return {"status": payment_proof.status.value}
 
 @router.get("/enrollments/{enrollment_id}/status", response_model=EnrollmentStatusResponse, summary="Check enrollment status by enrollment ID")
 def get_enrollment_status_by_id(
