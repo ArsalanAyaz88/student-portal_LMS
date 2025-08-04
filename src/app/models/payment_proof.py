@@ -20,6 +20,6 @@ class PaymentProof(SQLModel, table=True):
     enrollment_id: uuid.UUID = Field(foreign_key="enrollment.id", nullable=False)
     proof_url: str
     submitted_at: datetime = Field(default_factory=get_pakistan_time)
-    status: PaymentStatus = Field(sa_column=Column(Enum(PaymentStatus)), default=PaymentStatus.PENDING, nullable=False)
+    status: PaymentStatus = Field(default=PaymentStatus.PENDING, sa_column=Column(Enum(PaymentStatus), nullable=False))
 
     enrollment: "src.app.models.enrollment.Enrollment" = Relationship(back_populates="payment_proofs")
