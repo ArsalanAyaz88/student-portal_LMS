@@ -14,7 +14,7 @@ from src.app.models.enrollment import Enrollment
 from src.app.models.enrollment_application import EnrollmentApplication, ApplicationStatus
 from src.app.models.bank_account import BankAccount
 from src.app.models.notification import Notification
-from src.app.models.payment_proof import PaymentProof
+from src.app.models.payment_proof import PaymentProof, PaymentStatus
 from ..models.bank_account import BankAccount
 from src.app.schemas.enrollment_application_schema import (
     EnrollmentApplicationCreate,
@@ -172,7 +172,11 @@ async def submit_payment_proof(
         session.refresh(enrollment)
 
     # Create the payment proof with the correct enrollment_id
-    payment_proof = PaymentProof(enrollment_id=enrollment.id, proof_url=url, status="pending")
+    payment_proof = PaymentProof(
+        enrollment_id=enrollment.id,
+        proof_url=url,
+        status=PaymentStatus.PENDING  # Correctly set the enum value
+    )
     session.add(payment_proof)
 
     notif = Notification(
