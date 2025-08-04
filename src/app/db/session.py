@@ -44,5 +44,8 @@ from src.app import models
 
 # A function to create all tables. This is useful for initial setup.
 def create_db_and_tables():
+    # Drop all tables first to ensure schema updates are applied.
+    # WARNING: This is destructive and will delete all data.
+    SQLModel.metadata.drop_all(engine)
     SQLModel.metadata.create_all(engine)
 
