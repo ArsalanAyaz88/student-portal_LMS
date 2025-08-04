@@ -191,19 +191,21 @@ def get_payment_proof_status(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    application = db.exec(
-        select(EnrollmentApplication).where(
-            EnrollmentApplication.course_id == course_id,
-            EnrollmentApplication.user_id == current_user.id
+    # --- FINAL FIX: Find the enrollment record first ---
+    enrollment = db.exec(
+        select(Enrollment).where(
+            Enrollment.course_id == course_id,
+            Enrollment.user_id == current_user.id
         )
     ).first()
 
-    if not application:
-        raise HTTPException(status_code=404, detail="Enrollment application not found.")
+    if not enrollment:
+        # If there's no enrollment record, there can be no payment proof.
+        raise HTTPException(status_code=404, detail="Enrollment not found, so no payment proof available.")
 
-    # --- CRITICAL FIX: Find the proof using the application_id ---
+    # --- FINAL FIX: Find the proof using the enrollment_id ---
     payment_proof = db.exec(
-        select(PaymentProof).where(PaymentProof.application_id == application.id)
+        select(PaymentProof).where(PaymentProof.enrollment_id == enrollment.id)
     ).first()
 
     if not payment_proof:
