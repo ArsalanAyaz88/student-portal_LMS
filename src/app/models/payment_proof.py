@@ -23,5 +23,3 @@ class PaymentProof(PaymentProofBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     enrollment_id: uuid.UUID = Field(foreign_key="enrollment.id")
     enrollment: "Enrollment" = Relationship(back_populates="payment_proofs")
-    enrollment_application_id: uuid.UUID = Field(foreign_key="enrollment_applications.id")
-    enrollment_application: "EnrollmentApplication" = Relationship(back_populates="payment_proof")
