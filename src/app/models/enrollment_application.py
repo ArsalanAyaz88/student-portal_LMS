@@ -24,7 +24,7 @@ class EnrollmentApplication(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: uuid.UUID = Field(foreign_key="users.id")
-    course_id: uuid.UUID = Field(foreign_key="courses.id")
+    course_id: uuid.UUID = Field(foreign_key="course.id")
     status: ApplicationStatus = Field(default=ApplicationStatus.PENDING, sa_column=Column(SQLAlchemyEnum(ApplicationStatus)))
     payment_status: PaymentStatus = Field(default=PaymentStatus.UNPAID, sa_column=Column(SQLAlchemyEnum(PaymentStatus)))
     qualification: Optional[str] = None
