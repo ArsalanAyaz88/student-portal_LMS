@@ -14,4 +14,4 @@ class Profile(SQLModel, table=True):
     avatar_url: Optional[str] = None
     bio: Optional[str] = None
 
-    # user: "User" = Relationship(back_populates="profile")
+    user: "User" = Relationship(back_populates="profile")
