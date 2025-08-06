@@ -1,36 +1,37 @@
 import uuid
 from typing import TYPE_CHECKING, Optional
-from sqlmodel import SQLModel, Field, Relationship
+from sqlmodel import SQLModel, Field, Relationship, Column
 import enum
 from sqlalchemy import Enum as SQLAlchemyEnum
 
 if TYPE_CHECKING:
-    from src.app.models.user import User
-    from src.app.models.course import Course
+    from .user import User
+    from .course import Course
+    from .payment_proof import PaymentProof
 
 class ApplicationStatus(str, enum.Enum):
     PENDING = "pending"
     APPROVED = "approved"
     REJECTED = "rejected"
 
+class PaymentStatus(str, enum.Enum):
+    UNPAID = "UNPAID"
+    PAID = "PAID"
+    VERIFIED = "VERIFIED"
+
 class EnrollmentApplication(SQLModel, table=True):
     __tablename__ = "enrollment_applications"
 
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    first_name: str
-    last_name: str
-    qualification: str
-    qualification_certificate_url: str
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: uuid.UUID = Field(foreign_key="users.id")
+    course_id: uuid.UUID = Field(foreign_key="courses.id")
+    status: ApplicationStatus = Field(default=ApplicationStatus.PENDING, sa_column=Column(SQLAlchemyEnum(ApplicationStatus)))
+    payment_status: PaymentStatus = Field(default=PaymentStatus.UNPAID, sa_column=Column(SQLAlchemyEnum(PaymentStatus)))
+    qualification: Optional[str] = None
     ultrasound_experience: Optional[str] = None
-    contact_number: str
-    
-    status: ApplicationStatus = Field(
-        sa_column=SQLAlchemyEnum(ApplicationStatus, name="application_status_enum"),
-        default=ApplicationStatus.PENDING
-    )
-
-    user_id: uuid.UUID = Field(foreign_key="user.id")
-    course_id: uuid.UUID = Field(foreign_key="course.id")
+    contact_number: Optional[str] = None
+    qualification_certificate_url: Optional[str] = None
 
     user: "User" = Relationship(back_populates="enrollment_applications")
     course: "Course" = Relationship(back_populates="enrollment_applications")
+    payment_proof: Optional["PaymentProof"] = Relationship(back_populates="enrollment_application")
