@@ -204,7 +204,7 @@ async def submit_payment_proof(
         session.refresh(payment_proof)
         
         logger.info(f"[SUBMIT_PROOF_SUCCESS] Refreshed Enrollment ID: {enrollment.id}, PaymentProof ID: {payment_proof.id}, Linked Enrollment ID: {payment_proof.enrollment_id}")
-        return {"detail": "Payment proof submitted, pending admin approval.", "status": "pending"}
+        return {"detail": "Payment proof submitted, pending admin approval.", "enrollment_status": enrollment.status}
         
     except Exception as e:
         logger.error(f"[SUBMIT_PROOF_EXCEPTION] An unexpected error occurred: {e}")
