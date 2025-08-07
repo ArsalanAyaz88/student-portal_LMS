@@ -15,7 +15,7 @@ from botocore.exceptions import ClientError, NoCredentialsError
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status, UploadFile, File, Form
 
 # Add MediaConvert client
-mediaconvert_client = boto3.client('mediaconvert', region_name='ap-southeast-2') # Replace with your region if different
+mediaconvert_client = boto3.client('mediaconvert', region_name='us-east-1') # Replace with your region if different
 from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import selectinload
@@ -288,73 +288,10 @@ async def upload_video_for_course(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
 
     try:
-        # Create a MediaConvert job
-        job_settings = {
-            "Settings": {
-                "TimecodeConfig": {
-                    "Source": "ZEROBASED"
-                },
-                "OutputGroups": [
-                    {
-                        "Name": "HLS Group",
-                        "OutputGroupSettings": {
-                            "Type": "HLS_GROUP_SETTINGS",
-                            "HlsGroupSettings": {
-                                "Destination": f"s3://{S3_BUCKET_NAME}/hls/{video_data.file_key}/",
-                                "SegmentLength": 10,
-                                "MinSegmentLength": 0
-                            }
-                        },
-                        "Outputs": [
-                            {
-                                "VideoDescription": {
-                                    "CodecSettings": {
-                                        "Codec": "H_264",
-                                        "H264Settings": {
-                                            "RateControlMode": "QVBR",
-                                            "SceneChangeDetect": "TRANSITION_DETECTION"
-                                        }
-                                    }
-                                },
-                                "AudioDescriptions": [
-                                    {
-                                        "CodecSettings": {
-                                            "Codec": "AAC",
-                                            "AacSettings": {
-                                                "Bitrate": 96000,
-                                                "CodingMode": "CODING_MODE_2_0",
-                                                "SampleRate": 48000
-                                            }
-                                        }
-                                    }
-                                ],
-                                "NameModifier": "_720p"
-                            }
-                        ]
-                    }
-                ],
-                "Inputs": [
-                    {
-                        "AudioSelectors": {
-                            "Audio Selector 1": {
-                                "DefaultSelection": "DEFAULT"
-                            }
-                        },
-                        "VideoSelector": {},
-                        "TimecodeSource": "ZEROBASED",
-                        "FileInput": f"s3://{S3_BUCKET_NAME}/{video_data.file_key}"
-                    }
-                ]
-            },
-            "Role": "arn:aws:iam::YOUR_AWS_ACCOUNT_ID:role/MediaConvert_Role" # IMPORTANT: Replace with your MediaConvert role ARN
-        }
-
-        mediaconvert_client.create_job(**job_settings)
-
         new_video = Video(
             title=video_data.title,
             description=video_data.description,
-            cloudinary_url=f"https://{S3_BUCKET_NAME}.s3.amazonaws.com/hls/{video_data.file_key}/index.m3u8", # Store HLS URL
+            cloudinary_url=video_data.video_url, # Use S3 URL for this field
             public_id=video_data.file_key,      # Store S3 file key
             duration=video_data.duration,
             course_id=course_id,
@@ -364,7 +301,7 @@ async def upload_video_for_course(
         db.add(new_video)
         db.commit()
         db.refresh(new_video)
-        logging.info(f"Successfully created video with ID {new_video.id} for course {course_id} and started transcoding job.")
+        logging.info(f"Successfully created video with ID {new_video.id} for course {course_id}")
         return new_video
 
     except Exception as e:

@@ -424,27 +424,9 @@ def get_course_videos_with_checkpoint(
         # Build response
         result = []
         for video in course.videos:
-            video_url = video.cloudinary_url
-            # If the URL is an HLS manifest, pass it directly.
-            # Otherwise, generate a presigned URL for other S3 content.
-            if video_url and video_url.endswith('.m3u8'):
-                # This is an HLS stream, no pre-signing needed
-                pass
-            elif video_url and 's3.amazonaws.com' in video_url:
-                try:
-                    key = urlparse(video_url).path.lstrip('/')
-                    video_url = s3_client.generate_presigned_url(
-                        'get_object',
-                        Params={'Bucket': S3_BUCKET_NAME, 'Key': key},
-                        ExpiresIn=3600  # 1 hour
-                    )
-                except Exception as e:
-                    logger.error(f"Error generating presigned URL for video {video.id}: {e}")
-                    video_url = None
-
             result.append(VideoWithCheckpoint(
                 id=str(video.id),
-                cloudinary_url=video_url, # use the processed URL
+                cloudinary_url=video.cloudinary_url,
                 title=video.title,
                 description=video.description,
                 watched=progress_map.get(str(video.id), False)
