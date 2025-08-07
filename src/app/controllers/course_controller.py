@@ -65,6 +65,46 @@ def to_hls_url(original_url: str) -> str:
     
     return hls_url
 
+def generate_presigned_url(s3_key: str) -> str:
+    """Return a presigned URL (valid for 1 hour) for the given S3 object key.
+    The bucket name and region are read from environment variables:
+        AWS_S3_BUCKET
+        AWS_REGION (optional, defaults to us-east-1)
+    """
+    bucket_name = os.getenv("AWS_S3_BUCKET")
+    if not bucket_name:
+        raise HTTPException(status_code=500, detail="AWS_S3_BUCKET not configured")
+    region = os.getenv("AWS_REGION", "us-east-1")
+    s3_client = boto3.client("s3", region_name=region)
+    try:
+        url = s3_client.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": bucket_name, "Key": s3_key},
+            ExpiresIn=3600,  # 1 hour
+        )
+        return url
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate S3 URL: {e}")
+    """Return a presigned URL (valid for 1 hour) for the given S3 object key.
+    The bucket name and region are read from environment variables:
+        AWS_S3_BUCKET
+        AWS_REGION (optional, defaults to us-east-1)
+    """
+    bucket_name = os.getenv("AWS_S3_BUCKET")
+    if not bucket_name:
+        raise HTTPException(status_code=500, detail="AWS_S3_BUCKET not configured")
+    region = os.getenv("AWS_REGION", "us-east-1")
+    s3_client = boto3.client("s3", region_name=region)
+    try:
+        url = s3_client.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": bucket_name, "Key": s3_key},
+            ExpiresIn=3600,  # 1 hour
+        )
+        return url
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate S3 URL: {e}")
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 from datetime import datetime
@@ -451,12 +491,23 @@ def get_course_videos_with_checkpoint(
         # Create progress map using UUIDs
         progress_map = {str(p.video_id): p.completed for p in progresses}
 
+        def choose_video_url(video):
+            if video.cloudinary_url.startswith("https://res.cloudinary.com/"):
+                return video.cloudinary_url
+            else:
+                key = urlparse(video.cloudinary_url).path.lstrip('/')
+                return s3_client.generate_presigned_url(
+                    'get_object',
+                    Params={'Bucket': S3_BUCKET_NAME, 'Key': key},
+                    ExpiresIn=3600
+                )
+
         # Build response
         result = []
         for video in course.videos:
             result.append(VideoWithCheckpoint(
                 id=str(video.id),
-                cloudinary_url=to_hls_url(video.cloudinary_url),
+                cloudinary_url=choose_video_url(video),
                 title=video.title,
                 description=video.description,
                 watched=progress_map.get(str(video.id), False)
