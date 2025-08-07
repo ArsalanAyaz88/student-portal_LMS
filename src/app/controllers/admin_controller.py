@@ -49,7 +49,7 @@ from src.app.schemas.course import (
 )
 from src.app.schemas.enrollment_application_schema import EnrollmentApplicationRead, EnrollmentApplicationUpdate
 from src.app.schemas.notification import NotificationRead, AdminNotificationRead
-from src.app.schemas.quiz import QuizCreate, QuizReadWithDetails, QuizRead, QuizCreateForVideo
+from src.app.schemas.quiz import QuizCreate, QuizReadWithDetails, QuizRead
 from src.app.schemas.user import UserRead
 from src.app.schemas.video import VideoAdminRead, VideoCreate, VideoRead, VideoUpdate
 
