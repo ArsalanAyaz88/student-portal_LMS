@@ -48,16 +48,13 @@ class QuizCreate(QuizBase):
     course_id: uuid.UUID
     questions: List[QuestionCreate] = []
 
-class QuizCreateForVideo(BaseModel):
-    title: str
-    description: Optional[str] = None
-    questions: List[QuestionCreate] = []
-
 class QuizCreateWithQuestions(QuizCreate):
     pass
 
-class QuizUpdate(BaseModel):
-    title: Optional[str] = None
+class QuizUpdate(QuizBase):
+    course_id: uuid.UUID | None = None
+    due_date: datetime | None = None
+    questions: list[QuestionCreate] | None = None
     description: Optional[str] = None
     due_date: Optional[datetime] = None
     published: Optional[bool] = None

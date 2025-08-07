@@ -1614,7 +1614,8 @@ def create_quiz(
     db_quiz = Quiz(
         title=quiz_data.title,
         description=quiz_data.description,
-        video_id=quiz_data.video_id
+        course_id=quiz_data.course_id,
+        due_date=quiz_data.due_date
     )
 
     # Create Question and Option instances from the nested data
