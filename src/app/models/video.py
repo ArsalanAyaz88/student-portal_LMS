@@ -26,4 +26,4 @@ class Video(SQLModel, table=True):
 
     course: "Course" = Relationship(back_populates="videos", sa_relationship_kwargs={'foreign_keys': '[Video.course_id]'})
     progress: List["VideoProgress"] = Relationship(back_populates="video", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
-    quiz: Optional["Quiz"] = Relationship(back_populates="video", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+    
