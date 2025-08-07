@@ -35,6 +35,36 @@ from urllib.parse import urlparse
 import traceback
 from ..config.s3_config import s3_client, S3_BUCKET_NAME
 
+def to_hls_url(original_url: str) -> str:
+    """Converts a standard Cloudinary video URL to an HLS streaming URL."""
+    if not original_url or 'res.cloudinary.com' not in original_url:
+        return original_url
+
+    # The public_id is part of the URL. We can derive the HLS URL by replacing
+    # the format extension with .m3u8 and adding a streaming profile.
+    # Example:
+    # From: https://res.cloudinary.com/demo/video/upload/v1589232929/dog.mp4
+    # To:   https://res.cloudinary.com/demo/video/upload/sp_hd/v1589232929/dog.m3u8
+
+    parts = original_url.split('/upload/')
+    if len(parts) != 2:
+        return original_url
+
+    base_url, version_and_public_id = parts
+    # Remove the existing format for a clean slate
+    public_id_with_format = version_and_public_id.split('/')[-1]
+    public_id = os.path.splitext(public_id_with_format)[0]
+
+    # Reconstruct the path without the final filename part
+    path_parts = version_and_public_id.split('/')[:-1]
+    path_parts.append(public_id)
+    version_and_public_id_no_ext = "/".join(path_parts)
+
+    # Using a generic adaptive bitrate streaming profile 'sp_auto'
+    hls_url = f"{base_url}/upload/sp_auto/{version_and_public_id_no_ext}.m3u8"
+    
+    return hls_url
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 from datetime import datetime
@@ -426,7 +456,7 @@ def get_course_videos_with_checkpoint(
         for video in course.videos:
             result.append(VideoWithCheckpoint(
                 id=str(video.id),
-                cloudinary_url=video.cloudinary_url,
+                cloudinary_url=to_hls_url(video.cloudinary_url),
                 title=video.title,
                 description=video.description,
                 watched=progress_map.get(str(video.id), False)
