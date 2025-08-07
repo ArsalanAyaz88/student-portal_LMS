@@ -208,23 +208,27 @@ class SignatureRequest(BaseModel):
 
 @router.post("/generate-video-upload-signature", response_model=dict)
 async def generate_video_upload_signature(
-    request_data: SignatureRequest,
+    request: Request,
     admin: User = Depends(get_current_admin_user)
 ):
     """
     Generates a pre-signed URL for a direct video upload to AWS S3, 
     using the Content-Type provided by the client.
     """
+    body = await request.json()
+    logging.info(f"--- Raw request body for signature: {body} ---")
+    
+    try:
+        request_data = SignatureRequest(**body)
+    except ValidationError as e:
+        logging.error(f"Pydantic validation error: {e.json()}")
+        raise HTTPException(status_code=422, detail=e.errors())
+
     logging.info(f"--- Generating video upload signature for content_type: {request_data.content_type} ---")
     try:
         if s3_client is None:
             logging.error("S3 client is not configured.")
             raise HTTPException(status_code=500, detail="S3 client is not configured")
-
-        content_type = request_data.content_type
-        if not content_type.startswith('video/'):
-            logging.warning(f"Invalid content type received: {content_type}")
-            raise HTTPException(status_code=400, detail="Invalid content type. Only video files are allowed.")
 
         # Generate a unique key for the video file
         timestamp = int(time.time())
@@ -237,25 +241,20 @@ async def generate_video_upload_signature(
             Params={
                 'Bucket': S3_BUCKET_NAME,
                 'Key': file_key,
-                'ContentType': content_type
+                'ContentType': request_data.content_type
             },
-            ExpiresIn=7200  # URL expires in 2 hours
+            ExpiresIn=3600  # URL expires in 1 hour
         )
-        
-        logging.info(f"Successfully generated pre-signed URL for {file_key}")
-        return {
-            "presigned_url": presigned_url,
-            "file_key": file_key,
-            "bucket": S3_BUCKET_NAME,
-            "expires_in": 7200
-        }
+
+        return {"presigned_url": presigned_url, "file_key": file_key}
+
+    except ClientError as e:
+        logging.error(f"S3 ClientError: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate S3 pre-signed URL: {str(e)}")
     except Exception as e:
-        tb_str = traceback.format_exc()
-        logging.error(f"Error generating video upload signature: {e}\nTraceback:\n{tb_str}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Could not generate upload signature: {e}"
-        )
+        logging.error(f"An unexpected error occurred: {e}")
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
+
 
 class VideoCreateAdmin(BaseModel):
     title: str
