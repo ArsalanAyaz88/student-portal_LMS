@@ -13,7 +13,7 @@ from urllib.parse import urlparse
 import boto3
 from botocore.exceptions import ClientError, NoCredentialsError
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status, UploadFile, File, Form
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
@@ -203,8 +203,8 @@ async def create_course(
 
 
 class SignatureRequest(BaseModel):
-    content_type: str = Field(..., description="MIME type of the file")
-    file_name: str = Field(..., description="Name of the file to upload")
+    content_type: str
+    file_name: str
 
 @router.post("/generate-video-upload-signature", response_model=dict)
 async def generate_video_upload_signature(
@@ -215,9 +215,7 @@ async def generate_video_upload_signature(
     Generates a pre-signed URL for a direct video upload to AWS S3, 
     using the Content-Type provided by the client.
     """
-    logging.info(f"--- Generating video upload signature ---")
-    logging.info(f"Request data: content_type={request_data.content_type}, file_name={request_data.file_name}")
-    logging.info(f"Admin user: {admin.email if admin else 'None'}")
+    logging.info(f"--- Generating video upload signature for content_type: {request_data.content_type} ---")
     try:
         if s3_client is None:
             logging.error("S3 client is not configured.")
