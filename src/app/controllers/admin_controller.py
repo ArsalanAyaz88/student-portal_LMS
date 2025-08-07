@@ -208,39 +208,23 @@ class SignatureRequest(BaseModel):
 
 @router.post("/generate-video-upload-signature", response_model=dict)
 async def generate_video_upload_signature(
-    request: Request,
+    request_data: SignatureRequest,
     admin: User = Depends(get_current_admin_user)
 ):
     """
     Generates a pre-signed URL for a direct video upload to AWS S3, 
     using the Content-Type provided by the client.
     """
-    body = await request.json()
-    logging.info(f"--- Raw request body for signature: {body} ---")
-    
-    try:
-        request_data = SignatureRequest(**body)
-    except ValidationError as e:
-        logging.error(f"Pydantic validation error: {e.json()}")
-        raise HTTPException(status_code=422, detail=e.errors())
-
     logging.info(f"--- Generating video upload signature for content_type: {request_data.content_type} ---")
     try:
-        S3_BUCKET_NAME = os.getenv('AWS_S3_BUCKET_NAME')
-        AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
-        AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
-        AWS_REGION = os.getenv('AWS_S3_REGION')
+        if s3_client is None:
+            logging.error("S3 client is not configured.")
+            raise HTTPException(status_code=500, detail="S3 client is not configured")
 
-        if not all([S3_BUCKET_NAME, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION]):
-            logging.error("S3 environment variables are not fully configured.")
-            raise HTTPException(status_code=500, detail="Server S3 configuration is incomplete.")
-
-        s3_client = boto3.client(
-            's3',
-            aws_access_key_id=AWS_ACCESS_KEY_ID,
-            aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-            region_name=AWS_REGION
-        )
+        content_type = request_data.content_type
+        if not content_type.startswith('video/'):
+            logging.warning(f"Invalid content type received: {content_type}")
+            raise HTTPException(status_code=400, detail="Invalid content type. Only video files are allowed.")
 
         # Generate a unique key for the video file
         timestamp = int(time.time())
@@ -253,20 +237,25 @@ async def generate_video_upload_signature(
             Params={
                 'Bucket': S3_BUCKET_NAME,
                 'Key': file_key,
-                'ContentType': request_data.content_type
+                'ContentType': content_type
             },
-            ExpiresIn=3600  # URL expires in 1 hour
+            ExpiresIn=7200  # URL expires in 2 hours
         )
-
-        return {"presigned_url": presigned_url, "file_key": file_key}
-
-    except ClientError as e:
-        logging.error(f"S3 ClientError: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to generate S3 pre-signed URL: {str(e)}")
+        
+        logging.info(f"Successfully generated pre-signed URL for {file_key}")
+        return {
+            "presigned_url": presigned_url,
+            "file_key": file_key,
+            "bucket": S3_BUCKET_NAME,
+            "expires_in": 7200
+        }
     except Exception as e:
-        logging.error(f"An unexpected error occurred: {e}")
-        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
-
+        tb_str = traceback.format_exc()
+        logging.error(f"Error generating video upload signature: {e}\nTraceback:\n{tb_str}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Could not generate upload signature: {e}"
+        )
 
 class VideoCreateAdmin(BaseModel):
     title: str
