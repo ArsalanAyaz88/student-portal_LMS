@@ -226,9 +226,21 @@ async def generate_video_upload_signature(
 
     logging.info(f"--- Generating video upload signature for content_type: {request_data.content_type} ---")
     try:
-        if s3_client is None:
-            logging.error("S3 client is not configured.")
-            raise HTTPException(status_code=500, detail="S3 client is not configured")
+        S3_BUCKET_NAME = os.getenv('AWS_S3_BUCKET_NAME')
+        AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
+        AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
+        AWS_REGION = os.getenv('AWS_S3_REGION')
+
+        if not all([S3_BUCKET_NAME, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION]):
+            logging.error("S3 environment variables are not fully configured.")
+            raise HTTPException(status_code=500, detail="Server S3 configuration is incomplete.")
+
+        s3_client = boto3.client(
+            's3',
+            aws_access_key_id=AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+            region_name=AWS_REGION
+        )
 
         # Generate a unique key for the video file
         timestamp = int(time.time())
