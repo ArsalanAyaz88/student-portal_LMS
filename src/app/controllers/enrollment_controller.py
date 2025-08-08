@@ -204,7 +204,11 @@ async def submit_payment_proof(
         session.refresh(payment_proof)
         
         logger.info(f"[SUBMIT_PROOF_SUCCESS] Refreshed Enrollment ID: {enrollment.id}, PaymentProof ID: {payment_proof.id}, Linked Enrollment ID: {payment_proof.enrollment_id}")
-        return {"detail": "Payment proof submitted, pending admin approval.", "enrollment_status": enrollment.status}
+        return {
+            "detail": "Payment proof submitted, pending admin approval.",
+            "enrollment_status": enrollment.status,
+            "payment_status": payment_proof.status.value
+        }
         
     except Exception as e:
         logger.error(f"[SUBMIT_PROOF_EXCEPTION] An unexpected error occurred: {e}")
@@ -240,7 +244,10 @@ def get_payment_proof_status(
         logger.info(f"[GET_STATUS] Found {len(enrollment.payment_proofs)} payment proof(s) on the relationship.")
         payment_proof = sorted(enrollment.payment_proofs, key=lambda p: p.submitted_at, reverse=True)[0]
         logger.info(f"[GET_STATUS_SUCCESS] Latest proof found with ID: {payment_proof.id} and status: '{payment_proof.status.value}'.")
-        return {"status": enrollment.status}
+        return {
+            "payment_status": payment_proof.status.value,
+            "enrollment_status": enrollment.status
+        }
     else:
         logger.warning(f"[GET_STATUS_FAIL] Enrollment {enrollment.id} found, but it has no linked payment proofs.")
         raise HTTPException(
