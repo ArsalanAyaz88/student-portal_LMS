@@ -1,6 +1,8 @@
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Request
+from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select, func
+import requests
 from sqlalchemy.orm import selectinload
 from src.app.models.course import Course
 from src.app.models.video import Video
@@ -421,12 +423,15 @@ def get_course_videos_with_checkpoint(
         # Create progress map using UUIDs
         progress_map = {str(p.video_id): p.completed for p in progresses}
 
-        # Build response
+        # Build response with secure video URLs
         result = []
         for video in course.videos:
+            # Instead of exposing direct cloudinary_url, use a secure proxy endpoint
+            secure_video_url = f"/api/courses/videos/{video.id}/stream"
+            
             result.append(VideoWithCheckpoint(
                 id=str(video.id),
-                cloudinary_url=video.cloudinary_url,
+                cloudinary_url=secure_video_url,  # Use secure proxy URL instead
                 title=video.title,
                 description=video.description,
                 watched=progress_map.get(str(video.id), False)
@@ -437,6 +442,158 @@ def get_course_videos_with_checkpoint(
         raise HTTPException(
             status_code=500,
             detail=f"An error occurred while fetching course videos: {str(e)}"
+        )
+
+
+@router.get("/videos/{video_id}/stream")
+def stream_video(
+    video_id: str,
+    request: Request,
+    user=Depends(get_current_user),
+    session: Session = Depends(get_db)
+):
+    """
+    Secure video streaming endpoint that acts as a proxy to prevent direct URL access.
+    This endpoint validates user permissions and streams video content without exposing the actual URL.
+    """
+    import requests
+    from fastapi.responses import StreamingResponse
+    import time
+    import hashlib
+    
+    try:
+        # Validate video_id format
+        try:
+            video_uuid = uuid.UUID(video_id)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid video ID format")
+
+        # Get video from database
+        video = session.get(Video, video_uuid)
+        if not video:
+            raise HTTPException(status_code=404, detail="Video not found")
+
+        # Verify user has access to this video through course enrollment
+        course = session.exec(
+            select(Course)
+            .where(Course.id == video.course_id)
+        ).first()
+        
+        if not course:
+            raise HTTPException(status_code=404, detail="Course not found")
+
+        # Check if user is enrolled and has access
+        enrollment = session.exec(
+            select(Enrollment).where(
+                Enrollment.user_id == user.id,
+                Enrollment.course_id == course.id,
+                Enrollment.status == "approved"
+            )
+        ).first()
+
+        if not enrollment:
+            raise HTTPException(
+                status_code=403,
+                detail="You are not enrolled in this course or enrollment not approved."
+            )
+
+        # Check if enrollment is still valid (not expired)
+        current_time = get_pakistan_time()
+        if enrollment.expiration_date:
+            expiration_date = enrollment.expiration_date
+            if expiration_date.tzinfo is not None:
+                expiration_date = expiration_date.replace(tzinfo=None)
+            
+            if expiration_date < current_time.replace(tzinfo=None):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Your access to this course has expired."
+                )
+
+        if not enrollment.is_accessible:
+            raise HTTPException(
+                status_code=403,
+                detail="You do not have access to this course."
+            )
+
+        # Add anti-download headers to prevent IDM detection
+        headers = {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+            'X-Content-Type-Options': 'nosniff',
+            'X-Frame-Options': 'DENY',
+            'Referrer-Policy': 'no-referrer',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Content-Security-Policy': "default-src 'self'",
+        }
+
+        # Handle range requests for video streaming
+        range_header = request.headers.get('range')
+        
+        # Get video from Cloudinary with anti-download headers
+        cloudinary_headers = {
+            'User-Agent': 'LMS-SecurePlayer/1.0',
+            'Referer': request.headers.get('referer', ''),
+            'X-Requested-With': 'XMLHttpRequest',
+        }
+        
+        if range_header:
+            cloudinary_headers['Range'] = range_header
+
+        # Stream video content from Cloudinary
+        response = requests.get(
+            video.cloudinary_url,
+            headers=cloudinary_headers,
+            stream=True,
+            timeout=30
+        )
+        
+        if response.status_code not in [200, 206]:
+            raise HTTPException(status_code=404, detail="Video content not available")
+
+        # Determine content type
+        content_type = response.headers.get('content-type', 'video/mp4')
+        
+        # Add additional security headers
+        headers.update({
+            'Content-Type': content_type,
+            'Accept-Ranges': 'bytes',
+        })
+        
+        # Handle partial content (range requests)
+        if response.status_code == 206:
+            headers['Content-Range'] = response.headers.get('content-range', '')
+            headers['Content-Length'] = response.headers.get('content-length', '')
+            status_code = 206
+        else:
+            headers['Content-Length'] = response.headers.get('content-length', '')
+            status_code = 200
+
+        # Create streaming response that proxies the video content
+        def generate():
+            try:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        yield chunk
+            except Exception as e:
+                print(f"Error streaming video: {e}")
+            finally:
+                response.close()
+
+        return StreamingResponse(
+            generate(),
+            status_code=status_code,
+            headers=headers,
+            media_type=content_type
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"An error occurred while streaming video: {str(e)}"
         )
 
 
