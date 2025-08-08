@@ -244,10 +244,7 @@ def get_payment_proof_status(
         logger.info(f"[GET_STATUS] Found {len(enrollment.payment_proofs)} payment proof(s) on the relationship.")
         payment_proof = sorted(enrollment.payment_proofs, key=lambda p: p.submitted_at, reverse=True)[0]
         logger.info(f"[GET_STATUS_SUCCESS] Latest proof found with ID: {payment_proof.id} and status: '{payment_proof.status.value}'.")
-        return {
-            "payment_status": payment_proof.status.value,
-            "enrollment_status": enrollment.status
-        }
+        return {"status": enrollment.status}
     else:
         logger.warning(f"[GET_STATUS_FAIL] Enrollment {enrollment.id} found, but it has no linked payment proofs.")
         raise HTTPException(
