@@ -1,4 +1,5 @@
 from typing import Optional
+import uuid
 from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Request
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select, func
@@ -23,6 +24,7 @@ from src.app.models.certificate import Certificate
 from src.app.db.session import get_db
 from src.app.utils.dependencies import get_current_user
 from src.app.utils.certificate_generator import CertificateGenerator
+from src.app.utils.time import get_pakistan_time
 from src.app.utils.time import get_pakistan_time
 import uuid
 import os
@@ -522,10 +524,12 @@ def stream_video(
             'Pragma': 'no-cache',
             'Expires': '0',
             'X-Content-Type-Options': 'nosniff',
-            'X-Frame-Options': 'DENY',
             'Referrer-Policy': 'no-referrer',
             'X-Requested-With': 'XMLHttpRequest',
-            'Content-Security-Policy': "default-src 'self'",
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+            'Access-Control-Allow-Headers': 'Range, Content-Type, Authorization',
+            'Access-Control-Expose-Headers': 'Content-Range, Content-Length, Accept-Ranges',
         }
 
         # Handle range requests for video streaming
@@ -581,11 +585,11 @@ def stream_video(
             finally:
                 response.close()
 
+        # The media_type is already in the headers, so we pass it directly
         return StreamingResponse(
-            generate(),
+            content=generate(),
             status_code=status_code,
-            headers=headers,
-            media_type=content_type
+            headers=headers
         )
 
     except HTTPException:
