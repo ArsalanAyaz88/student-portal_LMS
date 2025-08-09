@@ -34,6 +34,41 @@ from botocore.exceptions import ClientError
 from urllib.parse import urlparse
 import traceback
 from ..config.s3_config import s3_client, S3_BUCKET_NAME
+# Simple CloudFront optimization function
+def optimize_video_url_simple(s3_url: str) -> str:
+    """Convert S3 URL to CloudFront URL if CLOUDFRONT_DOMAIN is configured"""
+    import os
+    cloudfront_domain = os.getenv('CLOUDFRONT_DOMAIN')
+    
+    if not cloudfront_domain or not s3_url:
+        return s3_url
+    
+    try:
+        from urllib.parse import urlparse
+        parsed_url = urlparse(s3_url)
+        
+        # Extract object key from S3 URL
+        if 'dummy222222.s3.' in parsed_url.netloc:
+            # Format: https://bucket.s3.region.amazonaws.com/path/to/file
+            object_key = parsed_url.path.lstrip('/')
+        elif 's3.amazonaws.com' in parsed_url.netloc and 'dummy222222' in parsed_url.path:
+            # Format: https://s3.amazonaws.com/bucket/path/to/file
+            path_parts = parsed_url.path.lstrip('/').split('/', 1)
+            if len(path_parts) > 1 and path_parts[0] == 'dummy222222':
+                object_key = path_parts[1]
+            else:
+                return s3_url
+        else:
+            return s3_url
+        
+        # Construct CloudFront URL
+        cloudfront_url = f"https://{cloudfront_domain}/{object_key}"
+        logger.info(f"Optimized S3 URL to CloudFront: {s3_url} -> {cloudfront_url}")
+        return cloudfront_url
+        
+    except Exception as e:
+        logger.error(f"Error optimizing URL to CloudFront: {e}")
+        return s3_url
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -421,12 +456,15 @@ def get_course_videos_with_checkpoint(
         # Create progress map using UUIDs
         progress_map = {str(p.video_id): p.completed for p in progresses}
 
-        # Build response
+        # Build response with CloudFront-optimized URLs
         result = []
         for video in course.videos:
+            # Optimize video URL for CloudFront delivery
+            optimized_url = optimize_video_url_simple(video.cloudinary_url)
+            
             result.append(VideoWithCheckpoint(
                 id=str(video.id),
-                cloudinary_url=video.cloudinary_url,
+                cloudinary_url=optimized_url,  # Now serves CloudFront URL for better performance
                 title=video.title,
                 description=video.description,
                 watched=progress_map.get(str(video.id), False)

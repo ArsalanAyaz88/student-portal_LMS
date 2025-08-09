@@ -27,11 +27,13 @@ from src.app.models import (
 # --- End of Explicit Imports ---
 
 # Import routers
-from src.app.routers import (
-    auth_router, profile_router, course_router, sa_router, sq_router, 
-    student_dashboard_router, admin_quiz_router, admin_router
-)
-from src.app.controllers import enrollment_controller
+from src.app.routers import auth_router, profile_router, course_router, admin_router
+from src.app.controllers import enrollment_controller, admin_controller
+from src.app.controllers import video_streaming_controller
+from src.app.routers import student_assignment_router as sa_router
+from src.app.routers import student_quiz_router as sq_router
+from src.app.routers import student_dashboard_router
+from src.app.routers import admin_quiz_router
 
 # ─── Env setup ─────────────────────────────────────────────
 load_dotenv()
@@ -46,7 +48,7 @@ app = FastAPI(
 # ─── Middlewares ───────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://frontend-rho-nine-62.vercel.app","https://suti-sabiry-ultrasounds-projects.vercel.app","https://suti.vercel.app"],
+    allow_origins=["https://frontend-rho-nine-62.vercel.app","https://suti-sabiry-ultrasounds-projects.vercel.app","https://suti.vercel.app","https://localhost:8000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -86,6 +88,7 @@ app.include_router(student_dashboard_router.router, prefix="/api/student/dashboa
 app.include_router(admin_quiz_router.quiz_router, prefix="/api/admin/quizzes")
 app.include_router(admin_quiz_router.question_router, prefix="/api/admin/questions")
 app.include_router(admin_quiz_router.submission_router, prefix="/api/admin/submissions")
+app.include_router(video_streaming_controller.router, prefix="/api", tags=["Video Streaming"])
 
 # ─── Simple endpoints ──────────────────────────────────────────
 @app.get("/")
