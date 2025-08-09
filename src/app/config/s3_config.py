@@ -13,8 +13,8 @@ load_dotenv()
 # AWS S3 Configuration
 AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
 AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
-AWS_REGION = os.getenv('AWS_REGION')
-S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
+AWS_REGION = os.getenv('AWS_REGION', 'ap-south-1')  # Default to Asia region
+S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME', 'sabiry2')  # Default to new bucket
 
 # Check for missing required configuration
 missing_vars = []
