@@ -235,7 +235,6 @@ async def generate_video_upload_signature(
         logging.info(f"Generated S3 file key: {file_key}")
 
         # Generate pre-signed URL for PUT operation (upload)
-        # Ensure region-specific endpoint is used for CORS compatibility
         presigned_url = s3_client.generate_presigned_url(
             'put_object',
             Params={
@@ -245,14 +244,6 @@ async def generate_video_upload_signature(
             },
             ExpiresIn=7200  # URL expires in 2 hours
         )
-        
-        # Ensure the URL uses region-specific endpoint for CORS compatibility
-        from ..config.s3_config import AWS_REGION
-        if AWS_REGION and AWS_REGION != 'us-east-1':
-            # Replace generic endpoint with region-specific endpoint
-            generic_endpoint = f"https://{S3_BUCKET_NAME}.s3.amazonaws.com/"
-            region_endpoint = f"https://{S3_BUCKET_NAME}.s3.{AWS_REGION}.amazonaws.com/"
-            presigned_url = presigned_url.replace(generic_endpoint, region_endpoint)
         
         logging.info(f"Successfully generated pre-signed URL for {file_key}")
         return {

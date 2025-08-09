@@ -1,5 +1,4 @@
 import boto3
-from botocore.config import Config
 import os
 import logging
 from dotenv import load_dotenv
@@ -14,8 +13,8 @@ load_dotenv()
 # AWS S3 Configuration
 AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
 AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
-AWS_REGION = os.getenv('AWS_REGION', 'ap-south-1')  # Default to Asia region
-S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME', 'sabiry2')  # Default to new bucket
+AWS_REGION = os.getenv('AWS_REGION')
+S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
 
 # Check for missing required configuration
 missing_vars = []
@@ -40,12 +39,6 @@ else:
             aws_access_key_id=AWS_ACCESS_KEY_ID,
             aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
             region_name=AWS_REGION,
-            config=Config(
-                s3={
-                    'addressing_style': 'virtual'
-                },
-                signature_version='s3v4'
-            )
         )
         
         # Test the connection
