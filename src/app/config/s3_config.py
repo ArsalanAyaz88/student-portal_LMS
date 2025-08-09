@@ -1,4 +1,5 @@
 import boto3
+from botocore.config import Config
 import os
 import logging
 from dotenv import load_dotenv
@@ -39,6 +40,12 @@ else:
             aws_access_key_id=AWS_ACCESS_KEY_ID,
             aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
             region_name=AWS_REGION,
+            config=Config(
+                s3={
+                    'addressing_style': 'virtual'
+                },
+                signature_version='s3v4'
+            )
         )
         
         # Test the connection
