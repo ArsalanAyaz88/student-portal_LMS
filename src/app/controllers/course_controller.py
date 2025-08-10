@@ -494,15 +494,15 @@ def get_course_videos_with_checkpoint(
         # Create progress map using UUIDs
         progress_map = {str(p.video_id): p.completed for p in progresses}
 
-        # Build response with CloudFront-optimized URLs
+        # Build response with streaming URLs for instant playback
         result = []
         for video in course.videos:
-            # Optimize video URL for CloudFront delivery
-            optimized_url = optimize_video_url_simple(video.cloudinary_url)
+            # Use streaming endpoint for instant playback instead of direct URLs
+            streaming_url = f"/api/videos/{video.id}/stream"
             
             result.append(VideoWithCheckpoint(
                 id=str(video.id),
-                cloudinary_url=optimized_url,  # Now serves CloudFront URL for better performance
+                cloudinary_url=streaming_url,  # Use streaming endpoint for instant playback
                 title=video.title,
                 description=video.description,
                 watched=progress_map.get(str(video.id), False)
