@@ -13,7 +13,7 @@ import json
 # Third-party Imports
 import boto3
 from botocore.exceptions import ClientError, NoCredentialsError
-from fastapi import APIRouter, Depends, HTTPException, Query, status, File, UploadFile, Form, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, status, File, UploadFile, Form, Request, BackgroundTasks
 
 # Add MediaConvert client
 mediaconvert_client = boto3.client('mediaconvert', region_name='ap-southeast-2') # Replace with your region if different
@@ -275,6 +275,7 @@ class VideoCreateAdmin(BaseModel):
 
 @router.post("/courses/{course_id}/videos", response_model=VideoRead)
 async def upload_video_for_course(
+    background_tasks: BackgroundTasks,
     course_id: uuid.UUID,
     video_data: VideoCreateAdmin,
     db: Session = Depends(get_db),
@@ -303,8 +304,8 @@ async def upload_video_for_course(
         db.commit()
         db.refresh(new_video)
 
-        # Trigger the MediaConvert job
-        start_media_conversion_job(file_key=new_video.public_id, video_id=new_video.id)
+        # Trigger the MediaConvert job in the background
+        background_tasks.add_task(start_media_conversion_job, file_key=new_video.public_id, video_id=new_video.id)
         
         logging.info(f"Successfully saved video metadata for {new_video.id} and started transcoding.")
         return new_video
@@ -380,8 +381,9 @@ def start_media_conversion_job(file_key: str, video_id: uuid.UUID):
         if media_convert_queue:
             job_params['Queue'] = media_convert_queue
 
-        mediaconvert_client.create_job(**job_params)
-        logging.info(f"Started MediaConvert job for video_id: {video_id}")
+        response = mediaconvert_client.create_job(**job_params)
+        job_id = response['Job']['Id']
+        logging.info(f"Started MediaConvert job with ID: {job_id} for video: {video_id}")
     except Exception as e:
         logging.error(f"Error creating MediaConvert job for {file_key}: {e}", exc_info=True)
 
