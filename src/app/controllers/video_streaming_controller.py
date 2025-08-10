@@ -60,26 +60,17 @@ async def stream_hls_video(
         if not video.public_id:
             raise HTTPException(status_code=500, detail="Video is not configured for streaming.")
 
-        # Define the resource path for the HLS stream
-        # This assumes HLS files are in 'hls/<video_public_id>/'
-        resource_path = f"hls/{video.public_id}/*"
-        manifest_url = f"https://{os.getenv('CLOUDFRONT_DOMAIN')}/hls/{video.public_id}/playlist.m3u8"
+        # The resource key for the HLS manifest file.
+        # The signed URL will grant access to this specific file.
+        resource_key = f"hls/{video.public_id}/playlist.m3u8"
 
-        # Generate and set signed cookies
-        cookies = generate_signed_cloudfront_url(resource_path)
-        for key, value in cookies.items():
-            response.set_cookie(
-                key=key,
-                value=str(value),
-                domain=cookies["Domain"],
-                expires=cookies["Expires"],
-                httponly=True,
-                secure=True,  # Use True in production
-                samesite='strict'
-            )
-        
-        # Redirect to the HLS manifest URL
-        return RedirectResponse(url=manifest_url)
+        # Generate a signed URL for the manifest. CloudFront will use this
+        # to validate the request for the manifest and subsequent segments.
+        signed_url = generate_signed_cloudfront_url(resource_key)
+
+        # Redirect the client to the signed URL.
+        # The browser will follow this, and hls.js will handle the stream.
+        return RedirectResponse(url=signed_url)
 
     except ValueError as e:
         logger.error(f"CloudFront configuration error for HLS stream: {e}")
