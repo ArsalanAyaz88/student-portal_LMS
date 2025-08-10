@@ -139,53 +139,43 @@ async def stream_video_optimized(
                 logger.error(f"Error optimizing video URL: {str(e)}")
                 return s3_url
         
-        # Get optimized CloudFront URL for faster delivery
-        logger.info(f"Starting video optimization for {video_id}, original URL: {video.cloudinary_url}")
-        try:
-            optimized_url = optimize_video_url_simple(video.cloudinary_url)
-            logger.info(f"Video optimization successful: {optimized_url}")
-        except Exception as e:
-            logger.error(f"Video optimization failed: {str(e)}, using original URL")
-            optimized_url = video.cloudinary_url
+        # For debugging, use original URL directly (bypass CloudFront optimization)
+        logger.info(f"Using original video URL for debugging: {video.cloudinary_url}")
+        optimized_url = video.cloudinary_url
+        
+        # Uncomment below to re-enable CloudFront optimization later
+        # try:
+        #     optimized_url = optimize_video_url_simple(video.cloudinary_url)
+        #     logger.info(f"Video optimization successful: {optimized_url}")
+        # except Exception as e:
+        #     logger.error(f"Video optimization failed: {str(e)}, using original URL")
+        #     optimized_url = video.cloudinary_url
         
         logger.info(f"Serving video {video_id} via streaming endpoint with CloudFront optimization")
         
         # Handle range requests for smooth streaming
         range_header = request.headers.get('range')
         
-        # Stream video content directly with proper headers for HTML5 compatibility
-        import httpx
-        async with httpx.AsyncClient() as client:
-            # Get range header for progressive streaming
-            range_header = request.headers.get('range')
-            headers = {}
-            if range_header:
-                headers['Range'] = range_header
-            
-            # Fetch video content from CloudFront
-            response = await client.get(optimized_url, headers=headers)
-            
-            # Return streaming response with proper video headers
-            from fastapi.responses import StreamingResponse
-            return StreamingResponse(
-                iter([response.content]),
-                status_code=response.status_code,
-                headers={
-                    "Content-Type": "video/mp4",
-                    "Accept-Ranges": "bytes",
-                    "Cache-Control": "no-cache, no-store, must-revalidate",
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-                    "Access-Control-Allow-Headers": "Range, Content-Type, Authorization",
-                    "Access-Control-Expose-Headers": "Content-Range, Accept-Ranges, Content-Length",
-                    "X-Content-Type-Options": "nosniff",
-                    "X-Frame-Options": "SAMEORIGIN",
-                    "Referrer-Policy": "no-referrer",
-                    # Forward important headers from CloudFront response
-                    "Content-Length": response.headers.get("Content-Length", ""),
-                    "Content-Range": response.headers.get("Content-Range", ""),
-                }
-            )
+        # For now, redirect directly to CloudFront with proper headers for HTML5 compatibility
+        logger.info(f"Redirecting to optimized CloudFront URL: {optimized_url}")
+        
+        response = RedirectResponse(
+            url=optimized_url,
+            status_code=302
+        )
+        
+        # Add proper headers for video streaming
+        response.headers.update({
+            "Content-Type": "video/mp4",
+            "Accept-Ranges": "bytes", 
+            "Cache-Control": "public, max-age=3600",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+            "Access-Control-Allow-Headers": "Range, Content-Type, Authorization",
+            "Access-Control-Expose-Headers": "Content-Range, Accept-Ranges, Content-Length",
+        })
+        
+        return response
             
     except HTTPException:
         raise
