@@ -36,38 +36,44 @@ import traceback
 from ..config.s3_config import s3_client, S3_BUCKET_NAME
 # Simple CloudFront optimization function
 def optimize_video_url_simple(s3_url: str) -> str:
-    """Convert S3 URL to CloudFront URL if CLOUDFRONT_DOMAIN is configured"""
+    """Convert S3 URL to CloudFront URL for instant video playback"""
     import os
     cloudfront_domain = os.getenv('CLOUDFRONT_DOMAIN')
     
     if not cloudfront_domain or not s3_url:
+        logger.warning(f"CloudFront optimization skipped - Domain: {cloudfront_domain}, URL: {bool(s3_url)}")
         return s3_url
     
     try:
         from urllib.parse import urlparse
         parsed_url = urlparse(s3_url)
         
-        # Extract object key from S3 URL
-        if 'dummy222222.s3.' in parsed_url.netloc:
-            # Format: https://bucket.s3.region.amazonaws.com/path/to/file
+        # Extract object key from S3 URL (configured for 'sabiry' bucket)
+        bucket_name = os.getenv('S3_BUCKET_NAME', 'sabiry')
+        
+        if f'{bucket_name}.s3.' in parsed_url.netloc:
+            # Format: https://sabiry.s3.region.amazonaws.com/path/to/file
             object_key = parsed_url.path.lstrip('/')
-        elif 's3.amazonaws.com' in parsed_url.netloc and 'dummy222222' in parsed_url.path:
-            # Format: https://s3.amazonaws.com/bucket/path/to/file
+        elif 's3.amazonaws.com' in parsed_url.netloc and bucket_name in parsed_url.path:
+            # Format: https://s3.amazonaws.com/sabiry/path/to/file
             path_parts = parsed_url.path.lstrip('/').split('/', 1)
-            if len(path_parts) > 1 and path_parts[0] == 'dummy222222':
+            if len(path_parts) > 1 and path_parts[0] == bucket_name:
                 object_key = path_parts[1]
             else:
+                logger.warning(f"Could not extract object key from S3 URL: {s3_url}")
                 return s3_url
         else:
-            return s3_url
+            # Fallback: assume the path is the object key
+            object_key = parsed_url.path.lstrip('/')
+            logger.info(f"Using fallback object key extraction for: {s3_url}")
         
-        # Construct CloudFront URL
+        # Construct CloudFront URL for instant playback
         cloudfront_url = f"https://{cloudfront_domain}/{object_key}"
-        logger.info(f"Optimized S3 URL to CloudFront: {s3_url} -> {cloudfront_url}")
+        logger.info(f"✅ CloudFront optimization: {s3_url} -> {cloudfront_url}")
         return cloudfront_url
         
     except Exception as e:
-        logger.error(f"Error optimizing URL to CloudFront: {e}")
+        logger.error(f"❌ CloudFront optimization failed: {e}")
         return s3_url
 
 logging.basicConfig(level=logging.INFO)

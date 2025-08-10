@@ -22,8 +22,7 @@ from ..models.video import Video
 from ..models.enrollment import Enrollment
 from ..models.course import Course
 from ..utils.dependencies import get_current_user
-# Temporarily disable CloudFront optimization until module is properly set up
-# from ..utils.cloudfront_manager import optimize_video_url, get_optimized_video_response
+from ..utils.cloudfront_manager import get_optimized_video_response
 from ..config.s3_config import s3_client, S3_BUCKET_NAME
 
 logger = logging.getLogger(__name__)
@@ -86,13 +85,15 @@ async def stream_video_optimized(
         if not course:
             raise HTTPException(status_code=404, detail="Course not found")
         
-        # TODO: Re-enable CloudFront optimization after fixing module import
-        # optimized_response = get_optimized_video_response(video.cloudinary_url)
-        # optimized_url = optimized_response['url']
-        optimized_url = video.cloudinary_url  # Temporarily use original URL
+        # Get optimized CloudFront URL for faster delivery
+        optimized_response = get_optimized_video_response(video.cloudinary_url)
+        optimized_url = optimized_response['url']
         
-        # Log the optimization for monitoring
-        logger.info(f"Serving video {video_id} directly from S3 (CloudFront optimization temporarily disabled)")
+        # Log the optimization status
+        if optimized_response['cdn_enabled']:
+            logger.info(f"Serving video {video_id} via CloudFront CDN for faster delivery")
+        else:
+            logger.info(f"Serving video {video_id} directly from S3 (CloudFront fallback)")
         
         # Handle range requests for smooth streaming
         range_header = request.headers.get('range')
