@@ -36,44 +36,76 @@ import traceback
 from ..config.s3_config import s3_client, S3_BUCKET_NAME
 # Simple CloudFront optimization function
 def optimize_video_url_simple(s3_url: str) -> str:
-    """Convert S3 URL to CloudFront URL for instant video playback"""
+    """
+    Convert S3 URL to CloudFront URL for instant video streaming
+    
+    This function ensures videos are served through CloudFront CDN for:
+    - Instant playback with global edge caching
+    - Byte-range request support for smooth streaming
+    - Reduced latency and buffering
+    """
     import os
     cloudfront_domain = os.getenv('CLOUDFRONT_DOMAIN')
     
-    if not cloudfront_domain or not s3_url:
-        logger.warning(f"CloudFront optimization skipped - Domain: {cloudfront_domain}, URL: {bool(s3_url)}")
+    if not cloudfront_domain:
+        logger.warning(f"CLOUDFRONT_DOMAIN not configured - videos will stream directly from S3")
+        return s3_url
+    
+    if not s3_url:
+        logger.error("Empty S3 URL provided for CloudFront optimization")
         return s3_url
     
     try:
         from urllib.parse import urlparse
         parsed_url = urlparse(s3_url)
-        
-        # Extract object key from S3 URL (configured for 'sabiry' bucket)
         bucket_name = os.getenv('S3_BUCKET_NAME', 'sabiry')
+        object_key = None
         
+        # Enhanced object key extraction for multiple S3 URL formats
         if f'{bucket_name}.s3.' in parsed_url.netloc:
-            # Format: https://sabiry.s3.region.amazonaws.com/path/to/file
+            # Format: https://sabiry.s3.region.amazonaws.com/path/to/video.mp4
             object_key = parsed_url.path.lstrip('/')
-        elif 's3.amazonaws.com' in parsed_url.netloc and bucket_name in parsed_url.path:
-            # Format: https://s3.amazonaws.com/sabiry/path/to/file
+            logger.debug(f"Extracted object key from bucket subdomain format: {object_key}")
+            
+        elif 's3.amazonaws.com' in parsed_url.netloc:
+            # Format: https://s3.amazonaws.com/sabiry/path/to/video.mp4
             path_parts = parsed_url.path.lstrip('/').split('/', 1)
             if len(path_parts) > 1 and path_parts[0] == bucket_name:
                 object_key = path_parts[1]
+                logger.debug(f"Extracted object key from path format: {object_key}")
             else:
-                logger.warning(f"Could not extract object key from S3 URL: {s3_url}")
-                return s3_url
-        else:
-            # Fallback: assume the path is the object key
-            object_key = parsed_url.path.lstrip('/')
-            logger.info(f"Using fallback object key extraction for: {s3_url}")
+                logger.warning(f"Bucket name '{bucket_name}' not found in S3 path: {s3_url}")
+                
+        elif 'amazonaws.com' in parsed_url.netloc:
+            # Format: https://s3-region.amazonaws.com/sabiry/path/to/video.mp4
+            path_parts = parsed_url.path.lstrip('/').split('/', 1)
+            if len(path_parts) > 1 and path_parts[0] == bucket_name:
+                object_key = path_parts[1]
+                logger.debug(f"Extracted object key from regional format: {object_key}")
         
-        # Construct CloudFront URL for instant playback
+        # Fallback: assume the entire path is the object key (for direct URLs)
+        if not object_key:
+            object_key = parsed_url.path.lstrip('/')
+            logger.info(f"Using fallback object key extraction: {object_key}")
+        
+        if not object_key:
+            logger.error(f"Could not extract object key from S3 URL: {s3_url}")
+            return s3_url
+        
+        # Construct CloudFront URL optimized for video streaming
         cloudfront_url = f"https://{cloudfront_domain}/{object_key}"
-        logger.info(f"✅ CloudFront optimization: {s3_url} -> {cloudfront_url}")
+        
+        # Validate the CloudFront URL format
+        if not cloudfront_url.startswith('https://') or '.cloudfront.net' not in cloudfront_url:
+            logger.error(f"Invalid CloudFront URL generated: {cloudfront_url}")
+            return s3_url
+        
+        logger.info(f"🎥 Video streaming optimized: {s3_url} -> {cloudfront_url}")
         return cloudfront_url
         
     except Exception as e:
-        logger.error(f"❌ CloudFront optimization failed: {e}")
+        logger.error(f"❌ CloudFront streaming optimization failed: {str(e)}")
+        logger.debug(f"Error details: {traceback.format_exc()}")
         return s3_url
 
 logging.basicConfig(level=logging.INFO)
