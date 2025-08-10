@@ -33,7 +33,7 @@ router = APIRouter(tags=["Video Streaming"])
 async def stream_video_optimized(
     video_id: uuid.UUID,
     request: Request,
-    user: User = Depends(get_current_user),
+    token: str = None,  # Accept token as URL parameter for HTML5 video
     session: Session = Depends(get_db)
 ):
     """
@@ -47,6 +47,22 @@ async def stream_video_optimized(
     - Automatic URL optimization
     """
     try:
+        # Validate authentication token from URL parameter
+        if not token:
+            # Try to get token from Authorization header as fallback
+            auth_header = request.headers.get('authorization', '')
+            if auth_header.startswith('Bearer '):
+                token = auth_header.replace('Bearer ', '')
+            else:
+                raise HTTPException(status_code=401, detail="Authentication token required")
+        
+        # Validate token and get user
+        from ..utils.dependencies import verify_token
+        try:
+            user = verify_token(token, session)
+        except Exception as e:
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+        
         # Validate video exists
         video = session.exec(
             select(Video).where(Video.id == video_id)

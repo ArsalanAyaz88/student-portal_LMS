@@ -494,17 +494,23 @@ def get_course_videos_with_checkpoint(
         # Create progress map using UUIDs
         progress_map = {str(p.video_id): p.completed for p in progresses}
 
-        # Build response with authenticated proxy URLs for instant HTML5 streaming
+        # Build response with signed URLs for HTML5 video authentication
         result = []
         for video in course.videos:
-            # Use authenticated proxy endpoint that works with HTML5 video elements
-            # This endpoint will validate session and stream video directly
+            # Generate signed URL that includes authentication token for HTML5 compatibility
+            # This allows HTML5 video elements to access videos without sending headers
             backend_url = os.getenv('BACKEND_URL', 'https://student-portal-lms-seven.vercel.app')
-            proxy_url = f"{backend_url}/api/courses/courses/{course_id}/videos/{video.id}/stream"
+            
+            # Get the token from the current request
+            auth_header = request.headers.get('authorization', '')
+            token = auth_header.replace('Bearer ', '') if auth_header.startswith('Bearer ') else ''
+            
+            # Create signed URL with embedded token for HTML5 video elements
+            signed_url = f"{backend_url}/api/courses/{course_id}/videos/{video.id}/stream?token={token}"
             
             result.append(VideoWithCheckpoint(
                 id=str(video.id),
-                cloudinary_url=proxy_url,  # Authenticated proxy for instant HTML5 streaming
+                cloudinary_url=signed_url,  # Signed URL for HTML5 video authentication
                 title=video.title,
                 description=video.description,
                 watched=progress_map.get(str(video.id), False)
@@ -523,7 +529,7 @@ async def stream_course_video_authenticated(
     course_id: uuid.UUID,
     video_id: uuid.UUID,
     request: Request,
-    user: User = Depends(get_current_user),
+    token: str = None,  # Accept token as URL parameter for HTML5 video
     session: Session = Depends(get_db)
 ):
     """
@@ -536,6 +542,22 @@ async def stream_course_video_authenticated(
     4. Enables instant playback without frontend authentication complexity
     """
     try:
+        # Validate authentication token from URL parameter
+        if not token:
+            # Try to get token from Authorization header as fallback
+            auth_header = request.headers.get('authorization', '')
+            if auth_header.startswith('Bearer '):
+                token = auth_header.replace('Bearer ', '')
+            else:
+                raise HTTPException(status_code=401, detail="Authentication token required")
+        
+        # Validate token and get user
+        from ..utils.dependencies import verify_token
+        try:
+            user = verify_token(token, session)
+        except Exception as e:
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+        
         # Validate enrollment (reuse logic from video checkpoint endpoint)
         enrollment = session.exec(
             select(Enrollment).where(
@@ -568,12 +590,12 @@ async def stream_course_video_authenticated(
         # Make internal request to streaming controller with authentication
         async with httpx.AsyncClient() as client:
             backend_url = os.getenv('BACKEND_URL', 'https://student-portal-lms-seven.vercel.app')
-            streaming_url = f"{backend_url}/api/videos/{video_id}/stream"
+            streaming_url = f"{backend_url}/api/videos/{video_id}/stream?token={token}"
             
-            # Forward the request with authentication headers
+            # Forward the request with authentication headers as backup
             headers = {
-                "Authorization": auth_header,
-                "User-Agent": "Internal-Proxy",
+                "Authorization": f"Bearer {token}",
+                "User-Agent": "LMS-Proxy/1.0"
             }
             
             # Forward range header for progressive streaming
