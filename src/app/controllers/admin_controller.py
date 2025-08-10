@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from typing import List, Optional
 import traceback
 from urllib.parse import urlparse
+from src.app.utils.cloudfront_setup import generate_signed_cloudfront_url
 
 # Third-party Imports
 import boto3
@@ -515,36 +516,27 @@ def get_video_view_url(
     """
     Generate a pre-signed URL for viewing a private video from S3.
     """
-    logging.info(f"Request to generate view URL for video_id: {video_id}")
+    logging.info(f"Request to generate CloudFront view URL for video_id: {video_id}")
     
     video = db.get(Video, video_id)
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")
 
-    if not video.public_id: # public_id should store the S3 key
+    if not video.public_id:
         logging.error(f"Video {video_id} does not have a file key (public_id) associated with it.")
         raise HTTPException(status_code=500, detail="Video file key not found.")
 
     try:
-        if s3_client is None:
-            logging.error("S3 client is not configured.")
-            raise HTTPException(status_code=500, detail="S3 client is not configured")
+        signed_url = generate_signed_cloudfront_url(video.public_id)
+        logging.info(f"Successfully generated CloudFront view URL for video {video_id}")
+        return {"view_url": signed_url}
 
-        presigned_url = s3_client.generate_presigned_url(
-            'get_object',
-            Params={
-                'Bucket': S3_BUCKET_NAME,
-                'Key': video.public_id 
-            },
-            ExpiresIn=3600  # URL expires in 1 hour
-        )
-        
-        logging.info(f"Successfully generated view URL for video {video_id}")
-        return {"view_url": presigned_url}
-
+    except ValueError as e:
+        logging.error(f"Configuration error when generating signed URL: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
         tb_str = traceback.format_exc()
-        logging.error(f"Error generating video view URL for {video.public_id}: {e}\nTraceback:\n{tb_str}")
+        logging.error(f"Error generating CloudFront URL for {video.public_id}: {e}\nTraceback:\n{tb_str}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Could not generate video view URL."
