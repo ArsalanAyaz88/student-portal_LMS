@@ -498,7 +498,9 @@ def get_course_videos_with_checkpoint(
         result = []
         for video in course.videos:
             # Use streaming endpoint for instant playback instead of direct URLs
-            streaming_url = f"/api/videos/{video.id}/stream"
+            # For deployed projects, use complete URL with backend domain
+            backend_url = os.getenv('BACKEND_URL', 'https://student-portal-lms-seven.vercel.app')
+            streaming_url = f"{backend_url}/api/videos/{video.id}/stream"
             
             result.append(VideoWithCheckpoint(
                 id=str(video.id),
