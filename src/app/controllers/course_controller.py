@@ -456,22 +456,18 @@ def get_course_videos_with_checkpoint(
         # Create progress map using UUIDs
         progress_map = {str(p.video_id): p.completed for p in progresses}
 
-        # Build response with HLS stream URLs
+        # Build response with CloudFront-optimized URLs
         result = []
         for video in course.videos:
-            # Get the last checkpoint for the video
-            last_checkpoint = progress_map.get(str(video.id), 0)
-            
-            # Construct the secure HLS streaming URL
-            streaming_url = f"/api/videos/{video.id}/hls-stream"
+            # Optimize video URL for CloudFront delivery
+            optimized_url = optimize_video_url_simple(video.cloudinary_url)
             
             result.append(VideoWithCheckpoint(
                 id=str(video.id),
-                streaming_url=streaming_url,
+                cloudinary_url=optimized_url,  # Now serves CloudFront URL for better performance
                 title=video.title,
                 description=video.description,
-                watched=progress_map.get(str(video.id), False),
-                last_position_seconds=last_checkpoint
+                watched=progress_map.get(str(video.id), False)
             ))
         return result
 
@@ -480,6 +476,7 @@ def get_course_videos_with_checkpoint(
             status_code=500,
             detail=f"An error occurred while fetching course videos: {str(e)}"
         )
+
 
 @router.post("/videos/{video_id}/complete")
 def mark_video_completed(

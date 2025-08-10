@@ -10,13 +10,7 @@ This script creates a CloudFront distribution for your S3 bucket to enable:
 import boto3
 import json
 import logging
-import os
-from datetime import datetime, timedelta
 from botocore.exceptions import ClientError
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import padding
-from cryptography.hazmat.primitives import serialization
-from botocore.signers import CloudFrontSigner
 from ..config.s3_config import AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION, S3_BUCKET_NAME
 
 logger = logging.getLogger(__name__)
@@ -216,35 +210,6 @@ def setup_cloudfront_for_lms():
     except Exception as e:
         logger.error(f"Failed to set up CloudFront: {e}")
         raise
-
-def rsa_signer(message, key):
-    private_key = serialization.load_pem_private_key(
-        key.encode(),
-        password=None,
-    )
-    return private_key.sign(message, padding.PKCS1v15(), hashes.SHA1())
-
-def generate_signed_cloudfront_url(resource_key: str) -> str:
-    """
-    Generates a signed URL for a CloudFront resource.
-    """
-    cloudfront_domain = os.getenv('CLOUDFRONT_DOMAIN')
-    key_id = os.getenv('CLOUDFRONT_KEY_PAIR_ID')
-    private_key = os.getenv('CLOUDFRONT_PRIVATE_KEY')
-
-    if not all([cloudfront_domain, key_id, private_key]):
-        logger.error("CloudFront environment variables for signing are not fully configured.")
-        raise ValueError("CloudFront is not configured for signing URLs.")
-
-    resource_url = f"https://{cloudfront_domain}/{resource_key}"
-    expire_date = datetime.utcnow() + timedelta(hours=1)  # URL is valid for 1 hour
-
-    cloudfront_signer = CloudFrontSigner(key_id, rsa_signer)
-
-    signed_url = cloudfront_signer.generate_presigned_url(
-        resource_url, date_less_than=expire_date
-    )
-    return signed_url
 
 if __name__ == "__main__":
     # Run the setup
