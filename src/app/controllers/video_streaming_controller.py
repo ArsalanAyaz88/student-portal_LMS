@@ -128,32 +128,57 @@ async def stream_video_optimized(
             logger.error(f"Failed to generate video URL: {e}")
             raise HTTPException(status_code=500, detail="Failed to access video")
         
-        # Return the secure URL directly to avoid CORS issues with redirects
-        from fastapi.responses import JSONResponse
+        # Stream video directly through our server to avoid CORS issues
+        from fastapi.responses import StreamingResponse
+        import httpx
         
-        response_data = {
-            "video_url": presigned_url,
-            "expires_in": 10800,  # 3 hours
-            "message": "Secure video URL generated successfully"
-        }
-        
-        response = JSONResponse(content=response_data)
-        
-        # Security headers to prevent downloads while allowing normal video playback
-        response.headers.update({
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "X-Content-Type-Options": "nosniff",
-            "X-Frame-Options": "DENY",
-            "X-Download-Options": "noopen",
-            "Referrer-Policy": "no-referrer",
-            "Access-Control-Allow-Origin": request.headers.get("origin", "*"),
-            "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-            "Access-Control-Allow-Headers": "Range, Content-Type, Authorization",
-            "X-Video-Access": "authorized",
-            "X-Session-Duration": "10800"  # 3 hours
-        })
-        
-        return response
+        try:
+            # Get the video from S3 using presigned URL
+            async with httpx.AsyncClient() as client:
+                # Handle range requests for video seeking
+                headers = {}
+                if "range" in request.headers:
+                    headers["Range"] = request.headers["range"]
+                
+                # Stream the video content from S3
+                response = await client.get(presigned_url, headers=headers)
+                
+                # Create streaming response
+                def generate():
+                    for chunk in response.iter_bytes(chunk_size=8192):
+                        yield chunk
+                
+                # Determine content type
+                content_type = response.headers.get("content-type", "video/mp4")
+                
+                # Create streaming response with proper headers
+                streaming_response = StreamingResponse(
+                    generate(),
+                    status_code=response.status_code,
+                    media_type=content_type
+                )
+                
+                # Add security and streaming headers
+                streaming_response.headers.update({
+                    "Accept-Ranges": "bytes",
+                    "Content-Length": response.headers.get("content-length", ""),
+                    "Content-Range": response.headers.get("content-range", ""),
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "X-Content-Type-Options": "nosniff",
+                    "X-Frame-Options": "DENY",
+                    "X-Download-Options": "noopen",
+                    "Referrer-Policy": "no-referrer",
+                    "Access-Control-Allow-Origin": request.headers.get("origin", "*"),
+                    "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+                    "Access-Control-Allow-Headers": "Range, Content-Type, Authorization",
+                    "X-Video-Access": "authorized"
+                })
+                
+                return streaming_response
+                
+        except Exception as e:
+            logger.error(f"Failed to stream video: {e}")
+            raise HTTPException(status_code=500, detail="Failed to stream video")
             
     except HTTPException:
         raise
