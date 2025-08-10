@@ -84,7 +84,6 @@ def create_upload_signature(folder: str = Form("videos")):
             Params={
                 'Bucket': S3_BUCKET_NAME,
                 'Key': file_key,
-                'ContentType': request_data.content_type,
                 'ACL': 'public-read'
             },
             ExpiresIn=3600  # 1 hour
