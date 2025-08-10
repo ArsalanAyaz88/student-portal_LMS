@@ -422,7 +422,8 @@ def get_course_description(course_id: str, session: Session = Depends(get_db)):
 
 @router.get("/my-courses/{course_id}/videos-with-checkpoint", response_model=list[VideoWithCheckpoint])
 def get_course_videos_with_checkpoint(
-    course_id: uuid.UUID,  
+    course_id: uuid.UUID,
+    request: Request,  # Added Request parameter for token extraction
     user=Depends(get_current_user),
     session: Session = Depends(get_db)
 ):
