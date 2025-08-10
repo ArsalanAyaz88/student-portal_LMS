@@ -48,7 +48,7 @@ app = FastAPI(
 # ─── Middlewares ───────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://frontend-rho-nine-62.vercel.app","https://suti-sabiry-ultrasounds-projects.vercel.app","https://suti.vercel.app","https://localhost:8000","http://localhost:8080"],
+    allow_origins=["https://frontend-rho-nine-62.vercel.app","https://suti-sabiry-ultrasounds-projects.vercel.app","https://suti.vercel.app","https://localhost:8000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
