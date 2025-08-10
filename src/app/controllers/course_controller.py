@@ -507,7 +507,7 @@ def get_course_videos_with_checkpoint(
             token = auth_header.replace('Bearer ', '') if auth_header.startswith('Bearer ') else ''
             
             # Create signed URL with embedded token for HTML5 video elements
-            signed_url = f"{backend_url}/api/courses/{course_id}/videos/{video.id}/stream?token={token}"
+            signed_url = f"{backend_url}/api/courses/courses/{course_id}/videos/{video.id}/stream?token={token}"
             
             result.append(VideoWithCheckpoint(
                 id=str(video.id),
