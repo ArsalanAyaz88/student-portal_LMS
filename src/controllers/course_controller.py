@@ -1,5 +1,5 @@
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Request
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile
 from sqlmodel import Session, select, func
 from sqlalchemy.orm import selectinload
 from src.app.models.course import Course
@@ -36,76 +36,38 @@ import traceback
 from ..config.s3_config import s3_client, S3_BUCKET_NAME
 # Simple CloudFront optimization function
 def optimize_video_url_simple(s3_url: str) -> str:
-    """
-    Convert S3 URL to CloudFront URL for instant video streaming
-    
-    This function ensures videos are served through CloudFront CDN for:
-    - Instant playback with global edge caching
-    - Byte-range request support for smooth streaming
-    - Reduced latency and buffering
-    """
+    """Convert S3 URL to CloudFront URL if CLOUDFRONT_DOMAIN is configured"""
     import os
     cloudfront_domain = os.getenv('CLOUDFRONT_DOMAIN')
     
-    if not cloudfront_domain:
-        logger.warning(f"CLOUDFRONT_DOMAIN not configured - videos will stream directly from S3")
-        return s3_url
-    
-    if not s3_url:
-        logger.error("Empty S3 URL provided for CloudFront optimization")
+    if not cloudfront_domain or not s3_url:
         return s3_url
     
     try:
         from urllib.parse import urlparse
         parsed_url = urlparse(s3_url)
-        bucket_name = os.getenv('S3_BUCKET_NAME', 'sabiry')
-        object_key = None
         
-        # Enhanced object key extraction for multiple S3 URL formats
-        if f'{bucket_name}.s3.' in parsed_url.netloc:
-            # Format: https://sabiry.s3.region.amazonaws.com/path/to/video.mp4
+        # Extract object key from S3 URL
+        if 'dummy222222.s3.' in parsed_url.netloc:
+            # Format: https://bucket.s3.region.amazonaws.com/path/to/file
             object_key = parsed_url.path.lstrip('/')
-            logger.debug(f"Extracted object key from bucket subdomain format: {object_key}")
-            
-        elif 's3.amazonaws.com' in parsed_url.netloc:
-            # Format: https://s3.amazonaws.com/sabiry/path/to/video.mp4
+        elif 's3.amazonaws.com' in parsed_url.netloc and 'dummy222222' in parsed_url.path:
+            # Format: https://s3.amazonaws.com/bucket/path/to/file
             path_parts = parsed_url.path.lstrip('/').split('/', 1)
-            if len(path_parts) > 1 and path_parts[0] == bucket_name:
+            if len(path_parts) > 1 and path_parts[0] == 'dummy222222':
                 object_key = path_parts[1]
-                logger.debug(f"Extracted object key from path format: {object_key}")
             else:
-                logger.warning(f"Bucket name '{bucket_name}' not found in S3 path: {s3_url}")
-                
-        elif 'amazonaws.com' in parsed_url.netloc:
-            # Format: https://s3-region.amazonaws.com/sabiry/path/to/video.mp4
-            path_parts = parsed_url.path.lstrip('/').split('/', 1)
-            if len(path_parts) > 1 and path_parts[0] == bucket_name:
-                object_key = path_parts[1]
-                logger.debug(f"Extracted object key from regional format: {object_key}")
-        
-        # Fallback: assume the entire path is the object key (for direct URLs)
-        if not object_key:
-            object_key = parsed_url.path.lstrip('/')
-            logger.info(f"Using fallback object key extraction: {object_key}")
-        
-        if not object_key:
-            logger.error(f"Could not extract object key from S3 URL: {s3_url}")
+                return s3_url
+        else:
             return s3_url
         
-        # Construct CloudFront URL optimized for video streaming
+        # Construct CloudFront URL
         cloudfront_url = f"https://{cloudfront_domain}/{object_key}"
-        
-        # Validate the CloudFront URL format
-        if not cloudfront_url.startswith('https://') or '.cloudfront.net' not in cloudfront_url:
-            logger.error(f"Invalid CloudFront URL generated: {cloudfront_url}")
-            return s3_url
-        
-        logger.info(f"🎥 Video streaming optimized: {s3_url} -> {cloudfront_url}")
+        logger.info(f"Optimized S3 URL to CloudFront: {s3_url} -> {cloudfront_url}")
         return cloudfront_url
         
     except Exception as e:
-        logger.error(f"❌ CloudFront streaming optimization failed: {str(e)}")
-        logger.debug(f"Error details: {traceback.format_exc()}")
+        logger.error(f"Error optimizing URL to CloudFront: {e}")
         return s3_url
 
 logging.basicConfig(level=logging.INFO)
@@ -422,8 +384,7 @@ def get_course_description(course_id: str, session: Session = Depends(get_db)):
 
 @router.get("/my-courses/{course_id}/videos-with-checkpoint", response_model=list[VideoWithCheckpoint])
 def get_course_videos_with_checkpoint(
-    course_id: uuid.UUID,
-    request: Request,  # Added Request parameter for token extraction
+    course_id: uuid.UUID,  
     user=Depends(get_current_user),
     session: Session = Depends(get_db)
 ):
@@ -495,23 +456,15 @@ def get_course_videos_with_checkpoint(
         # Create progress map using UUIDs
         progress_map = {str(p.video_id): p.completed for p in progresses}
 
-        # Build response with signed URLs for HTML5 video authentication
+        # Build response with CloudFront-optimized URLs
         result = []
         for video in course.videos:
-            # Generate signed URL that includes authentication token for HTML5 compatibility
-            # This allows HTML5 video elements to access videos without sending headers
-            backend_url = os.getenv('BACKEND_URL', 'https://student-portal-lms-seven.vercel.app')
-            
-            # Get the token from the current request
-            auth_header = request.headers.get('authorization', '')
-            token = auth_header.replace('Bearer ', '') if auth_header.startswith('Bearer ') else ''
-            
-            # Create signed URL with embedded token for HTML5 video elements
-            signed_url = f"{backend_url}/api/courses/{course_id}/videos/{video.id}/stream?token={token}"
+            # Optimize video URL for CloudFront delivery
+            optimized_url = optimize_video_url_simple(video.cloudinary_url)
             
             result.append(VideoWithCheckpoint(
                 id=str(video.id),
-                cloudinary_url=signed_url,  # Signed URL for HTML5 video authentication
+                cloudinary_url=optimized_url,  # Now serves CloudFront URL for better performance
                 title=video.title,
                 description=video.description,
                 watched=progress_map.get(str(video.id), False)
@@ -522,121 +475,6 @@ def get_course_videos_with_checkpoint(
         raise HTTPException(
             status_code=500,
             detail=f"An error occurred while fetching course videos: {str(e)}"
-        )
-
-
-@router.get("/{course_id}/videos/{video_id}/stream")
-async def stream_course_video_authenticated(
-    course_id: uuid.UUID,
-    video_id: uuid.UUID,
-    request: Request,
-    token: str = None,  # Accept token as URL parameter for HTML5 video
-    session: Session = Depends(get_db)
-):
-    """
-    Authenticated video streaming proxy for HTML5 video elements
-    
-    This endpoint:
-    1. Validates user authentication and enrollment
-    2. Calls the internal streaming controller with proper headers
-    3. Streams video content directly to HTML5 video elements
-    4. Enables instant playback without frontend authentication complexity
-    """
-    try:
-        # Validate authentication token from URL parameter
-        if not token:
-            # Try to get token from Authorization header as fallback
-            auth_header = request.headers.get('authorization', '')
-            if auth_header.startswith('Bearer '):
-                token = auth_header.replace('Bearer ', '')
-            else:
-                raise HTTPException(status_code=401, detail="Authentication token required")
-        
-        # Validate token and get user
-        from ..utils.security import decode_access_token
-        try:
-            payload = decode_access_token(token)
-            user_id = payload.get("user_id")
-            if not user_id:
-                raise HTTPException(status_code=401, detail="Invalid token payload")
-            
-            user = session.get(User, user_id)
-            if not user or not user.is_active:
-                raise HTTPException(status_code=401, detail="Invalid or inactive user")
-                
-        except Exception as e:
-            raise HTTPException(status_code=401, detail="Invalid or expired token")
-        
-        # Validate enrollment (reuse logic from video checkpoint endpoint)
-        enrollment = session.exec(
-            select(Enrollment).where(
-                Enrollment.user_id == user.id,
-                Enrollment.course_id == course_id,
-                Enrollment.status == "approved"
-            )
-        ).first()
-
-        if not enrollment:
-            raise HTTPException(
-                status_code=403,
-                detail="You are not enrolled in this course."
-            )
-
-        # Check enrollment expiration
-        enrollment.update_expiration_status()
-        if not enrollment.is_accessible:
-            raise HTTPException(
-                status_code=403,
-                detail="Your access to this course has expired."
-            )
-
-        # Call the internal streaming controller with authentication
-        import httpx
-        
-        # Get the authorization header from the current request
-        auth_header = request.headers.get('authorization', '')
-        
-        # Make internal request to streaming controller with authentication
-        async with httpx.AsyncClient() as client:
-            # Use localhost for development, production URL for deployment
-            backend_url = "https://student-portal-lms-seven.vercel.app"  # Local development
-            streaming_url = f"{backend_url}/api/videos/{video_id}/stream?token={token}"
-            
-            # Forward the request with authentication headers as backup
-            headers = {
-                "Authorization": f"Bearer {token}",
-                "User-Agent": "LMS-Proxy/1.0"
-            }
-            
-            # Forward range header for progressive streaming
-            if "range" in request.headers:
-                headers["Range"] = request.headers["range"]
-            
-            response = await client.get(streaming_url, headers=headers, follow_redirects=True)
-            
-            # Return the streaming response with proper headers for HTML5 video
-            from fastapi.responses import StreamingResponse
-            
-            return StreamingResponse(
-                iter([response.content]),
-                status_code=response.status_code,
-                headers={
-                    "Content-Type": "video/mp4",
-                    "Accept-Ranges": "bytes",
-                    "Cache-Control": "no-cache, no-store, must-revalidate",
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-                    "Access-Control-Allow-Headers": "Range, Content-Type, Authorization",
-                }
-            )
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error in video proxy streaming: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail="Error streaming video content"
         )
 
 
@@ -932,12 +770,6 @@ async def get_certificate(
         }
 
     except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error retrieving certificate: {str(e)}"
-        )    
         raise
     except Exception as e:
         raise HTTPException(

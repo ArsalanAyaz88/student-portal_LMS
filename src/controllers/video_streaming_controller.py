@@ -14,7 +14,6 @@ from sqlmodel import Session, select
 from typing import Optional
 import uuid
 import logging
-import os
 from urllib.parse import urlparse
 
 from ..db.session import get_db
@@ -23,7 +22,8 @@ from ..models.video import Video
 from ..models.enrollment import Enrollment
 from ..models.course import Course
 from ..utils.dependencies import get_current_user
-from ..config.s3_config import s3_client, S3_BUCKET_NAME
+# Temporarily disable CloudFront optimization until module is properly set up
+# from ..utils.cloudfront_manager import optimize_video_url, get_optimized_video_response
 from ..config.s3_config import s3_client, S3_BUCKET_NAME
 
 logger = logging.getLogger(__name__)
@@ -33,7 +33,7 @@ router = APIRouter(tags=["Video Streaming"])
 async def stream_video_optimized(
     video_id: uuid.UUID,
     request: Request,
-    token: str = None,  # Accept token as URL parameter for HTML5 video
+    user: User = Depends(get_current_user),
     session: Session = Depends(get_db)
 ):
     """
@@ -47,30 +47,6 @@ async def stream_video_optimized(
     - Automatic URL optimization
     """
     try:
-        # Validate authentication token from URL parameter
-        if not token:
-            # Try to get token from Authorization header as fallback
-            auth_header = request.headers.get('authorization', '')
-            if auth_header.startswith('Bearer '):
-                token = auth_header.replace('Bearer ', '')
-            else:
-                raise HTTPException(status_code=401, detail="Authentication token required")
-        
-        # Validate token and get user
-        from ..utils.security import decode_access_token
-        try:
-            payload = decode_access_token(token)
-            user_id = payload.get("user_id")
-            if not user_id:
-                raise HTTPException(status_code=401, detail="Invalid token payload")
-            
-            user = session.get(User, user_id)
-            if not user or not user.is_active:
-                raise HTTPException(status_code=401, detail="Invalid or inactive user")
-                
-        except Exception as e:
-            raise HTTPException(status_code=401, detail="Invalid or expired token")
-        
         # Validate video exists
         video = session.exec(
             select(Video).where(Video.id == video_id)
@@ -110,80 +86,54 @@ async def stream_video_optimized(
         if not course:
             raise HTTPException(status_code=404, detail="Course not found")
         
-        # Use the simple optimization function from course controller
-        def optimize_video_url_simple(s3_url: str) -> str:
-            """Convert S3 URL to CloudFront URL for instant streaming"""
-            try:
-                cloudfront_domain = os.getenv('CLOUDFRONT_DOMAIN', 'd1x3zj6gsrmrll.cloudfront.net')
-                bucket_name = os.getenv('S3_BUCKET_NAME', 'sabiry')
-                
-                if not cloudfront_domain:
-                    logger.warning("CloudFront domain not configured, using direct S3 URL")
-                    return s3_url
-                
-                # Extract object key from S3 URL
-                parsed_url = urlparse(s3_url)
-                if f'{bucket_name}.s3.amazonaws.com' in parsed_url.netloc:
-                    object_key = parsed_url.path.lstrip('/')
-                elif 's3.amazonaws.com' in parsed_url.netloc and f'/{bucket_name}/' in parsed_url.path:
-                    object_key = parsed_url.path.split(f'/{bucket_name}/', 1)[1]
-                else:
-                    logger.warning(f"Unrecognized S3 URL format: {s3_url}")
-                    return s3_url
-                
-                cloudfront_url = f"https://{cloudfront_domain}/{object_key}"
-                logger.info(f"🎥 Video streaming optimized: {s3_url} -> {cloudfront_url}")
-                return cloudfront_url
-                
-            except Exception as e:
-                logger.error(f"Error optimizing video URL: {str(e)}")
-                return s3_url
+        # TODO: Re-enable CloudFront optimization after fixing module import
+        # optimized_response = get_optimized_video_response(video.cloudinary_url)
+        # optimized_url = optimized_response['url']
+        optimized_url = video.cloudinary_url  # Temporarily use original URL
         
-        # For debugging, use original URL directly (bypass CloudFront optimization)
-        logger.info(f"Using original video URL for debugging: {video.cloudinary_url}")
-        optimized_url = video.cloudinary_url
-        
-        # Uncomment below to re-enable CloudFront optimization later
-        # try:
-        #     optimized_url = optimize_video_url_simple(video.cloudinary_url)
-        #     logger.info(f"Video optimization successful: {optimized_url}")
-        # except Exception as e:
-        #     logger.error(f"Video optimization failed: {str(e)}, using original URL")
-        #     optimized_url = video.cloudinary_url
-        
-        logger.info(f"Serving video {video_id} via streaming endpoint with CloudFront optimization")
+        # Log the optimization for monitoring
+        logger.info(f"Serving video {video_id} directly from S3 (CloudFront optimization temporarily disabled)")
         
         # Handle range requests for smooth streaming
         range_header = request.headers.get('range')
         
-        # For now, redirect directly to CloudFront with proper headers for HTML5 compatibility
-        logger.info(f"Redirecting to optimized CloudFront URL: {optimized_url}")
-        
-        response = RedirectResponse(
-            url=optimized_url,
-            status_code=302
-        )
-        
-        # Add proper headers for video streaming
-        response.headers.update({
-            "Content-Type": "video/mp4",
-            "Accept-Ranges": "bytes", 
-            "Cache-Control": "public, max-age=3600",
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-            "Access-Control-Allow-Headers": "Range, Content-Type, Authorization",
-            "Access-Control-Expose-Headers": "Content-Range, Accept-Ranges, Content-Length",
-        })
-        
-        return response
+        # Temporarily disable CloudFront check
+        if False:  # optimized_response['cdn_enabled']:
+            # For CloudFront URLs, redirect with optimized headers
+            response = RedirectResponse(
+                url=optimized_url,
+                status_code=302  # Temporary redirect to preserve range requests
+            )
+            
+            # Add security headers to prevent download managers
+            response.headers.update({
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "X-Content-Type-Options": "nosniff",
+                "X-Frame-Options": "DENY",
+                "Referrer-Policy": "no-referrer",
+                "X-Download-Options": "noopen",
+                "X-Permitted-Cross-Domain-Policies": "none",
+                "Access-Control-Allow-Origin": request.headers.get("origin", "*"),
+                "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+                "Access-Control-Allow-Headers": "Range, Content-Type, Authorization"
+            })
+            
+            return response
+        else:
+            # Fallback: Direct S3 streaming with security headers
+            return await stream_from_s3_with_security(
+                video.cloudinary_url, 
+                range_header, 
+                request
+            )
             
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error streaming video {video_id}: {str(e)}", exc_info=True)
+        logger.error(f"Error streaming video {video_id}: {str(e)}")
         raise HTTPException(
             status_code=500,
-            detail=f"An error occurred while streaming the video: {str(e)}"
+            detail="An error occurred while streaming the video"
         )
 
 async def stream_from_s3_with_security(s3_url: str, range_header: Optional[str], request: Request):
