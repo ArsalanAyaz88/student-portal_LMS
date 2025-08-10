@@ -470,7 +470,7 @@ def get_course_videos_with_checkpoint(
                 streaming_url=streaming_url,
                 title=video.title,
                 description=video.description,
-                watched=progress_map.get(str(video.id), {}).get('watched', False),
+                watched=progress_map.get(str(video.id), False),
                 last_position_seconds=last_checkpoint
             ))
         return result
