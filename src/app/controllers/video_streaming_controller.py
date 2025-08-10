@@ -86,46 +86,66 @@ async def stream_video_optimized(
         if not course:
             raise HTTPException(status_code=404, detail="Course not found")
         
-        # TODO: Re-enable CloudFront optimization after fixing module import
-        # optimized_response = get_optimized_video_response(video.cloudinary_url)
-        # optimized_url = optimized_response['url']
-        optimized_url = video.cloudinary_url  # Temporarily use original URL
+        # Simple secure video access for saved MP4 files
+        # Extract S3 key from video URL (handles both S3 and "cloudinary_url" field that contains S3 URLs)
+        try:
+            parsed_url = urlparse(video.cloudinary_url)
+            
+            # Extract S3 key from various URL formats
+            if S3_BUCKET_NAME in parsed_url.netloc:
+                s3_key = parsed_url.path.lstrip('/')
+            elif 's3.amazonaws.com' in parsed_url.netloc:
+                path_parts = parsed_url.path.lstrip('/').split('/', 1)
+                if len(path_parts) > 1 and path_parts[0] == S3_BUCKET_NAME:
+                    s3_key = path_parts[1]
+                else:
+                    raise ValueError("Invalid S3 URL format")
+            else:
+                raise ValueError("URL is not an S3 URL")
+                
+        except Exception as e:
+            logger.error(f"Failed to extract S3 key from {video.cloudinary_url}: {e}")
+            raise HTTPException(status_code=400, detail="Invalid video URL format")
         
-        # Log the optimization for monitoring
-        logger.info(f"Serving video {video_id} directly from S3 (CloudFront optimization temporarily disabled)")
-        
-        # Handle range requests for smooth streaming
-        range_header = request.headers.get('range')
-        
-        # Temporarily disable CloudFront check
-        if False:  # optimized_response['cdn_enabled']:
-            # For CloudFront URLs, redirect with optimized headers
-            response = RedirectResponse(
-                url=optimized_url,
-                status_code=302  # Temporary redirect to preserve range requests
+        # Generate secure presigned URL for direct video access
+        # Long expiration (3 hours) for long videos but with security controls
+        try:
+            presigned_url = s3_client.generate_presigned_url(
+                'get_object',
+                Params={
+                    'Bucket': S3_BUCKET_NAME,
+                    'Key': s3_key,
+                    'ResponseContentType': 'video/mp4',
+                    'ResponseContentDisposition': 'inline; filename="video.mp4"'
+                },
+                ExpiresIn=10800,  # 3 hours for long videos
+                HttpMethod='GET'
             )
             
-            # Add security headers to prevent download managers
-            response.headers.update({
-                "Cache-Control": "no-cache, no-store, must-revalidate",
-                "X-Content-Type-Options": "nosniff",
-                "X-Frame-Options": "DENY",
-                "Referrer-Policy": "no-referrer",
-                "X-Download-Options": "noopen",
-                "X-Permitted-Cross-Domain-Policies": "none",
-                "Access-Control-Allow-Origin": request.headers.get("origin", "*"),
-                "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-                "Access-Control-Allow-Headers": "Range, Content-Type, Authorization"
-            })
+            logger.info(f"Generated secure video URL for {video_id} - expires in 3 hours")
             
-            return response
-        else:
-            # Fallback: Direct S3 streaming with security headers
-            return await stream_from_s3_with_security(
-                video.cloudinary_url, 
-                range_header, 
-                request
-            )
+        except Exception as e:
+            logger.error(f"Failed to generate video URL: {e}")
+            raise HTTPException(status_code=500, detail="Failed to access video")
+        
+        # Simple redirect to secure video URL with anti-download headers
+        response = RedirectResponse(url=presigned_url, status_code=302)
+        
+        # Security headers to prevent downloads while allowing normal video playback
+        response.headers.update({
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "X-Content-Type-Options": "nosniff",
+            "X-Frame-Options": "DENY",
+            "X-Download-Options": "noopen",
+            "Referrer-Policy": "no-referrer",
+            "Access-Control-Allow-Origin": request.headers.get("origin", "*"),
+            "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+            "Access-Control-Allow-Headers": "Range, Content-Type, Authorization",
+            "X-Video-Access": "authorized",
+            "X-Session-Duration": "10800"  # 3 hours
+        })
+        
+        return response
             
     except HTTPException:
         raise
