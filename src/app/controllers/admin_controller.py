@@ -334,8 +334,7 @@ def start_media_conversion_job(file_key: str, video_id: uuid.UUID):
                 "FilterEnable": "AUTO",
                 "PsiControl": "USE_PSI",
                 "FilterStrength": 0,
-                "DeinterlaceAlgorithm": "INTERPOLATE",
-                "TimecodeSource": "EMBEDDED",
+                "TimecodeSource": "ZEROBASED",
                 "FileInput": f"s3://{S3_BUCKET_NAME}/{file_key}"
             }
         ],
