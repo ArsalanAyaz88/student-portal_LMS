@@ -14,6 +14,7 @@ from sqlmodel import Session, select
 from typing import Optional
 import uuid
 import logging
+import os
 from urllib.parse import urlparse
 
 from ..db.session import get_db
@@ -22,7 +23,7 @@ from ..models.video import Video
 from ..models.enrollment import Enrollment
 from ..models.course import Course
 from ..utils.dependencies import get_current_user
-from ..utils.cloudfront_manager import get_optimized_video_response
+from ..config.s3_config import s3_client, S3_BUCKET_NAME
 from ..config.s3_config import s3_client, S3_BUCKET_NAME
 
 logger = logging.getLogger(__name__)
@@ -85,38 +86,63 @@ async def stream_video_optimized(
         if not course:
             raise HTTPException(status_code=404, detail="Course not found")
         
-        # Get optimized CloudFront URL for faster delivery
-        optimized_response = get_optimized_video_response(video.cloudinary_url)
-        optimized_url = optimized_response['url']
+        # Use the simple optimization function from course controller
+        def optimize_video_url_simple(s3_url: str) -> str:
+            """Convert S3 URL to CloudFront URL for instant streaming"""
+            try:
+                cloudfront_domain = os.getenv('CLOUDFRONT_DOMAIN', 'd1x3zj6gsrmrll.cloudfront.net')
+                bucket_name = os.getenv('S3_BUCKET_NAME', 'sabiry')
+                
+                if not cloudfront_domain:
+                    logger.warning("CloudFront domain not configured, using direct S3 URL")
+                    return s3_url
+                
+                # Extract object key from S3 URL
+                parsed_url = urlparse(s3_url)
+                if f'{bucket_name}.s3.amazonaws.com' in parsed_url.netloc:
+                    object_key = parsed_url.path.lstrip('/')
+                elif 's3.amazonaws.com' in parsed_url.netloc and f'/{bucket_name}/' in parsed_url.path:
+                    object_key = parsed_url.path.split(f'/{bucket_name}/', 1)[1]
+                else:
+                    logger.warning(f"Unrecognized S3 URL format: {s3_url}")
+                    return s3_url
+                
+                cloudfront_url = f"https://{cloudfront_domain}/{object_key}"
+                logger.info(f"🎥 Video streaming optimized: {s3_url} -> {cloudfront_url}")
+                return cloudfront_url
+                
+            except Exception as e:
+                logger.error(f"Error optimizing video URL: {str(e)}")
+                return s3_url
         
-        # Log the optimization status
-        if optimized_response['cdn_enabled']:
-            logger.info(f"Serving video {video_id} via CloudFront CDN for faster delivery")
-        else:
-            logger.info(f"Serving video {video_id} directly from S3 (CloudFront fallback)")
+        # Get optimized CloudFront URL for faster delivery
+        optimized_url = optimize_video_url_simple(video.cloudinary_url)
+        logger.info(f"Serving video {video_id} via streaming endpoint with CloudFront optimization")
         
         # Handle range requests for smooth streaming
         range_header = request.headers.get('range')
         
-        # Temporarily disable CloudFront check
-        if False:  # optimized_response['cdn_enabled']:
+        # Enable CloudFront redirect for better HTML5 video compatibility
+        if True:  # Always use CloudFront redirect for instant playback
             # For CloudFront URLs, redirect with optimized headers
             response = RedirectResponse(
                 url=optimized_url,
                 status_code=302  # Temporary redirect to preserve range requests
             )
             
-            # Add security headers to prevent download managers
+            # Add security and CORS headers for video streaming
             response.headers.update({
                 "Cache-Control": "no-cache, no-store, must-revalidate",
                 "X-Content-Type-Options": "nosniff",
-                "X-Frame-Options": "DENY",
+                "X-Frame-Options": "SAMEORIGIN",  # Allow same origin for video playback
                 "Referrer-Policy": "no-referrer",
                 "X-Download-Options": "noopen",
                 "X-Permitted-Cross-Domain-Policies": "none",
-                "Access-Control-Allow-Origin": request.headers.get("origin", "*"),
+                "Access-Control-Allow-Origin": "*",  # Allow all origins for video streaming
                 "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-                "Access-Control-Allow-Headers": "Range, Content-Type, Authorization"
+                "Access-Control-Allow-Headers": "Range, Content-Type, Authorization",
+                "Access-Control-Expose-Headers": "Content-Range, Accept-Ranges, Content-Length",
+                "Content-Type": "video/mp4"  # Ensure proper content type
             })
             
             return response

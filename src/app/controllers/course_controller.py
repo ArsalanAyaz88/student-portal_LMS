@@ -1,5 +1,5 @@
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Request
 from sqlmodel import Session, select, func
 from sqlalchemy.orm import selectinload
 from src.app.models.course import Course
@@ -494,17 +494,17 @@ def get_course_videos_with_checkpoint(
         # Create progress map using UUIDs
         progress_map = {str(p.video_id): p.completed for p in progresses}
 
-        # Build response with streaming URLs for instant playback
+        # Build response with authenticated proxy URLs for instant HTML5 streaming
         result = []
         for video in course.videos:
-            # Use streaming endpoint for instant playback instead of direct URLs
-            # For deployed projects, use complete URL with backend domain
+            # Use authenticated proxy endpoint that works with HTML5 video elements
+            # This endpoint will validate session and stream video directly
             backend_url = os.getenv('BACKEND_URL', 'https://student-portal-lms-seven.vercel.app')
-            streaming_url = f"{backend_url}/api/videos/{video.id}/stream"
+            proxy_url = f"{backend_url}/api/courses/{course_id}/videos/{video.id}/stream"
             
             result.append(VideoWithCheckpoint(
                 id=str(video.id),
-                cloudinary_url=streaming_url,  # Use streaming endpoint for instant playback
+                cloudinary_url=proxy_url,  # Authenticated proxy for instant HTML5 streaming
                 title=video.title,
                 description=video.description,
                 watched=progress_map.get(str(video.id), False)
@@ -515,6 +515,96 @@ def get_course_videos_with_checkpoint(
         raise HTTPException(
             status_code=500,
             detail=f"An error occurred while fetching course videos: {str(e)}"
+        )
+
+
+@router.get("/courses/{course_id}/videos/{video_id}/stream")
+async def stream_course_video_authenticated(
+    course_id: uuid.UUID,
+    video_id: uuid.UUID,
+    request: Request,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_db)
+):
+    """
+    Authenticated video streaming proxy for HTML5 video elements
+    
+    This endpoint:
+    1. Validates user authentication and enrollment
+    2. Calls the internal streaming controller with proper headers
+    3. Streams video content directly to HTML5 video elements
+    4. Enables instant playback without frontend authentication complexity
+    """
+    try:
+        # Validate enrollment (reuse logic from video checkpoint endpoint)
+        enrollment = session.exec(
+            select(Enrollment).where(
+                Enrollment.user_id == user.id,
+                Enrollment.course_id == course_id,
+                Enrollment.status == "approved"
+            )
+        ).first()
+
+        if not enrollment:
+            raise HTTPException(
+                status_code=403,
+                detail="You are not enrolled in this course."
+            )
+
+        # Check enrollment expiration
+        enrollment.update_expiration_status()
+        if not enrollment.is_accessible:
+            raise HTTPException(
+                status_code=403,
+                detail="Your access to this course has expired."
+            )
+
+        # Call the internal streaming controller with authentication
+        import httpx
+        
+        # Get the authorization header from the current request
+        auth_header = request.headers.get('authorization', '')
+        
+        # Make internal request to streaming controller with authentication
+        async with httpx.AsyncClient() as client:
+            backend_url = os.getenv('BACKEND_URL', 'https://student-portal-lms-seven.vercel.app')
+            streaming_url = f"{backend_url}/api/videos/{video_id}/stream"
+            
+            # Forward the request with authentication headers
+            headers = {
+                "Authorization": auth_header,
+                "User-Agent": "Internal-Proxy",
+            }
+            
+            # Forward range header for progressive streaming
+            if "range" in request.headers:
+                headers["Range"] = request.headers["range"]
+            
+            response = await client.get(streaming_url, headers=headers, follow_redirects=True)
+            
+            # Return the streaming response with proper headers for HTML5 video
+            from fastapi.responses import StreamingResponse
+            
+            return StreamingResponse(
+                iter([response.content]),
+                status_code=response.status_code,
+                headers={
+                    "Content-Type": "video/mp4",
+                    "Accept-Ranges": "bytes",
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+                    "Access-Control-Allow-Headers": "Range, Content-Type, Authorization",
+                }
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in video proxy streaming: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Error streaming video content"
         )
 
 
@@ -810,6 +900,12 @@ async def get_certificate(
         }
 
     except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error retrieving certificate: {str(e)}"
+        )    
         raise
     except Exception as e:
         raise HTTPException(
