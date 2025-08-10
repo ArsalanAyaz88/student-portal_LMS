@@ -500,7 +500,7 @@ def get_course_videos_with_checkpoint(
             # Use authenticated proxy endpoint that works with HTML5 video elements
             # This endpoint will validate session and stream video directly
             backend_url = os.getenv('BACKEND_URL', 'https://student-portal-lms-seven.vercel.app')
-            proxy_url = f"{backend_url}/api/courses/{course_id}/videos/{video.id}/stream"
+            proxy_url = f"{backend_url}/api/courses/courses/{course_id}/videos/{video.id}/stream"
             
             result.append(VideoWithCheckpoint(
                 id=str(video.id),
