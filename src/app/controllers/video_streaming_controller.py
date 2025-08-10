@@ -153,36 +153,38 @@ async def stream_video_optimized(
         # Handle range requests for smooth streaming
         range_header = request.headers.get('range')
         
-        # Enable CloudFront redirect for better HTML5 video compatibility
-        if True:  # Always use CloudFront redirect for instant playback
-            # For CloudFront URLs, redirect with optimized headers
-            response = RedirectResponse(
-                url=optimized_url,
-                status_code=302  # Temporary redirect to preserve range requests
-            )
+        # Stream video content directly with proper headers for HTML5 compatibility
+        import httpx
+        async with httpx.AsyncClient() as client:
+            # Get range header for progressive streaming
+            range_header = request.headers.get('range')
+            headers = {}
+            if range_header:
+                headers['Range'] = range_header
             
-            # Add security and CORS headers for video streaming
-            response.headers.update({
-                "Cache-Control": "no-cache, no-store, must-revalidate",
-                "X-Content-Type-Options": "nosniff",
-                "X-Frame-Options": "SAMEORIGIN",  # Allow same origin for video playback
-                "Referrer-Policy": "no-referrer",
-                "X-Download-Options": "noopen",
-                "X-Permitted-Cross-Domain-Policies": "none",
-                "Access-Control-Allow-Origin": "*",  # Allow all origins for video streaming
-                "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-                "Access-Control-Allow-Headers": "Range, Content-Type, Authorization",
-                "Access-Control-Expose-Headers": "Content-Range, Accept-Ranges, Content-Length",
-                "Content-Type": "video/mp4"  # Ensure proper content type
-            })
+            # Fetch video content from CloudFront
+            response = await client.get(optimized_url, headers=headers)
             
-            return response
-        else:
-            # Fallback: Direct S3 streaming with security headers
-            return await stream_from_s3_with_security(
-                video.cloudinary_url, 
-                range_header, 
-                request
+            # Return streaming response with proper video headers
+            from fastapi.responses import StreamingResponse
+            return StreamingResponse(
+                iter([response.content]),
+                status_code=response.status_code,
+                headers={
+                    "Content-Type": "video/mp4",
+                    "Accept-Ranges": "bytes",
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+                    "Access-Control-Allow-Headers": "Range, Content-Type, Authorization",
+                    "Access-Control-Expose-Headers": "Content-Range, Accept-Ranges, Content-Length",
+                    "X-Content-Type-Options": "nosniff",
+                    "X-Frame-Options": "SAMEORIGIN",
+                    "Referrer-Policy": "no-referrer",
+                    # Forward important headers from CloudFront response
+                    "Content-Length": response.headers.get("Content-Length", ""),
+                    "Content-Range": response.headers.get("Content-Range", ""),
+                }
             )
             
     except HTTPException:
