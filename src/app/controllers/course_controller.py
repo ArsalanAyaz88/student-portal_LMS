@@ -507,7 +507,7 @@ def get_course_videos_with_checkpoint(
             token = auth_header.replace('Bearer ', '') if auth_header.startswith('Bearer ') else ''
             
             # Create signed URL with embedded token for HTML5 video elements
-            signed_url = f"{backend_url}/api/courses/courses/{course_id}/videos/{video.id}/stream?token={token}"
+            signed_url = f"{backend_url}/api/courses/{course_id}/videos/{video.id}/stream?token={token}"
             
             result.append(VideoWithCheckpoint(
                 id=str(video.id),
@@ -525,7 +525,7 @@ def get_course_videos_with_checkpoint(
         )
 
 
-@router.get("/courses/{course_id}/videos/{video_id}/stream")
+@router.get("/{course_id}/videos/{video_id}/stream")
 async def stream_course_video_authenticated(
     course_id: uuid.UUID,
     video_id: uuid.UUID,
@@ -553,9 +553,17 @@ async def stream_course_video_authenticated(
                 raise HTTPException(status_code=401, detail="Authentication token required")
         
         # Validate token and get user
-        from ..utils.dependencies import verify_token
+        from ..utils.security import decode_access_token
         try:
-            user = verify_token(token, session)
+            payload = decode_access_token(token)
+            user_id = payload.get("user_id")
+            if not user_id:
+                raise HTTPException(status_code=401, detail="Invalid token payload")
+            
+            user = session.get(User, user_id)
+            if not user or not user.is_active:
+                raise HTTPException(status_code=401, detail="Invalid or inactive user")
+                
         except Exception as e:
             raise HTTPException(status_code=401, detail="Invalid or expired token")
         
@@ -590,7 +598,8 @@ async def stream_course_video_authenticated(
         
         # Make internal request to streaming controller with authentication
         async with httpx.AsyncClient() as client:
-            backend_url = os.getenv('BACKEND_URL', 'https://student-portal-lms-seven.vercel.app')
+            # Use localhost for development, production URL for deployment
+            backend_url = "https://student-portal-lms-seven.vercel.app"  # Local development
             streaming_url = f"{backend_url}/api/videos/{video_id}/stream?token={token}"
             
             # Forward the request with authentication headers as backup

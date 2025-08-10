@@ -57,9 +57,17 @@ async def stream_video_optimized(
                 raise HTTPException(status_code=401, detail="Authentication token required")
         
         # Validate token and get user
-        from ..utils.dependencies import verify_token
+        from ..utils.security import decode_access_token
         try:
-            user = verify_token(token, session)
+            payload = decode_access_token(token)
+            user_id = payload.get("user_id")
+            if not user_id:
+                raise HTTPException(status_code=401, detail="Invalid token payload")
+            
+            user = session.get(User, user_id)
+            if not user or not user.is_active:
+                raise HTTPException(status_code=401, detail="Invalid or inactive user")
+                
         except Exception as e:
             raise HTTPException(status_code=401, detail="Invalid or expired token")
         
@@ -132,7 +140,14 @@ async def stream_video_optimized(
                 return s3_url
         
         # Get optimized CloudFront URL for faster delivery
-        optimized_url = optimize_video_url_simple(video.cloudinary_url)
+        logger.info(f"Starting video optimization for {video_id}, original URL: {video.cloudinary_url}")
+        try:
+            optimized_url = optimize_video_url_simple(video.cloudinary_url)
+            logger.info(f"Video optimization successful: {optimized_url}")
+        except Exception as e:
+            logger.error(f"Video optimization failed: {str(e)}, using original URL")
+            optimized_url = video.cloudinary_url
+        
         logger.info(f"Serving video {video_id} via streaming endpoint with CloudFront optimization")
         
         # Handle range requests for smooth streaming
@@ -173,10 +188,10 @@ async def stream_video_optimized(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error streaming video {video_id}: {str(e)}")
+        logger.error(f"Error streaming video {video_id}: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail="An error occurred while streaming the video"
+            detail=f"An error occurred while streaming the video: {str(e)}"
         )
 
 async def stream_from_s3_with_security(s3_url: str, range_header: Optional[str], request: Request):
