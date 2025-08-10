@@ -23,7 +23,7 @@ from ..models.video import Video
 from ..models.enrollment import Enrollment
 from ..models.course import Course
 from ..utils.dependencies import get_current_user
-from ..utils.cloudfront_setup import generate_signed_cookies
+from ..utils.cloudfront_setup import generate_signed_cloudfront_url
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Video Streaming"])
@@ -66,7 +66,7 @@ async def stream_hls_video(
         manifest_url = f"https://{os.getenv('CLOUDFRONT_DOMAIN')}/hls/{video.public_id}/playlist.m3u8"
 
         # Generate and set signed cookies
-        cookies = generate_signed_cookies(resource_path)
+        cookies = generate_signed_cloudfront_url(resource_path)
         for key, value in cookies.items():
             response.set_cookie(
                 key=key,
