@@ -13,7 +13,7 @@ import json
 # Third-party Imports
 import boto3
 from botocore.exceptions import ClientError, NoCredentialsError
-from fastapi import APIRouter, Depends, HTTPException, Query, status, File, UploadFile, Form, Request, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, Query, status, File, UploadFile, Form, Request
 
 # Add MediaConvert client
 mediaconvert_client = boto3.client('mediaconvert', region_name='ap-southeast-2') # Replace with your region if different
@@ -275,7 +275,6 @@ class VideoCreateAdmin(BaseModel):
 
 @router.post("/courses/{course_id}/videos", response_model=VideoRead)
 async def upload_video_for_course(
-    background_tasks: BackgroundTasks,
     course_id: uuid.UUID,
     video_data: VideoCreateAdmin,
     db: Session = Depends(get_db),
@@ -306,7 +305,6 @@ async def upload_video_for_course(
 
         # Trigger the MediaConvert job
         start_media_conversion_job(file_key=new_video.public_id, video_id=new_video.id)
-        background_tasks.add_task(poll_for_conversion_and_update, video_id=new_video.id, db=db)
         
         logging.info(f"Successfully saved video metadata for {new_video.id} and started transcoding.")
         return new_video
@@ -1560,8 +1558,6 @@ def get_quiz_for_video(video_id: uuid.UUID, db: Session = Depends(get_db), admin
         logging.error(f"An unexpected error occurred while fetching quiz for video {video_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="An internal server error occurred.")
 
-
-
 @router.post("/admin/quizzes", response_model=QuizRead, status_code=status.HTTP_201_CREATED)
 def create_quiz(
     quiz_data: QuizCreate,
@@ -1594,10 +1590,6 @@ def create_quiz(
     db.commit()
     db.refresh(db_quiz)
     return db_quiz
-
-
-
-    return application
 
 
 @router.get("/debug-video-info", dependencies=[Depends(get_current_admin_user)])
@@ -1677,49 +1669,6 @@ def check_video_conversion_status(video_id: uuid.UUID, db: Session = Depends(get
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred.")
 
 import time
-
-def poll_for_conversion_and_update(video_id: uuid.UUID, db: Session):
-    # This function will run in the background.
-    # It will poll for up to 30 minutes (1800 seconds).
-    max_wait_time = 1800
-    poll_interval = 30  # seconds
-    start_time = time.time()
-
-    db_video = db.get(Video, video_id)
-    if not db_video or not db_video.public_id:
-        logging.error(f"[BackgroundTask] Video {video_id} not found or has no file key. Aborting poll.")
-        return
-
-    file_key = db_video.public_id
-    output_key_base = f"converted/{os.path.splitext(os.path.basename(file_key))[0]}"
-    hls_manifest_key = f"{output_key_base}.m3u8"
-    hls_manifest_s3_uri = f"s3://{S3_BUCKET_NAME}/{hls_manifest_key}"
-
-    logging.info(f"[BackgroundTask] Starting to poll for video {video_id} at {hls_manifest_key}")
-
-    while time.time() - start_time < max_wait_time:
-        try:
-            s3_client.head_object(Bucket=S3_BUCKET_NAME, Key=hls_manifest_key)
-            # File found, update the database
-            db_video.cloudinary_url = hls_manifest_s3_uri
-            db.commit()
-            logging.info(f"[BackgroundTask] Success! Found converted video for {video_id}. URL updated.")
-            return  # Exit the function
-
-        except s3_client.exceptions.ClientError as e:
-            if e.response['Error']['Code'] == '404':
-                # File not found yet, wait and poll again
-                logging.info(f"[BackgroundTask] Converted video for {video_id} not found yet. Waiting {poll_interval}s.")
-                time.sleep(poll_interval)
-            else:
-                logging.error(f"[BackgroundTask] AWS error checking for video {video_id}: {e}")
-                return # Stop polling on other errors
-        except Exception as e:
-            logging.error(f"[BackgroundTask] Unexpected error polling for video {video_id}: {e}")
-            return # Stop polling on unexpected errors
-
-    logging.warning(f"[BackgroundTask] Stopped polling for video {video_id} after {max_wait_time} seconds. Conversion may have failed or is taking too long.")
-
 
 def video_to_dict(video: Video):
     if not video:
