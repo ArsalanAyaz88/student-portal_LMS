@@ -128,8 +128,16 @@ async def stream_video_optimized(
             logger.error(f"Failed to generate video URL: {e}")
             raise HTTPException(status_code=500, detail="Failed to access video")
         
-        # Simple redirect to secure video URL with anti-download headers
-        response = RedirectResponse(url=presigned_url, status_code=302)
+        # Return the secure URL directly to avoid CORS issues with redirects
+        from fastapi.responses import JSONResponse
+        
+        response_data = {
+            "video_url": presigned_url,
+            "expires_in": 10800,  # 3 hours
+            "message": "Secure video URL generated successfully"
+        }
+        
+        response = JSONResponse(content=response_data)
         
         # Security headers to prevent downloads while allowing normal video playback
         response.headers.update({
