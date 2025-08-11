@@ -7,6 +7,8 @@ import uuid
 from datetime import datetime, timedelta
 from typing import List, Optional
 import traceback
+import subprocess
+import shutil
 from urllib.parse import urlparse
 from src.app.controllers.course_controller import optimize_video_url_simple
 

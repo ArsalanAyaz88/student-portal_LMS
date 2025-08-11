@@ -3,6 +3,7 @@ import os
 import logging
 from dotenv import load_dotenv
 from botocore.exceptions import NoCredentialsError, ClientError
+from botocore.client import Config
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -39,6 +40,7 @@ else:
             aws_access_key_id=AWS_ACCESS_KEY_ID,
             aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
             region_name=AWS_REGION,
+            config=Config(s3={'use_accelerate_endpoint': True})
         )
         
         # Test the connection
