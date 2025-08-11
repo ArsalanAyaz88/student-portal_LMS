@@ -225,9 +225,10 @@ async def generate_video_upload_signature(
             raise HTTPException(status_code=500, detail="S3 client is not configured")
 
         content_type = request_data.content_type
-        if not content_type.startswith('video/'):
+        allowed_content_types = ['video/', 'application/vnd.apple.mpegurl', 'application/x-mpegurl']
+        if not any(content_type.startswith(allowed) for allowed in allowed_content_types):
             logging.warning(f"Invalid content type received: {content_type}")
-            raise HTTPException(status_code=400, detail="Invalid content type. Only video files are allowed.")
+            raise HTTPException(status_code=400, detail=f"Invalid content type: {content_type}. Only video and m3u8 files are allowed.")
 
         # Generate a unique key for the video file
         timestamp = int(time.time())
