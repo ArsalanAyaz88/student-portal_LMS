@@ -39,7 +39,6 @@ from src.app.models.notification import Notification
 from src.app.models.quiz import Quiz, Question, Option
 from src.app.models.user import User
 from src.app.models.video import Video
-from src.app.controllers.course_controller import optimize_video_url_simple
 from src.app.models.video_progress import VideoProgress
 
 # Schemas
@@ -226,15 +225,13 @@ async def generate_video_upload_signature(
             raise HTTPException(status_code=500, detail="S3 client is not configured")
 
         content_type = request_data.content_type
-        allowed_content_types = ['video/', 'application/vnd.apple.mpegurl', 'application/x-mpegurl']
-        if not any(content_type.startswith(allowed) for allowed in allowed_content_types):
+        if not content_type.startswith('video/'):
             logging.warning(f"Invalid content type received: {content_type}")
-            raise HTTPException(status_code=400, detail=f"Invalid content type: {content_type}. Only video and m3u8 files are allowed.")
+            raise HTTPException(status_code=400, detail="Invalid content type. Only video files are allowed.")
 
-        # Generate a unique key for the video file, preserving the extension
-        file_extension = os.path.splitext(request_data.file_name)[1]
+        # Generate a unique key for the video file
         timestamp = int(time.time())
-        file_key = f"videos/{timestamp}_{uuid.uuid4().hex}{file_extension}"
+        file_key = f"videos/{timestamp}_{uuid.uuid4().hex}"
         logging.info(f"Generated S3 file key: {file_key}")
 
         # Generate pre-signed URL for PUT operation (upload)
@@ -515,18 +512,43 @@ def get_video_view_url(
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin_user)
 ):
-    """Provides a CloudFront URL to view a video for admins."""
-    video = db.query(Video).filter(Video.id == video_id).first()
+    """
+    Generate a pre-signed URL for viewing a private video from S3.
+    """
+    logging.info(f"Request to generate view URL for video_id: {video_id}")
+    
+    video = db.get(Video, video_id)
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")
 
-    if not video.cloudinary_url:
-        raise HTTPException(status_code=404, detail="Video source URL not found")
+    if not video.public_id: # public_id should store the S3 key
+        logging.error(f"Video {video_id} does not have a file key (public_id) associated with it.")
+        raise HTTPException(status_code=500, detail="Video file key not found.")
 
-    # Optimize the S3 URL to a CloudFront URL
-    optimized_url = optimize_video_url_simple(video.cloudinary_url)
-    
-    return {"view_url": optimized_url}
+    try:
+        if s3_client is None:
+            logging.error("S3 client is not configured.")
+            raise HTTPException(status_code=500, detail="S3 client is not configured")
+
+        presigned_url = s3_client.generate_presigned_url(
+            'get_object',
+            Params={
+                'Bucket': S3_BUCKET_NAME,
+                'Key': video.public_id 
+            },
+            ExpiresIn=3600  # URL expires in 1 hour
+        )
+        
+        logging.info(f"Successfully generated view URL for video {video_id}")
+        return {"view_url": presigned_url}
+
+    except Exception as e:
+        tb_str = traceback.format_exc()
+        logging.error(f"Error generating video view URL for {video.public_id}: {e}\nTraceback:\n{tb_str}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not generate video view URL."
+        )
 
 
 
