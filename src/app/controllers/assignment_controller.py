@@ -5,6 +5,7 @@ from sqlalchemy.orm import selectinload
 from uuid import UUID
 from fastapi import HTTPException, status
 from datetime import datetime
+import os
 
 from ..models.assignment import Assignment, AssignmentSubmission
 from ..models.enrollment import Enrollment
@@ -127,10 +128,19 @@ def submit_assignment(
     student_id: UUID,
     payload: SubmissionCreate
 ):
-    # 1️⃣ check enrollment
+    # 1️⃣ Validate file type
+    allowed_extensions = {'.pdf', '.doc', '.docx', '.txt'}
+    file_ext = os.path.splitext(payload.content_url)[1].lower()
+    if file_ext not in allowed_extensions:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid file type. Only {', '.join(allowed_extensions)} files are accepted."
+        )
+
+    # 2️⃣ check enrollment
     _ensure_enrollment(db, course_id, student_id)
 
-    # 2️⃣ load assignment & enforce deadline
+    # 3️⃣ load assignment & enforce deadline
     assignment = db.get(Assignment, assignment_id)
     if not assignment or assignment.course_id != course_id:
         raise HTTPException(
@@ -140,7 +150,7 @@ def submit_assignment(
 
 
 
-    # 3️⃣ prevent double submit
+    # 4️⃣ prevent double submit
     existing = db.exec(
         select(AssignmentSubmission)
         .where(
@@ -154,7 +164,7 @@ def submit_assignment(
             detail="📌 You have already submitted this assignment."
         )
 
-    # 4️⃣ create & return
+    # 5️⃣ create & return
     sub = AssignmentSubmission(
         assignment_id=assignment_id,
         student_id=student_id,

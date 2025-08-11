@@ -102,7 +102,7 @@ def send_application_approved_email(to_email: str, course_title: str):
         course_title (str): Title of the course
     """
     try:
-        subject = f"✅ Your Application for {course_title} is Approved!"
+        subject = f"✅ Your Enrollement Application for {course_title} is Approved!"
         body = f"""
         <html>
         <body style='font-family: Arial, sans-serif; color: #333;'>
@@ -113,10 +113,15 @@ def send_application_approved_email(to_email: str, course_title: str):
                 <h2 style='color: #2c3e50; text-align: center;'>Congratulations! You are Eligible to Enroll</h2>
                 <p style='font-size: 16px; text-align: center; color: #555;'>Hello,</p>
                 <p style='font-size: 16px; color: #555;'>We are pleased to inform you that your application for the course <strong>{course_title}</strong> has been <span style='color: green; font-weight: bold;'>approved</span>.</p>
-                <p style='font-size: 16px; color: #555;'>You are now eligible to enroll. To complete your enrollment, please log in to your account and proceed with the payment.</p>
+                <p style='font-size: 16px; color: #555;'>To finalize your enrollment, please follow these steps:</p>
+                <ol style='font-size: 16px; color: #555; text-align: left; max-width: 80%; margin: 20px auto;'>
+                    <li>Log in to your student portal.</li>
+                    <li>Navigate to the <strong>{course_title}</strong> courses page and select the course.</li>
+                    <li>Submit your payment to gain full access.</li>
+                </ol>
 
                 <div style='text-align: center; margin: 30px 0;'>
-                    <a href="https://lmsfrontend-neon.vercel.app/login" style='background-color: #007bff; color: #ffffff; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 16px;'>Login and Pay Now</a>
+                    <a href="https://suti.vercel.app/login" style='background-color: #007bff; color: #ffffff; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 16px;'>Login and Pay Now</a>
                 </div>
 
                 <p style='font-size: 16px; color: #555; text-align: center;'>We look forward to welcoming you to the course!</p>
