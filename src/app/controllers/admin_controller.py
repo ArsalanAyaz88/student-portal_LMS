@@ -8,15 +8,14 @@ from datetime import datetime, timedelta
 from typing import List, Optional
 import traceback
 from urllib.parse import urlparse
-import json
 
 # Third-party Imports
 import boto3
 from botocore.exceptions import ClientError, NoCredentialsError
-from fastapi import APIRouter, Depends, HTTPException, Query, status, File, UploadFile, Form, Request, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status, UploadFile, File, Form
 
 # Add MediaConvert client
-mediaconvert_client = boto3.client('mediaconvert', region_name='ap-southeast-2') # Replace with your region if different
+mediaconvert_client = boto3.client('mediaconvert', region_name='us-east-1') # Replace with your region if different
 from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import selectinload
@@ -41,9 +40,6 @@ from src.app.models.quiz import Quiz, Question, Option
 from src.app.models.user import User
 from src.app.models.video import Video
 from src.app.models.video_progress import VideoProgress
-
-# Add MediaConvert client
-mediaconvert_client = boto3.client('mediaconvert', region_name=os.getenv('AWS_REGION')) # Replace with your region if different
 
 # Schemas
 from src.app.schemas.assignment import (
@@ -84,6 +80,7 @@ def create_upload_signature(folder: str = Form("videos")):
             Params={
                 'Bucket': S3_BUCKET_NAME,
                 'Key': file_key,
+                'ContentType': request_data.content_type,
                 'ACL': 'public-read'
             },
             ExpiresIn=3600  # 1 hour
@@ -274,26 +271,28 @@ class VideoCreateAdmin(BaseModel):
 
 @router.post("/courses/{course_id}/videos", response_model=VideoRead)
 async def upload_video_for_course(
-    background_tasks: BackgroundTasks,
     course_id: uuid.UUID,
     video_data: VideoCreateAdmin,
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin_user)
 ):
     """
-    Save video metadata for a specific course and trigger the transcoding job.
+    Save video metadata for a specific course after the video has been uploaded to S3.
     """
     logging.info(f"Received request to create video for course {course_id}")
+    logging.debug(f"Video creation payload: {video_data.model_dump_json()}")
+
     course = db.get(Course, course_id)
     if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
+        logging.warning(f"Course with ID {course_id} not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
 
     try:
         new_video = Video(
             title=video_data.title,
             description=video_data.description,
-            cloudinary_url=video_data.video_url, # Store original S3 URL temporarily
-            public_id=video_data.file_key, # Using public_id to store the S3 file key
+            cloudinary_url=video_data.video_url, # Use S3 URL for this field
+            public_id=video_data.file_key,      # Store S3 file key
             duration=video_data.duration,
             course_id=course_id,
             is_preview=video_data.is_preview,
@@ -302,101 +301,45 @@ async def upload_video_for_course(
         db.add(new_video)
         db.commit()
         db.refresh(new_video)
-
-        # Trigger the MediaConvert job in the background
-        background_tasks.add_task(start_media_conversion_job, file_key=new_video.public_id, video_id=new_video.id)
-        
-        logging.info(f"Successfully saved video metadata for {new_video.id} and started transcoding.")
+        logging.info(f"Successfully created video with ID {new_video.id} for course {course_id}")
         return new_video
 
     except Exception as e:
         db.rollback()
-        logging.error(f"Failed to process video upload for course {course_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to process video upload.")
+        logging.error(f"Error creating video for course {course_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected error occurred while creating the video: {str(e)}"
+        )
 
 
-def start_media_conversion_job(file_key: str, video_id: uuid.UUID):
-    media_convert_role = os.getenv("MEDIA_CONVERT_ROLE_ARN")
-    media_convert_queue = os.getenv("MEDIA_CONVERT_QUEUE_ARN")
-
-    if not all([media_convert_role, S3_BUCKET_NAME]):
-        logging.error("Missing required AWS MediaConvert environment variables: MEDIA_CONVERT_ROLE_ARN or S3_BUCKET_NAME")
-        return
-
-    output_key_base = f"converted/{os.path.splitext(os.path.basename(file_key))[0]}"
-    
-    settings = {
-        "Inputs": [
-            {
-                "AudioSelectors": {"Audio Selector 1": {"Offset": 0, "DefaultSelection": "DEFAULT", "ProgramSelection": 1}},
-                "VideoSelector": {"ColorSpace": "FOLLOW"},
-                "FilterEnable": "AUTO",
-                "PsiControl": "USE_PSI",
-                "FilterStrength": 0,
-                "TimecodeSource": "ZEROBASED",
-                "FileInput": f"s3://{S3_BUCKET_NAME}/{file_key}"
-            }
-        ],
-        "OutputGroups": [
-            {
-                "Name": "Apple HLS",
-                "Outputs": [
-                    {"Preset": "System-Avc_16x9_1080p_29_97fps_8500kbps", "NameModifier": "_1080p"},
-                    {"Preset": "System-Avc_16x9_720p_29_97fps_5000kbps", "NameModifier": "_720p"},
-                    {"Preset": "System-Avc_16x9_480p_29_97fps_2500kbps", "NameModifier": "_480p"}
-                ],
-                "OutputGroupSettings": {
-                    "Type": "HLS_GROUP_SETTINGS",
-                    "HlsGroupSettings": {
-                        "ManifestDurationFormat": "INTEGER",
-                        "SegmentLength": 10,
-                        "TimedMetadataId3Period": 10,
-                        "CaptionLanguageSetting": "OMIT",
-                        "Destination": f"s3://{S3_BUCKET_NAME}/{output_key_base}/hls/",
-                        "TimedMetadataId3Frame": "PRIV",
-                        "CodecSpecification": "RFC_4281",
-                        "OutputSelection": "MANIFESTS_AND_SEGMENTS",
-                        "ProgramDateTimePeriod": 600,
-                        "MinSegmentLength": 0,
-                        "DirectoryStructure": "SINGLE_DIRECTORY",
-                        "ProgramDateTime": "EXCLUDE",
-                        "SegmentControl": "SEGMENTED_FILES",
-                        "ManifestCompression": "NONE",
-                        "ClientCache": "ENABLED",
-                        "StreamInfResolution": "INCLUDE"
-                    }
-                }
-            }
-        ]
-    }
-
-    try:
-        job_params = {
-            'Role': media_convert_role,
-            'Settings': settings,
-            'UserMetadata': {'video_id': str(video_id)}
-        }
-        if media_convert_queue:
-            job_params['Queue'] = media_convert_queue
-
-        response = mediaconvert_client.create_job(**job_params)
-        job_id = response['Job']['Id']
-        logging.info(f"Started MediaConvert job with ID: {job_id} for video: {video_id}")
-    except Exception as e:
-        logging.error(f"Error creating MediaConvert job for {file_key}: {e}", exc_info=True)
 
 
-@router.post("/videos", response_model=VideoRead, status_code=status.HTTP_201_CREATED)
+
+@router.post("/videos", response_model=VideoAdminRead, status_code=status.HTTP_201_CREATED)
 def create_video(video: VideoCreate, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
     logging.info(f"Received request to create video for course {video.course_id}")
     logging.debug(f"Video creation payload: {video.model_dump_json()}")
-    course = db.get(Course, video.course_id)
-    if not course:
-        logging.warning(f"Course with ID {video.course_id} not found for video creation.")
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
-
     try:
-        db_video = Video.from_orm(video)
+        # Check if the course exists
+        course = db.get(Course, video.course_id)
+        if not course:
+            logging.warning(f"Course with ID {video.course_id} not found.")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+
+        # Get the highest order for the current course and add 1
+        max_order = db.exec(select(func.max(Video.order)).where(Video.course_id == video.course_id)).one_or_none()
+        new_order = (max_order or 0) + 1
+
+        video_data = video.model_dump()
+        video_data['order'] = new_order
+        db_video = Video(
+            title=video.title,
+            description=video.description,
+            cloudinary_url=video.cloudinary_url, # Use the correct field name
+            course_id=video.course_id,
+            order=new_order
+        )
         db.add(db_video)
         db.commit()
         db.refresh(db_video)
@@ -405,10 +348,8 @@ def create_video(video: VideoCreate, db: Session = Depends(get_db), admin: User 
     except Exception as e:
         logging.error(f"Error creating video for course {video.course_id}: {e}", exc_info=True)
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An error occurred while creating the video."
-        )
+        raise HTTPException(status_code=500, detail="An unexpected error occurred while creating the video.")
+
 
 @router.get("/videos", response_model=List[VideoAdminRead])
 def get_admin_videos_for_course(
@@ -1558,6 +1499,8 @@ def get_quiz_for_video(video_id: uuid.UUID, db: Session = Depends(get_db), admin
         logging.error(f"An unexpected error occurred while fetching quiz for video {video_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="An internal server error occurred.")
 
+
+
 @router.post("/admin/quizzes", response_model=QuizRead, status_code=status.HTTP_201_CREATED)
 def create_quiz(
     quiz_data: QuizCreate,
@@ -1590,6 +1533,10 @@ def create_quiz(
     db.commit()
     db.refresh(db_quiz)
     return db_quiz
+
+
+
+    return application
 
 
 @router.get("/debug-video-info", dependencies=[Depends(get_current_admin_user)])
@@ -1628,47 +1575,6 @@ def debug_video_info(db: Session = Depends(get_db)):
     except Exception as e:
         logging.error(f"--- DEBUG: Error fetching debug video info: {e} ---", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
-
-@router.post("/videos/{video_id}/check-conversion", status_code=status.HTTP_200_OK)
-def check_video_conversion_status(video_id: uuid.UUID, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
-    db_video = db.get(Video, video_id)
-    if not db_video:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found")
-
-    if not db_video.public_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Video does not have a file key, cannot check status.")
-
-    # Construct the expected S3 key for the HLS manifest
-    file_key = db_video.public_id
-    output_key_base = f"converted/{os.path.splitext(os.path.basename(file_key))[0]}"
-    hls_manifest_key = f"{output_key_base}.m3u8"
-
-    try:
-        s3_client.head_object(Bucket=S3_BUCKET_NAME, Key=hls_manifest_key)
-        # If head_object succeeds, the file exists.
-        hls_manifest_s3_uri = f"s3://{S3_BUCKET_NAME}/{hls_manifest_key}"
-
-        if db_video.cloudinary_url != hls_manifest_s3_uri:
-            db_video.cloudinary_url = hls_manifest_s3_uri
-            db.commit()
-            db.refresh(db_video)
-            return {"status": "COMPLETE", "message": "Video conversion is complete and URL has been updated.", "video": video_to_dict(db_video)}
-        else:
-            return {"status": "COMPLETE", "message": "Video conversion is complete. URL is already up-to-date.", "video": video_to_dict(db_video)}
-
-    except s3_client.exceptions.ClientError as e:
-        if e.response['Error']['Code'] == '404':
-            # The file was not found, so it's still processing or failed.
-            return {"status": "PROCESSING", "message": "Video is still processing or the conversion has failed."}
-        else:
-            # Another S3-related error occurred
-            logging.error(f"Error checking S3 object for video {video_id}: {e}", exc_info=True)
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error checking video status.")
-    except Exception as e:
-        logging.error(f"An unexpected error occurred while checking video conversion status for {video_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred.")
-
-import time
 
 def video_to_dict(video: Video):
     if not video:
