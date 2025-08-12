@@ -237,42 +237,16 @@ async def generate_video_upload_signature(
         file_key = f"videos/{timestamp}_{uuid.uuid4().hex}"
         logging.info(f"Generated S3 file key: {file_key}")
 
-        # Generate pre-signed URL for PUT operation (upload) with Transfer Acceleration
-        # Note: Transfer Acceleration must be enabled on the S3 bucket first
-        try:
-            # Try to generate URL with Transfer Acceleration
-            presigned_url = s3_client.generate_presigned_url(
-                'put_object',
-                Params={
-                    'Bucket': S3_BUCKET_NAME,
-                    'Key': file_key,
-                    'ContentType': content_type,
-                    # Add cache control for better performance
-                    'CacheControl': 'max-age=31536000',  # 1 year cache
-                },
-                ExpiresIn=7200  # URL expires in 2 hours
-            )
-            
-            # Replace standard S3 endpoint with Transfer Acceleration endpoint
-            if '.s3.' in presigned_url:
-                presigned_url = presigned_url.replace(
-                    f'{S3_BUCKET_NAME}.s3.',
-                    f'{S3_BUCKET_NAME}.s3-accelerate.'
-                )
-                logging.info("Using S3 Transfer Acceleration endpoint")
-            
-        except Exception as e:
-            logging.warning(f"Transfer Acceleration not available, using standard endpoint: {e}")
-            # Fallback to standard presigned URL
-            presigned_url = s3_client.generate_presigned_url(
-                'put_object',
-                Params={
-                    'Bucket': S3_BUCKET_NAME,
-                    'Key': file_key,
-                    'ContentType': content_type
-                },
-                ExpiresIn=7200
-            )
+        # Generate pre-signed URL for PUT operation (upload)
+        presigned_url = s3_client.generate_presigned_url(
+            'put_object',
+            Params={
+                'Bucket': S3_BUCKET_NAME,
+                'Key': file_key,
+                'ContentType': content_type
+            },
+            ExpiresIn=7200  # URL expires in 2 hours
+        )
         
         logging.info(f"Successfully generated pre-signed URL for {file_key}")
         return {
