@@ -121,7 +121,7 @@ def send_application_approved_email(to_email: str, course_title: str):
                 </ol>
 
                 <div style='text-align: center; margin: 30px 0;'>
-                    <a href="https://suti.vercel.app/login" style='background-color: #007bff; color: #ffffff; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 16px;'>Login and Pay Now</a>
+                    <a href="https://www.sabiryultrasound.com/login" style='background-color: #007bff; color: #ffffff; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 16px;'>Login and Pay Now</a>
                 </div>
 
                 <p style='font-size: 16px; color: #555; text-align: center;'>We look forward to welcoming you to the course!</p>
