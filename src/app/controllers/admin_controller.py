@@ -801,6 +801,13 @@ def delete_course(
             for quiz in quizzes:
                 db.delete(quiz)
         
+        # Delete related enrollment applications
+        enrollment_applications = db.exec(select(EnrollmentApplication).where(EnrollmentApplication.course_id == course.id)).all()
+        if enrollment_applications:
+            logger.info(f"Deleting {len(enrollment_applications)} associated enrollment applications.")
+            for app in enrollment_applications:
+                db.delete(app)
+
         # Commit deletions of related entities before deleting the course itself
         db.commit()
 
