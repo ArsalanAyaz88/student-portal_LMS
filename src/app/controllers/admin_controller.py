@@ -34,9 +34,7 @@ from src.app.config.s3_config import s3_client, S3_BUCKET_NAME
 
 # Models
 from src.app.models.assignment import Assignment, AssignmentSubmission
-from src.app.models.certificate import Certificate
 from src.app.models.course import Course
-from src.app.models.course_feedback import CourseFeedback
 from src.app.models.course_progress import CourseProgress
 from src.app.models.enrollment import Enrollment
 from src.app.models.enrollment_application import EnrollmentApplication, ApplicationStatus
@@ -782,20 +780,6 @@ def delete_course(
         # 3. Manually delete related entities to avoid constraint violations.
         # This is more explicit and safer than relying solely on cascades.
 
-        # Delete related enrollment applications
-        enrollment_applications = db.exec(select(EnrollmentApplication).where(EnrollmentApplication.course_id == course.id)).all()
-        if enrollment_applications:
-            logger.info(f"Deleting {len(enrollment_applications)} associated enrollment applications.")
-            for application in enrollment_applications:
-                db.delete(application)
-
-        # Delete related course progress records
-        course_progress_records = db.exec(select(CourseProgress).where(CourseProgress.course_id == course.id)).all()
-        if course_progress_records:
-            logger.info(f"Deleting {len(course_progress_records)} associated course progress records.")
-            for progress in course_progress_records:
-                db.delete(progress)
-
         # Delete related enrollments
         enrollments = db.exec(select(Enrollment).where(Enrollment.course_id == course.id)).all()
         if enrollments:
@@ -809,34 +793,6 @@ def delete_course(
             logger.info(f"Deleting {len(videos)} associated videos.")
             for video in videos:
                 db.delete(video)
-
-        # Delete related assignments
-        assignments = db.exec(select(Assignment).where(Assignment.course_id == course.id)).all()
-        if assignments:
-            logger.info(f"Deleting {len(assignments)} associated assignments.")
-            for assignment in assignments:
-                db.delete(assignment)
-
-        # Delete related notifications
-        notifications = db.exec(select(Notification).where(Notification.course_id == course.id)).all()
-        if notifications:
-            logger.info(f"Deleting {len(notifications)} associated notifications.")
-            for notification in notifications:
-                db.delete(notification)
-
-        # Delete related course feedback
-        course_feedback = db.exec(select(CourseFeedback).where(CourseFeedback.course_id == course.id)).all()
-        if course_feedback:
-            logger.info(f"Deleting {len(course_feedback)} associated course feedback records.")
-            for feedback in course_feedback:
-                db.delete(feedback)
-
-        # Delete related certificates
-        certificates = db.exec(select(Certificate).where(Certificate.course_id == course.id)).all()
-        if certificates:
-            logger.info(f"Deleting {len(certificates)} associated certificates.")
-            for certificate in certificates:
-                db.delete(certificate)
 
         # Delete related quizzes
         quizzes = db.exec(select(Quiz).where(Quiz.course_id == course.id)).all()
