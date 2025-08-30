@@ -43,6 +43,8 @@ from src.app.models.quiz import Quiz, Question, Option
 from src.app.models.user import User
 from src.app.models.video import Video
 from src.app.models.video_progress import VideoProgress
+from src.app.models.quiz import QuizSubmission, Answer
+from src.app.models.profile import Profile
 
 # Schemas
 from src.app.schemas.assignment import (
@@ -108,6 +110,111 @@ def list_students(session: Session = Depends(get_db), admin: User = Depends(get_
     query = select(User).where(User.role == "student")
     return session.exec(query).all()
 
+
+@router.delete("/users/{user_id}", status_code=status.HTTP_200_OK)
+def delete_user(
+    user_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    """
+    Delete a user and all their associated data from the database.
+    This includes enrollments, enrollment applications, course progress,
+    video progress, quizzes, assignments, and notifications.
+    """
+    logging.info(f"--- Admin User Deletion: START for user_id: {user_id} ---")
+
+    try:
+        # 1. Fetch the user
+        user = db.get(User, user_id)
+        if not user:
+            logging.warning(f"User with ID {user_id} not found for deletion.")
+            raise HTTPException(status_code=404, detail="User not found")
+        logging.info(f"Found user '{user.email}' for deletion.")
+
+        # 2. Delete related entities
+        # Delete related enrollments
+        enrollments = db.exec(select(Enrollment).where(Enrollment.user_id == user_id)).all()
+        if enrollments:
+            logging.info(f"Deleting {len(enrollments)} associated enrollments.")
+            for enrollment in enrollments:
+                db.delete(enrollment)
+
+        # Delete related enrollment applications
+        enrollment_applications = db.exec(select(EnrollmentApplication).where(EnrollmentApplication.user_id == user_id)).all()
+        if enrollment_applications:
+            logging.info(f"Deleting {len(enrollment_applications)} associated enrollment applications.")
+            for app in enrollment_applications:
+                db.delete(app)
+
+        # Delete related course progress
+        course_progresses = db.exec(select(CourseProgress).where(CourseProgress.user_id == user_id)).all()
+        if course_progresses:
+            logging.info(f"Deleting {len(course_progresses)} associated course progresses.")
+            for cp in course_progresses:
+                db.delete(cp)
+
+        # Delete related video progress
+        video_progresses = db.exec(select(VideoProgress).where(VideoProgress.user_id == user_id)).all()
+        if video_progresses:
+            logging.info(f"Deleting {len(video_progresses)} associated video progresses.")
+            for vp in video_progresses:
+                db.delete(vp)
+
+        # Delete related assignment submissions
+        assignment_submissions = db.exec(select(AssignmentSubmission).where(AssignmentSubmission.student_id == user_id)).all()
+        if assignment_submissions:
+            logging.info(f"Deleting {len(assignment_submissions)} associated assignment submissions.")
+            for sub in assignment_submissions:
+                db.delete(sub)
+        
+        # Delete related quiz submissions and their answers
+        quiz_submissions = db.exec(select(QuizSubmission).where(QuizSubmission.student_id == user_id)).all()
+        if quiz_submissions:
+            logging.info(f"Deleting {len(quiz_submissions)} associated quiz submissions and their answers.")
+            for qs in quiz_submissions:
+                # Delete associated answers first
+                answers = db.exec(select(Answer).where(Answer.submission_id == qs.id)).all()
+                for ans in answers:
+                    db.delete(ans)
+                db.delete(qs)
+
+        # Delete related notifications
+        notifications = db.exec(select(Notification).where(Notification.user_id == user_id)).all()
+        if notifications:
+            logging.info(f"Deleting {len(notifications)} associated notifications.")
+            for notif in notifications:
+                db.delete(notif)
+        
+        # Delete user's profile
+        profile = db.exec(select(Profile).where(Profile.user_id == user_id)).first()
+        if profile:
+            logging.info(f"Deleting profile for user {user_id}.")
+            db.delete(profile)
+
+        # Commit all deletions of related entities
+        db.commit()
+        logging.info(f"Successfully deleted all related data for user {user_id}.")
+
+        # 3. Delete the user itself
+        logging.info(f"Proceeding to delete the user object: {user.email}.")
+        db.delete(user)
+        db.commit()
+        logging.info(f"Successfully deleted user {user_id}.")
+
+        return {"detail": "User and all associated data deleted successfully"}
+
+    except HTTPException as http_exc:
+        logging.error(f"HTTP Exception in delete_user: {http_exc.detail}")
+        db.rollback()
+        raise http_exc
+    except Exception as e:
+        logging.error(f"Unexpected error during user deletion: {e}", exc_info=True)
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected internal server error occurred: {str(e)}"
+        )
 
 
 @router.post("/upload/image", response_model=dict)
