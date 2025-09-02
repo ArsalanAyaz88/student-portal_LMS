@@ -11,7 +11,7 @@ from src.app.models.course import Course
 from src.app.schemas.video import VideoCreate, VideoRead, VideoUpdate, VideoAdminRead
 from src.app.utils.dependencies import get_current_user, get_current_admin_user
 
-router = APIRouter()
+router = APIRouter() 
 
 @router.post("/courses/{course_id}/videos", response_model=VideoRead, status_code=status.HTTP_201_CREATED)
 def create_video(video: VideoCreate, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):

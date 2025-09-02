@@ -747,6 +747,8 @@ def update_enrollment_application_status(
         # Send approval email
         if user and course:
             try:
+                # Initialize logger within the function scope if not globally available
+                logger = logging.getLogger(__name__)
                 send_application_approved_email(
                     to_email=user.email,
                     course_title=course.title
