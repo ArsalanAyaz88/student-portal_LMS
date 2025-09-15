@@ -45,6 +45,7 @@ from src.app.models.video import Video
 from src.app.models.video_progress import VideoProgress
 from src.app.models.quiz import QuizSubmission, Answer
 from src.app.models.profile import Profile
+from src.app.models.password_reset import PasswordReset
 
 # Schemas
 from src.app.schemas.assignment import (
@@ -191,6 +192,13 @@ def delete_user(
         if profile:
             logging.info(f"Deleting profile for user {user_id}.")
             db.delete(profile)
+
+        # Delete related password reset tokens
+        password_resets = db.exec(select(PasswordReset).where(PasswordReset.user_id == user_id)).all()
+        if password_resets:
+            logging.info(f"Deleting {len(password_resets)} associated password reset tokens.")
+            for pr in password_resets:
+                db.delete(pr)
 
         # Commit all deletions of related entities
         db.commit()

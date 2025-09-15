@@ -19,6 +19,10 @@ SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
 SMTP_USER = os.getenv("SMTP_USER")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 
+# Temporary debug prints - REMOVE AFTER DEBUGGING
+print(f"DEBUG: SMTP_USER loaded: {SMTP_USER}")
+print(f"DEBUG: SMTP_PASSWORD loaded: {'*' * len(SMTP_PASSWORD) if SMTP_PASSWORD else None}")
+
 
 
 
